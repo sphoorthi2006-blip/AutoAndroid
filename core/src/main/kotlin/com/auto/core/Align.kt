@@ -25,7 +25,7 @@ object Align {
     private val NUM_WORDS = mapOf("one" to "1", "two" to "2", "three" to "3", "four" to "4", "five" to "5", "six" to "6", "seven" to "7", "eight" to "8",
         "nine" to "9", "ten" to "10", "eleven" to "11", "twelve" to "12", "first" to "1", "second" to "2", "third" to "3", "fourth" to "4",
         "fifth" to "5", "sixth" to "6", "seventh" to "7", "eighth" to "8", "ninth" to "9", "tenth" to "10")
-    private fun tn(t: String) = NUM_WORDS[t] ?: t
+    fun tn(t: String) = NUM_WORDS[t] ?: t
     private fun wordScore(tok: String, s: Set<String>) = if (tok in s) (if (tok in STOP) 0.4 else 1.0) else (if (tok in STOP) -0.1 else -0.4)
 
     /** Assign every spoken word to a scene, in order, to best match each scene's text. Returns the start word index of each scene. */

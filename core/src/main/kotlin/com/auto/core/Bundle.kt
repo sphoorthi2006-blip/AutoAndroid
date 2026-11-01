@@ -17,7 +17,25 @@ object Bundle {
     val AUDIO_EXT = setOf(".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".aif", ".aiff")
     private val TEXT_EXT = setOf(".txt", ".md", ".text")
     private val IMAGE_BLOCK = Regex("^\\W*image\\s*#?\\s*\\d+\\b", RegexOption.IGNORE_CASE)
-    private val ANY_BLOCK = Regex("^\\W*(?:image|scene|shot|frame)\\s*#?\\s*\\d+\\b", RegexOption.IGNORE_CASE)
+    private val ANY_BLOCK = Regex("^\\W*(?:image|scene|shot|frame|prompt)\\s*#?\\s*\\d+\\b", RegexOption.IGNORE_CASE)
+    private val FIELD = Regex("^\\s*[A-Za-z][A-Za-z ]{1,28}:\\s*\\S")
+    private val BLOCK_FIELDS = Regex("script line|narration|\\bline\\b|description|subject|prompt", RegexOption.IGNORE_CASE)
+
+    /** How many lines open a real scene block ('Image 3', 'Scene 3', 'Prompt 3 - Script line: ...'): its own line or the lines under it carry labelled fields. */
+    fun detailsBlocks(lines: List<String>): Int {
+        var n = 0
+        for ((i, l) in lines.withIndex()) if (ANY_BLOCK.containsMatchIn(l)) {
+            val rest = ANY_BLOCK.replaceFirst(l, "")
+            if (("" + ':' in rest && BLOCK_FIELDS.containsMatchIn(rest.substringBefore(':'))) || lines.drop(i + 1).take(3).any { FIELD.containsMatchIn(it) }) n++
+        }
+        return n
+    }
+    private fun nonBlank(e: Entry) = (try { e.readText() } catch (ex: Exception) { null } ?: "").replace("\r", "\n").split("\n").filter { it.isNotBlank() }
+    /** How much a text file looks like scene details (tells details from script when the file names do not say). */
+    fun detailsScore(e: Entry): Double {
+        val lines = nonBlank(e); if (lines.isEmpty()) return 0.0
+        return detailsBlocks(lines) * 3.0 + lines.count { ANY_BLOCK.containsMatchIn(it) } + 0.2 * lines.count { FIELD.containsMatchIn(it) }
+    }
     private val TIMED = Regex("^\\W*\\[?\\(?\\s*(?:\\d+:)?\\d{1,2}:\\d{2}(?:[.,]\\d{1,3})?")
 
     /** 'details' (Image N blocks), 'details_loose' (Scene/Shot N), 'timestamps' or 'script', decided from the content. */
@@ -26,6 +44,7 @@ object Bundle {
         val lines = txt.replace("\r", "\n").split("\n").filter { it.isNotBlank() }
         if (lines.isEmpty()) return "script"
         if (lines.count { IMAGE_BLOCK.containsMatchIn(it) } >= 3) return "details"
+        if (detailsBlocks(lines) >= 3) return "details"          // Image / Scene / Shot / Frame / Prompt N blocks with labelled fields
         val blocks = lines.filter { ANY_BLOCK.containsMatchIn(it) }
         val body = lines.filterNot { ANY_BLOCK.containsMatchIn(it) }.map { it.length }.sorted()
         val median = if (body.isEmpty()) 0 else body[body.size / 2]
@@ -75,11 +94,30 @@ object Bundle {
         }
         val strict = texts.filter { textRole(it) == "details" }
         val loose = texts.filter { textRole(it) == "details_loose" }
-        val details = strict.ifEmpty { loose }                       // "Scene N" files only count when no "Image N" file exists
-        val scripts = texts.filter { it !in details }
-        res.details = pick(details, "details", res.notes, listOf("detail", "scene"))
-        res.script = pick(scripts, "script", res.notes, listOf("script"))
+        var details = strict.ifEmpty { loose }                       // "Scene N" files only count when no "Image N" file exists
+        if (details.isEmpty() && texts.size >= 2) {                 // nothing looked like details by itself: the file that looks most like it
+            val best = texts.maxByOrNull { detailsScore(it) }!!
+            val named = texts.filter { x -> listOf("detail", "scene", "prompt", "image").any { it in x.stem } }
+            val pk = if (detailsScore(best) >= 3) best else named.firstOrNull()
+            if (pk != null) { details = listOf(pk); res.notes.add("'${pk.name}' was taken as the scene details (it looks most like it).") }
+        }
+        var scripts = texts.filter { it !in details }
+        res.details = pick(details, "details", res.notes, listOf("detail", "scene", "prompt"))
         res.timestamps = pick(ts, "timestamps", res.notes, listOf("clean"))
+        if (scripts.size > 1) {                                      // several candidate scripts: 'script' in the name, else the one the narrator says
+            val named = scripts.filter { "script" in it.stem }
+            if (named.isNotEmpty()) scripts = named + scripts.filter { it !in named }
+            else res.timestamps?.let { t ->
+                try {
+                    val ref = Details.tokens(t.readText() ?: "").toSet()
+                    fun overlap(x: Entry): Double { val w = Details.tokens(x.readText() ?: ""); return w.count { it in ref }.toDouble() / maxOf(w.size, 1) }
+                    scripts = scripts.sortedByDescending { overlap(it) }
+                    res.notes.add("'${scripts[0].name}' was taken as the script (most of its words are spoken in the timestamps).")
+                } catch (ex: Exception) { }
+            }
+        }
+        res.script = pick(scripts.take(1), "script", res.notes, listOf("script"))
+        scripts.drop(1).forEach { res.notes.add("More than one script file: using '${scripts[0].name}', left out '${it.name}'.") }
         if (res.details == null) res.notes.add("MISSING: scene details (a text file with 'Image N' blocks).")
         if (nPictures == 0) res.notes.add("MISSING: pictures.")
         if (res.audio == null && res.timestamps == null) res.notes.add("No audio and no timestamps: picture lengths will only be ESTIMATED from the script words.")

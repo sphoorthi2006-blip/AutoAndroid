@@ -88,14 +88,17 @@ object Matching {
     fun numberAssign(items: List<SceneItem>, images: List<String>, a: Int, b: Int): Pair<MutableList<String?>, String>? {
         val nm = numberMap(images); val n = b - a
         if (nm.size < max(2, (0.6 * min(images.size, n)).toInt())) return null
-        val keys = LinkedHashMap<String, List<Int>>()
-        keys["details"] = sceneKeys(items, a, b); keys["folder"] = (1..n).toList(); keys["folder from 0"] = (0 until n).toList()
-        if (keys["details"]!!.toSet().size != n) keys.remove("details")
+        val nop = (a until b).map { items[it].nopic }                  // a heading with no picture of its own takes no number
+        fun seq(first: Int): List<Int?> { var c = first; return nop.map { h -> if (h) null else c.also { c++ } } }
+        val keys = LinkedHashMap<String, List<Int?>>()
+        keys["details"] = sceneKeys(items, a, b); keys["folder"] = seq(1); keys["folder from 0"] = (0 until n).toList()
+        if (nop.any { it }) keys.remove("folder from 0")
+        if (keys["details"]!!.toSet().size != n || nop.any { it }) keys.remove("details")   // numbering restarts in every section: cannot identify a picture
         var best = ""; var bv = -1
-        for ((k, v) in keys) { val s = v.count { it in nm }; if (s > bv) { bv = s; best = k } }
-        val got = keys[best]!!.map { nm[it] }.toMutableList()
+        for ((k, v) in keys) { val sc = v.count { it != null && it in nm }; if (sc > bv) { bv = sc; best = k } }
+        val got = keys[best]!!.map { if (it == null) null else nm[it] }.toMutableList()
         val hit = got.count { it != null }
-        if (hit < 0.6 * n) return null
+        if (hit < 0.6 * (n - nop.count { it })) return null
         return Pair(got, "Pictures matched by their number ($best numbering): $hit of $n scenes.")
     }
 
@@ -198,10 +201,14 @@ object Matching {
     /** (section index or null, decided by the name). */
     fun matchGroupToSection(name: String, sections: List<Pair<Int, String>>): Pair<Int?, Boolean> {
         val real = sections.withIndex().filter { it.value.second != "Start" }.map { Pair(it.index, it.value.second) }
+        if (sections.isNotEmpty() && sections[0].second == "Start" && sectionRef(name) == Pair("intro", null) &&
+            real.none { sectionRef(it.second) == Pair("intro", null) }) return Pair(0, true)   // details whose first block has no heading: that block IS the intro
         val n = normTitle(name)
-        if (n.length >= 3) for ((i, t) in real) {
+        val nSp = normTitle(name.replace(Regex("[_\\-.]+"), " "))                             // '01_Crafty_Question' -> 'crafty question'
+        val names = setOf(n, nSp, nSp.replace(Regex("^\\d+\\s*"), "").trim()).filter { it.length >= 3 }.toSet()
+        for ((i, t) in real) {
             val forms = (listOf(t) + Regex("\\s*[:\u2013\u2014-]\\s+|:\\s*").split(t)).map { normTitle(it) }.toSet()
-            if (n in forms) return Pair(i, true)
+            if (names.any { it in forms }) return Pair(i, true)
         }
         val ref = sectionRef(name) ?: return Pair(null, false)
         val (kw, num) = ref
@@ -212,15 +219,46 @@ object Matching {
     }
 
     private val TITLE_LINE = Regex("^\\s*(?:#+\\s*)?(?:section|part|chapter)?\\s*(\\d+)\\s*[.):\\-\u2013\u2014]\\s*(\\S.{0,60})$", RegexOption.IGNORE_CASE)
-    private fun sectionsFromNumbering(items: List<SceneItem>): List<Pair<Int, String>> {
+    private val GENERIC_TITLE = Regex("^(start|intro|introduction|prologue|outro|conclusion|epilogue|ending|closing|summary|overview|(?:part|section|chapter)\\s*\\d+)$", RegexOption.IGNORE_CASE)
+
+    private fun cleanSecTitle(m: kotlin.text.MatchResult) = "Section ${m.groupValues[1].toInt()}: ${m.groupValues[2].trim()}"
+
+    /** The heading line of the script that sits directly in front of the line that STARTS with `spoken` (any heading style), or "". */
+    fun scriptHeadingBefore(scriptLines: List<String>, spoken: String): String {
+        val tk = Details.tokens(spoken).take(4)
+        if (tk.isEmpty() || scriptLines.isEmpty()) return ""
+        for ((k, ln) in scriptLines.withIndex()) {
+            if (k == 0 || Details.isHeading(ln)) continue
+            val lt = Details.tokens(ln)
+            if (lt.take(tk.size) == tk && Details.isHeading(scriptLines[k - 1])) return Details.cleanTitle(scriptLines[k - 1])
+        }
+        return ""
+    }
+
+    private fun sectionsFromNumbering(items: List<SceneItem>, scriptText: String = ""): List<Pair<Int, String>> {
         val nums = items.map { it.num }
         if (items.size < 3 || nums.any { it == null }) return emptyList()
         val starts = listOf(0) + (1 until items.size).filter { nums[it]!! <= nums[it - 1]!! }
         if (starts.size < 2) return emptyList()
+        val slines = Details.linesOf(scriptText)
+        var outH = HashMap<Int, String>()
+        for ((k, i) in starts.withIndex()) {
+            val h = scriptHeadingBefore(slines, items[i].spoken)
+            if (h.isNotEmpty() && !GENERIC_TITLE.matches(h) && (k > 0 || TITLE_LINE.containsMatchIn(h))) {
+                val m = TITLE_LINE.find(h)
+                outH[i] = if (m != null) cleanSecTitle(m) else h
+            }
+        }
+        if (starts.any { items[it].heading }) outH = HashMap()          // headings are already scenes: handled below
+        if (outH.isNotEmpty()) return starts.withIndex().map { (k, i) -> Pair(i, outH[i] ?: (if (k == 0) "Intro" else if (k == starts.size - 1) "Outro" else "Part ${k + 1}")) }
         return starts.withIndex().map { (k, i) ->
+            if (items[i].heading) {
+                val h = items[i].spoken.trim(); val m = TITLE_LINE.find(h)
+                return@map Pair(i, if (m != null) cleanSecTitle(m) else h)
+            }
             val sp = items[i].spoken.trim(); val m = TITLE_LINE.find(sp)
             val t = if (m != null && m.groupValues[2].split(Regex("\\s+")).size <= 8 && !m.groupValues[2].trimEnd().let { it.endsWith(".") || it.endsWith(",") || it.endsWith(";") || it.endsWith("?") || it.endsWith("!") })
-                "Section ${m.groupValues[1].toInt()}: ${m.groupValues[2].trim()}" else if (k == 0) "Intro" else if (k == starts.size - 1) "Outro" else "Part ${k + 1}"
+                cleanSecTitle(m) else if (k == 0) "Intro" else if (k == starts.size - 1) "Outro" else "Part ${k + 1}"
             Pair(i, t)
         }
     }
@@ -230,7 +268,7 @@ object Matching {
         val secs = ArrayList<Pair<Int, String>>()
         for ((i, it) in items.withIndex()) if (it.section.isNotEmpty() && (secs.isEmpty() || secs.last().second != it.section)) secs.add(Pair(i, it.section))
         if (secs.isNotEmpty()) { if (secs[0].first > 0) secs.add(0, Pair(0, "Start")); return secs }
-        val num = sectionsFromNumbering(items); if (num.isNotEmpty()) return num
+        val num = sectionsFromNumbering(items, scriptText); if (num.isNotEmpty()) return num
         if (scriptText.isEmpty()) return emptyList()
         val lines = Details.linesOf(scriptText); val toks = items.map { Details.tokens(it.spoken) }
         var last = 0; val out = ArrayList<Pair<Int, String>>()
@@ -244,7 +282,59 @@ object Matching {
             }
             if (bi != null && best >= 0.5 && (out.isEmpty() || bi > out.last().first)) { out.add(Pair(bi, Details.cleanTitle(ln))); last = bi }
         }
+        if (out.size >= 2 && out[0].first > 0) out.add(0, Pair(0, "Intro"))         // the lines before the first heading are the intro
         return if (out.size >= 2) out else emptyList()
+    }
+
+
+    // ------------------------------------------------------------ section headings as scenes
+    private fun headingSpoken(wtoks: List<String>, head: String, first: String): Boolean {
+        val H = Details.tokens(head).map { Align.tn(it) }; val F = Details.tokens(first).map { Align.tn(it) }.take(3)
+        if (H.isEmpty() || F.isEmpty()) return false
+        val W = wtoks.map { Align.tn(it) }; val need = max(1, (0.6 * H.size + 0.5).toInt())
+        for (i in 0..(W.size - F.size)) {
+            if (W.subList(i, i + F.size) == F) {
+                val win = W.subList(max(0, i - H.size - 3), i); val left = H.toMutableList(); var hit = 0
+                for (w in win) if (left.remove(w)) hit++
+                if (hit >= need) return true
+            }
+        }
+        return false
+    }
+
+    /** A section heading that the SCRIPT has and the narrator SAYS, but the details do not list, becomes a scene of its own
+     *  (with a picture when its folder has one more picture than the section has scenes, else a black screen with the text). */
+    fun addHeadingItems(items: List<SceneItem>, scriptText: String, groups: List<Group>, warnings: MutableList<String>, wtoks: List<String>? = null): List<SceneItem> {
+        val secs = findSections(items, scriptText)
+        if (secs.isEmpty()) return items
+        val slines = Details.linesOf(scriptText)
+        val npics = HashMap<Int, Int>(); var unnamed = false
+        for (g in groups) { val idx = matchGroupToSection(g.name, secs).first; if (idx == null) unnamed = true else npics[idx] = (npics[idx] ?: 0) + g.images.size }
+        if (unnamed && groups.isNotEmpty() && groups.size == secs.size && npics.isEmpty()) groups.forEachIndexed { i, g -> npics[i] = g.images.size }
+        val out = ArrayList<SceneItem>(items.subList(0, secs[0].first)); val made = ArrayList<Pair<String, Boolean>>()
+        for ((si, sec) in secs.withIndex()) {
+            val a = sec.first; val b = if (si + 1 < secs.size) secs[si + 1].first else items.size
+            val seg = items.subList(a, b); var outSeg: List<SceneItem> = seg
+            if (seg.isNotEmpty()) {
+                var head = seg[0].section.trim().ifEmpty { scriptHeadingBefore(slines, seg[0].spoken) }
+                if (head.isEmpty() || GENERIC_TITLE.matches(head)) head = ""
+                val T = Details.tokens(head).map { Align.tn(it) }.toSet()
+                val ft = Details.tokens(seg[0].spoken).map { Align.tn(it) }
+                val already = ft.isNotEmpty() && ft.size <= T.size + 1 && ft.count { it in T } >= 0.6 * ft.size
+                if (head.isNotEmpty() && !already) {
+                    val ok = if (!wtoks.isNullOrEmpty()) headingSpoken(wtoks, head, seg[0].spoken) else si > 0
+                    if (ok) {
+                        val withPic = npics[si] == seg.size + 1
+                        if (withPic) outSeg = seg.map { it.copy(num = it.num?.plus(1)) }
+                        out.add(SceneItem(if (withPic) 1 else -1, head, head, "", head, section = seg[0].section, type = "Heading", heading = true, nopic = !withPic))
+                        made.add(Pair(head, withPic))
+                    }
+                }
+            }
+            out.addAll(outSeg)
+        }
+        if (made.isNotEmpty()) warnings.add("Section headings added as scenes: " + made.joinToString("; ") { it.first + (if (it.second) " (with picture)" else " (black screen + text)") } + ".")
+        return out
     }
 
     // ------------------------------------------------------------ folders (groups)
@@ -311,6 +401,8 @@ object Matching {
         }
         return out
     }
+
+    private fun nNopic(items: List<SceneItem>, a: Int, b: Int) = items.subList(a, b).count { it.nopic }
 
     private fun guessWindow(sections: List<Pair<Int, String>>, N: Int, K: Int): Pair<Int, Int> {
         val bounds = sections.map { it.first } + N
@@ -387,7 +479,7 @@ object Matching {
 
         fun put(g: Group, idx: Int, sure: Boolean) {
             val K = g.images.size; val lo = bounds[idx]; val hi = bounds[idx + 1]; g.sure = sure
-            if (K >= hi - lo) g.window = Pair(lo, hi)
+            if (K >= hi - lo - nNopic(items, lo, hi)) g.window = Pair(lo, hi)
             else if (numberAssign(items, g.images, lo, hi) != null) g.window = Pair(lo, hi)
             else { val w = windowByNames(match, items, g.images, lo, hi)
                 if (w != null) g.window = w else {
@@ -396,11 +488,12 @@ object Matching {
                 } }
         }
         for (g in groups) {
-            val K = g.images.size; var (idx, byName) = named[g]!!; val guess = inf[g]
+            val K = g.images.size; var (idx, byName) = named[g]!!; var guess = inf[g]
+            if (one && idx == null && guess != null && K > (0 until bounds.size - 1).maxOf { bounds[it + 1] - bounds[it] }) guess = null   // ONE folder bigger than any section covers the whole script
             if (idx == null && guess != null && guess.sure) idx = guess.idx
             else if (byName && idx == null) { g.skipped = "its name points to a section that is not in your script"; continue }
             if (idx != null) put(g, idx, true)
-            else if (one && K >= N) { g.window = Pair(0, N); g.sure = true }
+            else if (one && K >= N - nNopic(items, 0, N)) { g.window = Pair(0, N); g.sure = true }
             else if (one && numberAssign(items, g.images, 0, N) != null) { g.window = Pair(0, N); g.sure = true }
             else { val w = windowByNames(match, items, g.images, 0, N)
                 if (w != null) { g.window = w; g.sure = true }
@@ -421,12 +514,13 @@ object Matching {
         }
         for (g in kept) {
             val (a, b) = g.window
-            val chosen = assignImages(match, items, g.images, a, b, scenes, warnings, mtime)
+            val chosen: List<String?> = if (items[a].nopic && b - a > 1) listOf<String?>(null) + assignImages(match, items, g.images, a + 1, b, scenes, warnings, mtime)
+                else assignImages(match, items, g.images, a, b, scenes, warnings, mtime)
             g.scenes = scenes.subList(a, b)
             g.scenes.zip(chosen).forEach { (s, img) -> s.image = img }
             g.extras = g.images.filter { it !in chosen }
-            val gone = g.scenes.filter { it.image == null }
-            gone.forEach { it.missing = true }
+            g.scenes.filter { it.image == null }.forEach { it.missing = true }
+            val gone = g.scenes.filter { it.image == null && it.item?.heading != true }
             if (gone.isNotEmpty()) warnings.add("MISSING PICTURES: ${gone.size} scene(s) have no picture and show a blank screen: " + gone.take(40).joinToString(", ") { it.num.toString() } +
                 (if (gone.size > 40) " ..." else "") + ". Generate them, then use Replace on those scenes.")
         }

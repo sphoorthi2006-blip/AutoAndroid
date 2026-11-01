@@ -3,7 +3,10 @@ package com.auto.app
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -25,7 +28,7 @@ import com.auto.core.Pipeline
 import java.io.File
 import kotlin.math.max
 
-/** Builds the MP4: every scene = its picture for (end-start) seconds, the narration underneath. Text overlay, click sound and music are not done yet. */
+/** Builds the MP4: every scene = its picture for (end-start) seconds, the narration underneath. Scenes without a picture get a black screen with their text. Text over pictures, click sound and music are not done yet. */
 object Exporter {
     private const val W = 1280
     private const val H = 720
@@ -36,13 +39,32 @@ object Exporter {
         return f
     }
 
+    /** A scene without a picture: black screen with its text centred (a heading is shown in capitals). */
+    private fun textScreen(dir: File, k: Int, text: String): File {
+        val f = File(dir, "text_$k.png")
+        val b = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888); b.eraseColor(Color.BLACK)
+        val c = Canvas(b)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 54f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
+        val lines = ArrayList<String>(); var cur = ""
+        for (w in text.split(Regex("\\s+")).filter { it.isNotEmpty() }) {
+            val t = if (cur.isEmpty()) w else "$cur $w"
+            if (paint.measureText(t) > W - 160 && cur.isNotEmpty()) { lines.add(cur); cur = w } else cur = t
+        }
+        if (cur.isNotEmpty()) lines.add(cur)
+        val lh = paint.textSize * 1.3f; var y = (H - lh * lines.size) / 2f + paint.textSize
+        for (l in lines.take(8)) { c.drawText(l, W / 2f, y, paint); y += lh }
+        f.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return f
+    }
+
     /** Must be called on the main thread. */
     fun export(ctx: Context, a: Pipeline.Analysis, narration: File?, onProgress: (Int) -> Unit, onDone: (String) -> Unit, onError: (String) -> Unit) {
         val work = File(ctx.cacheDir, "export").apply { mkdirs() }
         val blank = blankImage(work)
-        val video = a.scenes.map { s ->
+        val video = a.scenes.mapIndexed { k, s ->
             val dur = max(s.end - s.start, 0.04)
-            val mi = MediaItem.Builder().setUri(Uri.fromFile(File(s.image ?: blank.path))).setImageDurationMs((dur * 1000).toLong()).build()
+            val img = s.image ?: (if (s.text.isNotBlank()) textScreen(work, k, if (s.item?.heading == true) s.text.uppercase() else s.text).path else blank.path)
+            val mi = MediaItem.Builder().setUri(Uri.fromFile(File(img))).setImageDurationMs((dur * 1000).toLong()).build()
             EditedMediaItem.Builder(mi).setDurationUs((dur * 1_000_000).toLong()).setFrameRate(30)
                 .setEffects(Effects(listOf(), listOf(Presentation.createForWidthAndHeight(W, H, Presentation.LAYOUT_SCALE_TO_FIT)))).build()
         }

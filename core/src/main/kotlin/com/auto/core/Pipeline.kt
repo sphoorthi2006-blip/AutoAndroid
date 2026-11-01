@@ -54,12 +54,15 @@ object Pipeline {
     fun analyse(detailsText: String, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double,
                 pictureSources: List<File>, workDir: File, match: String = "number"): Analysis {
         val warn = ArrayList<String>()
-        val items = scopedItems(Details.parseSceneFile(detailsText), scriptText, warn)
+        var items = scopedItems(Details.parseSceneFile(detailsText), scriptText, warn)
         if (items.isEmpty()) throw PipelineError("No scenes were found in the details file.")
-        val timing = timeScenes(items, scriptText, words, audio, audioSeconds)
         val (refs, rootNames) = collectPictures(pictureSources, workDir)
         if (refs.isEmpty()) throw PipelineError("No pictures (png, jpg, webp) were found in the chosen folders or ZIP files.")
         val groups = Matching.imageGroups(refs, rootNames)
+        // a section heading the script has and the narrator says (but the details do not list) becomes a scene of its own
+        val spoken = words?.map { Details.tokens(it.text).joinToString("") }?.filter { it.isNotEmpty() }
+        items = Matching.addHeadingItems(items, scriptText, groups, warn, spoken)
+        val timing = timeScenes(items, scriptText, words, audio, audioSeconds)
         val res = Matching.matchPictures(items, timing.scenes, groups, scriptText, match, warnings0 = warn + timing.warnings,
             mtime = { File(it).lastModified() })
         return Analysis(timing, res)

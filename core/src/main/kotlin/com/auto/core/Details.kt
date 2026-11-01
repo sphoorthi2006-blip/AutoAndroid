@@ -3,15 +3,17 @@ package com.auto.core
 data class SceneItem(
     val num: Int?, val spoken: String, val full: String, val labels: String, val visual: String,
     val numbers: String = "", val emotion: String = "", val meaning: String = "", val type: String = "", val section: String = "",
+    val heading: Boolean = false,   // a section heading turned into a scene of its own
+    val nopic: Boolean = false,     // ... that has no picture: black screen + its text + click
 )
 
 /** Port of scriptvideo.engine: tokens, is_heading, parse_scene_file. */
 object Details {
-    private val BLOCK = Regex("^\\s*(?:image|scene|shot|frame)\\s*#?\\s*(\\d+)\\b", RegexOption.IGNORE_CASE)
+    private val BLOCK = Regex("^\\s*(?:image|scene|shot|frame|prompt)\\s*#?\\s*(\\d+)\\b", RegexOption.IGNORE_CASE)
     private val SECTION_WORDS = Regex(
         "^(intro(duction)?|outro|conclusion|epilogue|prologue|summary|overview|section|part|chapter|act|segment|hook|ending|closing|body|background|aftermath)\\b",
         RegexOption.IGNORE_CASE)
-    private val FIELD = Regex("^(?:(?:image|scene|shot|frame)\\s*#?\\s*\\d+\\s*[-:\\u2013\\u2014]?\\s*)?([A-Za-z][A-Za-z ]{1,25}):\\s*(.*)$", RegexOption.IGNORE_CASE)
+    private val FIELD = Regex("^(?:(?:image|scene|shot|frame|prompt)\\s*#?\\s*\\d+\\s*[-:\\u2013\\u2014]?\\s*)?([A-Za-z][A-Za-z ]{1,25}):\\s*(.*)$", RegexOption.IGNORE_CASE)
     private val VISUAL_KEYS = listOf("subject", "action", "key object", "setting", "location", "scene description", "description", "visual",
         "characters", "background", "era", "time period")
     private const val JUNK = "#*=-_[]() \t"

@@ -1,0 +1,47 @@
+name: Check core
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack the uploaded project text file (only if it is there)
+        run: |
+          if [ -f AutoAndroid.b64.txt ]; then
+            base64 -d AutoAndroid.b64.txt > project.zip
+            unzip -q project.zip -d _x
+            rm project.zip AutoAndroid.b64.txt
+            rm -rf _x/AutoAndroid/.github
+            cp -r _x/AutoAndroid/. .
+            rm -rf _x
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add -A
+            git commit -m "Unpack project"
+            git push
+          fi
+
+  parity:
+    needs: unpack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Install Kotlin compiler
+        run: |
+          curl -sL -o kotlinc.zip https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+          unzip -q kotlinc.zip -d "$HOME"
+          echo "$HOME/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Kotlin results must equal the Python engine's results
+        run: |
+          if [ -f scripts/run_parity.sh ]; then bash scripts/run_parity.sh; else echo "Project not unpacked yet"; fi

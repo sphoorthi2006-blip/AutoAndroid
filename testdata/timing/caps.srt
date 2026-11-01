@@ -1,0 +1,48 @@
+1
+00:00:01,300 --> 00:00:05,470
+The ancient city stood proudly above the sea.
+
+2
+00:00:05,870 --> 00:00:10,150
+Its great walls protected thousands of families.
+
+3
+00:00:10,550 --> 00:00:15,280
+Merchants brought silk and spices from distant lands.
+
+4
+00:00:15,730 --> 00:00:17,960
+Section two. The Siege.
+
+5
+00:00:18,360 --> 00:00:22,530
+In spring the sultan gathered a massive army.
+
+6
+00:00:22,930 --> 00:00:27,350
+Enormous cannons pounded the stone defenses daily.
+
+7
+00:00:27,750 --> 00:00:31,860
+Defenders repaired breaches every single night.
+
+8
+00:00:32,260 --> 00:00:36,780
+Hunger and fear spread across the crowded streets.
+
+9
+00:00:37,230 --> 00:00:39,530
+Section three. The Fall.
+
+10
+00:00:39,930 --> 00:00:43,930
+Finally the final assault began before dawn.
+
+11
+00:00:44,330 --> 00:00:47,950
+Soldiers poured through the broken gate.
+
+12
+00:00:48,350 --> 00:00:51,960
+The empire ended and a new age began.
+

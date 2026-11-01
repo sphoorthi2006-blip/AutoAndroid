@@ -1,0 +1,65 @@
+T1	number	/z/Pictures	Pictures	03_The_Fall/image_8.png
+T1	number	/z/Pictures	Pictures	03_The_Fall/image_10.png
+T1	number	/z/Pictures	Pictures	Section 2/Image 4.png
+T1	number	/z/Pictures	Pictures	Section 2/Image 5.png
+T1	number	/z/Pictures	Pictures	Section 2/Image 6.png
+T1	number	/z/Pictures	Pictures	Intro/image_2.png
+T1	number	/z/Pictures	Pictures	Intro/image_1.png
+T1	number	/z/Pictures	Pictures	Section 2/Image 7.png
+T1	number	/z/Pictures	Pictures	Intro/image_3.png
+T2	number	/p/flat	flat	scene_02.png
+T2	number	/p/flat	flat	scene_08.png
+T2	number	/p/flat	flat	scene_05.png
+T2	number	/p/flat	flat	scene_10.png
+T2	number	/p/flat	flat	scene_01.png
+T2	number	/p/flat	flat	scene_09.png
+T2	number	/p/flat	flat	scene_06.png
+T2	number	/p/flat	flat	scene_03.png
+T2	number	/p/flat	flat	scene_07.png
+T2	number	/p/flat	flat	scene_04.png
+T3	number	/p/Images A	Images A	Merchants_brought_silk_spices_distant_lands_33cc44dd.jpg
+T3	number	/p/Images A	Images A	Ancient_city_stood_proudly_above_sea_ab12cd34.jpg
+T3	number	/p/Images A	Images A	Great_walls_protected_thousands_families_11aa22bb.jpg
+T3	number	/p/Images B	Images B	Sultan_gathered_massive_army_spring_55ee66ff.jpg
+T3	number	/p/Images B	Images B	Hunger_fear_spread_crowded_streets_1234abcd.jpg
+T3	number	/p/Images B	Images B	Defenders_repaired_breaches_every_night_99cc00dd.jpg
+T3	number	/p/Images B	Images B	Enormous_cannons_pounded_stone_defenses_77aa88bb.jpg
+T3	number	/p/Images C	Images C	Final_assault_began_before_dawn_aabbccdd.jpg
+T3	number	/p/Images C	Images C	Empire_ended_new_age_began_01020304.jpg
+T3	number	/p/Images C	Images C	Soldiers_poured_broken_gate_ddeeff00.jpg
+T4	name	/p/gen	gen	Defenders_repaired_breaches_every_night_99cc00dd.jpg
+T4	name	/p/gen	gen	Final_assault_began_before_dawn_aabbccdd.jpg
+T4	name	/p/gen	gen	Sultan_gathered_massive_army_spring_55ee66ff.jpg
+T4	name	/p/gen	gen	Enormous_cannons_pounded_stone_defenses_77aa88bb.jpg
+T4	name	/p/gen	gen	Great_walls_protected_thousands_families_11aa22bb.jpg
+T4	name	/p/gen	gen	Merchants_brought_silk_spices_distant_lands_33cc44dd.jpg
+T4	name	/p/gen	gen	Soldiers_poured_broken_gate_ddeeff00.jpg
+T4	name	/p/gen	gen	Ancient_city_stood_proudly_above_sea_ab12cd34.jpg
+T4	name	/p/gen	gen	Hunger_fear_spread_crowded_streets_1234abcd.jpg
+T4	name	/p/gen	gen	Empire_ended_new_age_began_01020304.jpg
+T5	number	/p/gaps	gaps	image_6.png
+T5	number	/p/gaps	gaps	image_8.png
+T5	number	/p/gaps	gaps	cover.png
+T5	number	/p/gaps	gaps	image_1.png
+T5	number	/p/gaps	gaps	image_3.png
+T5	number	/p/gaps	gaps	image_10.png
+T5	number	/p/gaps	gaps	image_7.png
+T5	number	/p/gaps	gaps	image_2.png
+T5	number	/p/gaps	gaps	image_5.png
+T6	order	/p/order	order	a.png
+T6	order	/p/order	order	b.png
+T6	order	/p/order	order	c.png
+T6	order	/p/order	order	d.png
+T6	order	/p/order	order	e.png
+T6	order	/p/order	order	f.png
+T6	order	/p/order	order	g.png
+T6	order	/p/order	order	h.png
+T6	order	/p/order	order	i.png
+T6	order	/p/order	order	j.png
+T7	number	/z/A	A	Intro/img1.jpg
+T7	number	/z/A	A	Intro/img2.jpg
+T7	number	/z/A	A	Intro/img3.jpg
+T7	number	/z/B	B	Section 2/img4.jpg
+T7	number	/z/B	B	Section 2/img5.jpg
+T7	number	/z/B	B	Section 2/img6.jpg
+T7	number	/z/B	B	Section 2/img7.jpg

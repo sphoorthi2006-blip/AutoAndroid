@@ -1,0 +1,107 @@
+## a.srt 18
+The|1.200|1.436
+Siege|1.436|1.790
+began|1.790|2.144
+in|2.144|2.321
+the|2.321|2.556
+autumn|2.556|2.969
+of|2.969|3.146
+1453.|3.146|3.500
+It|3.500|3.710
+lasted|3.710|4.200
+fifty-three|4.200|5.040
+days!|5.040|5.460
+Nobody|5.460|5.950
+expected|5.950|6.580
+that.|6.580|7.000
+Then|8.000|8.500
+it|8.500|8.800
+ended.|8.800|9.500
+##cues a.srt
+1.200|5.460|The Siege began in the autumn of 1453. It lasted fifty-three days!
+5.460|7.000|Nobody expected that.
+8.000|9.500|Then it ended.
+## b.vtt 8
+Hello|1.000|1.545
+there,|1.545|2.182
+friends.|2.182|3.000
+One|3605.250|3605.728
+hour|3605.728|3606.326
+later|3606.326|3607.043
+we|3607.043|3607.402
+met.|3607.402|3608.000
+##cues b.vtt
+1.000|3.000|Hello there, friends.
+3605.250|3608.000|One hour later we met.
+## c.txt 12
+First|1.200|1.890
+line|1.890|2.465
+of|2.465|2.810
+text.|2.810|3.500
+Second|4.000|4.737
+line,|4.737|5.368
+here.|5.368|6.000
+Third|7.500|8.000
+has|8.000|8.333
+only|8.333|8.750
+a|8.750|8.917
+start.|8.917|9.500
+##cues c.txt
+1.200|3.500|First line of text.
+4.000|6.000|Second line, here.
+7.500|9.500|Third has only a start.
+## d.txt 15
+Alpha|12.000|14.667
+beta|14.667|16.889
+gamma.|16.889|20.000
+Delta|20.000|38.000
+epsilon.|38.000|65.000
+Last|65.000|65.408
+line|65.408|65.816
+goes|65.816|66.224
+on|66.224|66.469
+for|66.469|66.796
+a|66.796|66.959
+while|66.959|67.449
+longer|67.449|68.020
+than|68.020|68.429
+usual.|68.429|69.000
+##cues d.txt
+12.000|20.000|Alpha beta gamma.
+20.000|65.000|Delta epsilon.
+65.000|69.000|Last line goes on for a while longer than usual.
+## e.txt 6
+00:04.0|1.200|1.697
+-->|1.697|1.946
+00:05.0|1.946|2.443
+and|2.443|2.692
+another|2.692|3.189
+one.|3.189|3.500
+##cues e.txt
+1.200|3.500|00:04.0 --> 00:05.0 and another one.
+## f.json 5
+Whisper|0.500|1.262
+segment|1.262|2.024
+one.|2.024|2.500
+Word|2.500|2.900
+level|2.900|3.400
+##cues f.json
+0.500|2.500|Whisper segment one.
+2.500|3.400|Word level
+## g.json 2
+Solo|1.000|1.400
+words|1.400|2.000
+##cues g.json
+1.000|2.000|Solo words
+##details 4
+1|The city fell in 1453.|A walled city. Constantinople at dawn|||INTRO
+2|It had stood for a thousand years.|Ancient walls|Theodosian Walls||INTRO
+3|Then the cannons arrived.|Huge cannon fires||fear|Section 2: The Siege
+4|And so it ended.|And so it ended.|||Part 3
+##script 3
+##role details.txt details
+##role script.txt script
+##role a.srt script
+##role c.txt script
+##role d.txt script
+##role e.txt script

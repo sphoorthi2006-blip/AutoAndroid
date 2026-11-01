@@ -19,10 +19,14 @@ Every upload to GitHub is checked automatically (Actions tab): the Kotlin core m
 - testdata/matching  gen.py -> scen.txt, ref.py (Python) -> ref.out; Check4.kt (Kotlin) -> kt.out; the two are identical. Check5.kt = ZIP end-to-end.
 - core/src/test/kotlin/Check*.kt print the Kotlin results in the same format (compile with kotlinc, diff against the .out files)
 
-## Not done yet
-1. (done) Picture matching and ZIP handling
-2. Android layer: decode mp3/m4a to 16 kHz samples (MediaExtractor/MediaCodec), file picker, Open bundle screen
-3. Storyboard + player + simple timeline screens
-4. MP4 export (Media3 Transformer): narration, click sound, music, text, overlay
+## Phone app (app/) - first version, NOT yet compiled or tested on a phone
+- AudioDecoder.kt  mp3/m4a/wav -> 16 kHz mono samples (MediaExtractor + MediaCodec, streaming)
+- MainActivity.kt  1 choose files, 2 choose pictures (ZIP or images), 3 Analyse (list of scenes, warnings), 4 Export MP4
+- Exporter.kt      Media3 Transformer: one picture per scene + narration -> MP4 in Movies/Auto
+- .github/workflows/android.yml builds the APK on GitHub (Actions -> Build APK -> Artifacts -> Auto-debug-apk)
 
-Note: with audio but NO captions file the phone version estimates timing (Whisper is not ported) and says so in a warning.
+## Not done yet
+1. Text overlay, click sound, music and overlay in the exported video
+2. Picture folders (only ZIP files and loose images can be chosen)
+3. Storyboard / player / timeline screens (for now: a text list of scenes)
+4. Fixing whatever the first real build and phone test show

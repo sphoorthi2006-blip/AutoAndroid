@@ -52,3 +52,6 @@ class MiniJson(private val s: String) {
         }
     }
 }
+
+/** JSON string literal (quotes + escapes). */
+fun jsonQuote(s: String): String = buildString { append('"'); for (ch in s) when { ch == '"' -> append("\\\""); ch == '\\' -> append("\\\\"); ch == '\n' -> append("\\n"); ch == '\r' -> append("\\r"); ch == '\t' -> append("\\t"); ch < ' ' -> append(String.format("\\u%04x", ch.code)); else -> append(ch) }; append('"') }

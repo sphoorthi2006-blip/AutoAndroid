@@ -4,14 +4,14 @@ import kotlin.math.max
 import kotlin.math.min
 
 /** One picture on the image track. All times are integer milliseconds (no floating-point drift while editing). */
-data class ImageClip(val id: Int, val sceneNum: Int, val image: String?, val startMs: Long, val endMs: Long, val text: String = "", val conf: String = "", val heading: Boolean = false) {
+data class ImageClip(val id: Int, val sceneNum: Int, val image: String?, val startMs: Long, val endMs: Long, val text: String = "", val conf: String = "", val heading: Boolean = false, val score: Int = 100, val cutCheck: Boolean = false) {
     val durMs get() = endMs - startMs
 }
 
 /** One caption block on the caption track. */
 data class CaptionClip(val id: Int, val startMs: Long, val endMs: Long, val text: String)
 
-enum class IssueKind { GAP, OVERLAP, MISSING_IMAGE, FIRST_CLIP_LATE, SPEECH_PAST_END, CLIP_PAST_AUDIO, TOO_SHORT }
+enum class IssueKind { GAP, OVERLAP, MISSING_IMAGE, FIRST_CLIP_LATE, SPEECH_PAST_END, CLIP_PAST_AUDIO, TOO_SHORT, LOW_CONFIDENCE, LONG_PAUSE }
 data class Issue(val kind: IssueKind, val clipId: Int?, val message: String)
 
 enum class Edge { START, END }
@@ -32,7 +32,8 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
             val clips = scenes.mapIndexed { k, s ->
                 val a = if (k == 0) 0L else starts[k]
                 val b = if (k + 1 < scenes.size) starts[k + 1] else max(Math.round(s.end * 1000), audioMs)
-                ImageClip(k + 1, s.num, s.image, a, max(b, a + 1), s.text, s.conf, s.item?.heading == true)
+                val hd = s.item?.heading == true
+                ImageClip(k + 1, s.num, s.image, a, max(b, a + 1), s.text, s.conf, hd, Confidence.score(s.conf, s.cutCheck, s.image == null && !hd, max(b, a + 1) - a), s.cutCheck)
             }
             val caps = words?.let { Captions.parseCues(it).mapIndexed { k, c -> CaptionClip(k + 1, Math.round(c.start * 1000), Math.round(c.end * 1000), c.text) } } ?: emptyList()
             return Timeline(audioMs, clips, caps)
@@ -112,7 +113,7 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
     private fun q(s: String) = buildString { append('"'); for (ch in s) when { ch == '"' -> append("\\\""); ch == '\\' -> append("\\\\"); ch == '\n' -> append("\\n"); ch == '\r' -> append("\\r"); ch == '\t' -> append("\\t"); ch < ' ' -> append(String.format("\\u%04x", ch.code)); else -> append(ch) }; append('"') }
     fun toJson(): String = buildString {
         append("{\"version\":1,\"audioMs\":$audioMs,\"nextId\":$nextId,\"clips\":[")
-        append(clips.joinToString(",") { "{\"id\":${it.id},\"scene\":${it.sceneNum},\"image\":${it.image?.let(::q) ?: "null"},\"start\":${it.startMs},\"end\":${it.endMs},\"text\":${q(it.text)},\"conf\":${q(it.conf)},\"heading\":${it.heading}}" })
+        append(clips.joinToString(",") { "{\"id\":${it.id},\"scene\":${it.sceneNum},\"image\":${it.image?.let(::q) ?: "null"},\"start\":${it.startMs},\"end\":${it.endMs},\"text\":${q(it.text)},\"conf\":${q(it.conf)},\"heading\":${it.heading},\"score\":${it.score},\"cutCheck\":${it.cutCheck}}" })
         append("],\"captions\":[")
         append(captions.joinToString(",") { "{\"id\":${it.id},\"start\":${it.startMs},\"end\":${it.endMs},\"text\":${q(it.text)}}" })
         append("]}")
@@ -124,7 +125,7 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
             val root = try { MiniJson(text).parse() as? Map<*, *> } catch (e: Exception) { null } ?: throw PipelineError("The project file is damaged (not valid JSON).")
             if (n(root, "version") != 1L) throw PipelineError("Unsupported project file version ${n(root, "version")}.")
             val clips = (root["clips"] as? List<*> ?: throw PipelineError("Project file has no clips.")).map { c ->
-                c as Map<*, *>; ImageClip(n(c, "id").toInt(), n(c, "scene").toInt(), c["image"] as? String, n(c, "start"), n(c, "end"), c["text"] as? String ?: "", c["conf"] as? String ?: "", c["heading"] as? Boolean ?: false)
+                c as Map<*, *>; ImageClip(n(c, "id").toInt(), n(c, "scene").toInt(), c["image"] as? String, n(c, "start"), n(c, "end"), c["text"] as? String ?: "", c["conf"] as? String ?: "", c["heading"] as? Boolean ?: false, (c["score"] as? Double)?.toInt() ?: 100, c["cutCheck"] as? Boolean ?: false)
             }
             val caps = (root["captions"] as? List<*> ?: emptyList<Any>()).map { c -> c as Map<*, *>; CaptionClip(n(c, "id").toInt(), n(c, "start"), n(c, "end"), c["text"] as? String ?: "") }
             return Timeline(n(root, "audioMs"), clips.sortedBy { it.startMs }, caps, n(root, "nextId").toInt())

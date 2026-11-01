@@ -30,6 +30,17 @@ object AudioPauses {
         return Env(n, BooleanArray(n) { db[it] > thr })
     }
 
+    /** Silent gaps INSIDE the narration (not the lead-in or tail), as (startSec, endSec) pairs of at least minSec. null = no usable speech/quiet contrast. */
+    fun silences(x: FloatArray, minSec: Double = 0.5): List<Pair<Double, Double>>? {
+        val env = envelope(x, 50) ?: return null
+        val n = env.n; val voiced = env.voiced; val out = ArrayList<Pair<Double, Double>>()
+        var i = 0
+        while (i < n) {
+            if (!voiced[i]) { var j = i; while (j < n && !voiced[j]) j++; if (i > 0 && j < n && (j - i) / 100.0 >= minSec) out.add(Pair(i / 100.0, j / 100.0)); i = j } else i++
+        }
+        return out
+    }
+
     class Refined(val cuts: List<Double>, val moved: Int, val none: Int, val flagged: List<Int>)
 
     /** Put every picture change in the real SILENCE between two lines (see the Python docstring). */

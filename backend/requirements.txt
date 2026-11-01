@@ -1,0 +1,8 @@
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9
+numpy
+faster-whisper>=1.0.3     # Step 11: speech recognition (verified transcript + word times)
+whisperx>=3.1             # Step 13: wav2vec2 forced alignment (pulls torch; optional, see README)
+silero-vad-lite>=0.2      # Step 15: voice activity detection (model bundled, runs on onnxruntime)
+httpx                     # tests only

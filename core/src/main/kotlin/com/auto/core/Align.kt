@@ -89,7 +89,7 @@ object Align {
     }
 
     /** words from the captions file (or speech recognition) + the scene lines -> scenes with start/end. audio = 16 kHz samples for pause snapping (optional). */
-    fun align(words0: List<TimedWord>, sceneLines: List<String>, scriptText: String, audio: FloatArray? = null, heads: Map<Int, String>? = null): Pair<List<Scene>, AlignReport> {
+    fun align(words0: List<TimedWord>, sceneLines: List<String>, scriptText: String, audio: FloatArray? = null, heads: Map<Int, String>? = null, lead: Double = 0.12): Pair<List<Scene>, AlignReport> {
         if (words0.isEmpty()) throw PipelineError("No speech was found in the audio file.")
         val words = ArrayList<TimedWord>(); val wtoks = ArrayList<String>()
         for (w in words0) { val t = Details.tokens(w.text); if (t.isNotEmpty()) { wtoks.add(t.joinToString("")); words.add(w) } }
@@ -108,7 +108,7 @@ object Align {
         var cuts: List<Double> = arrayListOf(0.0).also { c ->
             for (i in 1 until starts.size) {
                 val a = starts[i]; val gap = words[a].start - words[a - 1].end
-                c.add(max(words[a].start - min(0.12, max(gap, 0.0) / 2), c.last() + 0.25))
+                c.add(max(words[a].start - min(lead, max(gap, 0.0) / 2), c.last() + 0.25))
             }
         }
         val rep = AlignReport(hit, words.size)
@@ -137,7 +137,7 @@ object Align {
 class TimingResult(val scenes: List<Scene>, val warnings: List<String>, val report: AlignReport?, val duration: Double)
 
 /** The timing part of analyse(): details items + captions (+ audio) -> scenes. audio = 16 kHz mono samples or null; audioSeconds = its length. */
-fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double): TimingResult {
+fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double, verified: Boolean = false): TimingResult {
     val warnings = ArrayList<String>()
     val lines = items.map { it.spoken }
     val scenes: List<Scene>; var rep: AlignReport? = null
@@ -149,8 +149,11 @@ fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord
     } else {
         val heads = HashMap<Int, String>()
         for ((k, it) in items.withIndex()) if (k > 0 && it.section.isNotEmpty() && it.section != items[k - 1].section) heads[k] = it.section
-        val r = Align.align(words, lines, scriptText, audio, heads); scenes = r.first; rep = r.second
-        if (audio != null) {
+        // verified = word times come from speech recognition + forced alignment of the real audio (backend). They are exact, so the energy-based
+        // pause snapping (which exists to repair APPROXIMATE caption times, and can move a cut early) is not applied.
+        val r = Align.align(words, lines, scriptText, if (verified) null else audio, heads, if (verified) 0.06 else 0.12); scenes = r.first; rep = r.second
+        if (verified) warnings.add("Picture changes use the exact spoken-word times from the audio analysis.")
+        if (audio != null && !verified) {
             val res = try { AudioPauses.anchorCuts(audio, scenes.map { it.text }, scenes.map { it.start }) } catch (e: Exception) { null }
             if (res != null) {
                 val (cuts, odd) = res

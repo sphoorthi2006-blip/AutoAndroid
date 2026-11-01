@@ -3,7 +3,6 @@ package com.auto.app
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.ViewGroup
 import android.widget.Button
@@ -25,7 +24,7 @@ class MainActivity : Activity() {
     private lateinit var scenesView: TextView
     private lateinit var exportBtn: Button
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 48, 32, 32) }
         fun btn(text: String, onClick: () -> Unit) = Button(this).apply { this.text = text; setOnClickListener { onClick() } }.also { root.addView(it) }
@@ -87,8 +86,8 @@ class MainActivity : Activity() {
         status.text = "Analysing... (decoding audio can take a minute)"; exportBtn.isEnabled = false; scenesView.text = ""
         thread {
             try {
-                val entries = inFiles.map { f -> Entry(f.name, f.length(), if (f.extension.lowercase().let { ".$it" } in Bundle.AUDIO_EXT) AudioDecoder.durationSec(f) else null, { f.readText() }) }
-                val b = Bundle.classify(entries, zips.size + pics.size)
+                val entries = inFiles.map { f -> Entry(f.name, f.length(), if (f.extension.lowercase().let { ".$it" } in com.auto.core.Bundle.AUDIO_EXT) AudioDecoder.durationSec(f) else null, { f.readText() }) }
+                val b = com.auto.core.Bundle.classify(entries, zips.size + pics.size)
                 fun file(e: Entry?) = e?.let { x -> inFiles.first { it.name == x.name } }
                 val detailsF = file(b.details) ?: throw PipelineError(b.notes.joinToString(" ").ifEmpty { "No scene details file found." })
                 val scriptText = file(b.script)?.readText() ?: ""

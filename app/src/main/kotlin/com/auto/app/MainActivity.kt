@@ -79,7 +79,7 @@ class MainActivity : Activity() {
     /** Text, caption, JSON and audio files inside a ZIP are copied out (zip-slip safe); the pictures stay in the ZIP. */
     private fun extractNonPictures(zip: File): List<File> {
         val out = ArrayList<File>(); val dir = File(cacheDir, "in").apply { mkdirs() }; val root = dir.canonicalFile
-        val ok = setOf("txt", "md", "text", "srt", "vtt", "json") + com.auto.core.Bundle.AUDIO_EXT.map { it.removePrefix(".") }
+        val ok = setOf("txt", "md", "text", "docx", "srt", "vtt", "json") + com.auto.core.Bundle.AUDIO_EXT.map { it.removePrefix(".") }
         ZipFile(zip).use { z ->
             for (e in z.entries()) {
                 if (e.isDirectory) continue
@@ -110,23 +110,24 @@ class MainActivity : Activity() {
         status.text = "Analysing... (decoding audio can take a minute)"; exportBtn.isEnabled = false; scenesView.text = ""
         thread {
             try {
-                val entries = inFiles.map { f -> Entry(f.name, f.length(), if (f.extension.lowercase().let { ".$it" } in com.auto.core.Bundle.AUDIO_EXT) AudioDecoder.durationSec(f) else null, { f.readText() }) }
+                val entries = inFiles.map { f -> Entry(f.name, f.length(), if (f.extension.lowercase().let { ".$it" } in com.auto.core.Bundle.AUDIO_EXT) AudioDecoder.durationSec(f) else null, { TextFiles.read(f) }) }
                 val b = com.auto.core.Bundle.classify(entries, bundleZips.size + zips.size + pics.size)
                 fun file(e: Entry?) = e?.let { x -> inFiles.first { it.name == x.name } }
                 val detailsF = file(b.details) ?: throw PipelineError(b.notes.joinToString(" ").ifEmpty { "No scene details file found." })
-                val scriptText = file(b.script)?.readText() ?: ""
+                val scriptText = file(b.script)?.let { TextFiles.read(it) } ?: ""
                 val words = file(b.timestamps)?.let { Captions.parse(it.readText(), it.name) }
                 val audioF = file(b.audio)
                 val dec = audioF?.let { AudioDecoder.decode(it) }
                 val sources = ArrayList<File>(bundleZips + zips)
                 if (pics.isNotEmpty()) sources.add(File(cacheDir, "Pictures"))
                 val work = File(cacheDir, "work").apply { deleteRecursively(); mkdirs() }
-                val a = Pipeline.analyse(detailsF.readText(), scriptText, words, dec?.first, dec?.second ?: 0.0, sources, work)
+                val a = Pipeline.analyse(TextFiles.read(detailsF), scriptText, words, dec?.first, dec?.second ?: 0.0, sources, work)
                 analysis = a; narration = audioF
                 val sb = StringBuilder()
                 for (s in a.scenes) sb.append(String.format(Locale.ROOT, "%3d %7.2f-%-7.2f %s%s%s\n", s.num, s.start, s.end,
                     s.image?.let { Matching.nameOf(it) } ?: "(MISSING)", if (s.conf == "?") "  ?" else "", if (s.cutCheck) "  !" else ""))
-                val msg = (b.notes + a.warnings).joinToString("\n\n")
+                val v = Validation.check(a)
+                val msg = (v.errors.map { "ERROR: $it" } + v.warnings + b.notes + a.warnings).distinct().joinToString("\n\n")
                 runOnUiThread { status.text = "${a.scenes.size} scenes ready.\n\n$msg"; scenesView.text = sb.toString(); exportBtn.isEnabled = true }
             } catch (e: Exception) { runOnUiThread { status.text = "Problem: ${e.message ?: e.toString()}" } }
         }
@@ -136,10 +137,13 @@ class MainActivity : Activity() {
         val a = analysis ?: return
         exportBtn.isEnabled = false; status.text = "Exporting..."
         try {
-            Exporter.export(this, a, narration,
-                { p -> status.text = "Exporting... $p%" },
-                { where -> status.text = "Done: $where"; exportBtn.isEnabled = true },
-                { err -> status.text = "Export failed: $err"; exportBtn.isEnabled = true })
+            val onP = { p: Int -> status.text = "Exporting... $p%" }
+            val onD = { where: String -> status.text = "Done: $where"; exportBtn.isEnabled = true }
+            val onE = { err: String -> status.text = "Export failed: $err"; exportBtn.isEnabled = true }
+            if (a.match.full) {   // whole script covered: exact-boundary plan, one narration item
+                val tl = Timeline.fromScenes(a.scenes, a.timing.duration)
+                Exporter.exportTimeline(this, ExportPlan.fromTimeline(tl), narration, ExportSettings.P720, onP, onD, onE)
+            } else Exporter.export(this, a, narration, onP, onD, onE)
         } catch (e: Exception) { status.text = "Export failed: ${e.message}"; exportBtn.isEnabled = true }
     }
 }

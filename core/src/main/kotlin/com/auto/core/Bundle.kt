@@ -15,7 +15,7 @@ data class BundleResult(
 object Bundle {
     val IMG_EXT = setOf(".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff")
     val AUDIO_EXT = setOf(".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".aif", ".aiff")
-    private val TEXT_EXT = setOf(".txt", ".md", ".text")
+    private val TEXT_EXT = setOf(".txt", ".md", ".text", ".docx")
     private val IMAGE_BLOCK = Regex("^\\W*image\\s*#?\\s*\\d+\\b", RegexOption.IGNORE_CASE)
     private val ANY_BLOCK = Regex("^\\W*(?:image|scene|shot|frame|prompt)\\s*#?\\s*\\d+\\b", RegexOption.IGNORE_CASE)
     private val FIELD = Regex("^\\s*[A-Za-z][A-Za-z ]{1,28}:\\s*\\S")

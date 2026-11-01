@@ -2,7 +2,11 @@ name: Build APK
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   apk:
@@ -14,7 +18,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.7" }
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace --console=plain 2>&1 | tee build.log
+      - name: Save the error log on a separate branch (so it can be read)
+        if: failure()
+        run: |
+          mkdir -p /tmp/lg && cp build.log /tmp/lg/build.log
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout --orphan buildlog && git rm -rf -q . && cp /tmp/lg/build.log . && git add build.log
+          git commit -q -m "build log for ${{ github.sha }}" && git push -f origin buildlog
       - uses: actions/upload-artifact@v4
         with:
           name: Auto-debug-apk

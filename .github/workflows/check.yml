@@ -22,4 +22,4 @@ jobs:
       - name: Kotlin results must equal the Python engine's results
         run: scripts/run_parity.sh
       - name: Backend tests (fake speech models)
-        run: python3 -m pytest -q backend/tests
+        run: cd backend && python3 -m pytest -q tests

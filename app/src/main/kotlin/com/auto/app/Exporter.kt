@@ -28,6 +28,7 @@ import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import com.auto.core.ExportPlan
 import com.auto.core.ExportSettings
+import com.auto.core.OverlayStyle
 import com.auto.core.Pipeline
 import java.io.File
 import kotlin.math.max
@@ -44,8 +45,8 @@ object Exporter {
         return f
     }
 
-    /** The picture fitted into a W x H black frame with the scene's text as a caption at the bottom (white, black outline, up to 3 lines). */
-    private fun captioned(dir: File, k: Int, imagePath: String, text: String, W: Int, H: Int): File {
+    /** The picture fitted into a W x H black frame with the scene's text burned in using the plan's caption style (OverlayRenderer: font, colour, outline, shadow, box, position). */
+    private fun captioned(ctx: Context, dir: File, k: Int, imagePath: String, text: String, W: Int, H: Int, style: OverlayStyle): File {
         val f = File(dir, "cap_${W}x${H}_$k.jpg")
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(imagePath, bounds)
@@ -57,17 +58,7 @@ object Exporter {
         val sc = min(W.toFloat() / src.width, H.toFloat() / src.height); val dw = src.width * sc; val dh = src.height * sc
         c.drawBitmap(src, null, RectF((W - dw) / 2f, (H - dh) / 2f, (W + dw) / 2f, (H + dh) / 2f), Paint(Paint.FILTER_BITMAP_FLAG))
         src.recycle()
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = H * 0.05f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
-        val edge = Paint(fill).apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = fill.textSize * 0.16f; strokeJoin = Paint.Join.ROUND }
-        val lines = ArrayList<String>(); var cur = ""
-        for (w in text.split(Regex("\\s+")).filter { it.isNotEmpty() }) {
-            val t = if (cur.isEmpty()) w else "$cur $w"
-            if (fill.measureText(t) > W * 0.88f && cur.isNotEmpty()) { lines.add(cur); cur = w } else cur = t
-        }
-        if (cur.isNotEmpty()) lines.add(cur)
-        val shown = lines.take(3); val lh = fill.textSize * 1.25f
-        var y = H - H * 0.06f - lh * (shown.size - 1)
-        for (l in shown) { c.drawText(l, W / 2f, y, edge); c.drawText(l, W / 2f, y, fill); y += lh }
+        OverlayRenderer.draw(ctx, c, W, H, text, style)
         f.outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, 92, it) }
         out.recycle()
         return f
@@ -100,7 +91,7 @@ object Exporter {
         val effects = Effects(listOf(), listOf(Presentation.createForWidthAndHeight(s.width, s.height, Presentation.LAYOUT_SCALE_TO_FIT)))
         val video = plan.segments.mapIndexed { k, g ->
             val img = when {
-                g.image != null && captions && g.text.isNotBlank() -> captioned(work, k, g.image!!, g.text, s.width, s.height).path   // captions switch ON
+                g.image != null && captions && g.text.isNotBlank() -> captioned(ctx, work, k, g.image!!, g.text, s.width, s.height, plan.captionStyle).path   // captions switch ON
                 g.image != null -> g.image!!
                 g.text.isNotBlank() -> textScreen(work, k, if (g.heading) g.text.uppercase() else g.text, s.width, s.height).path    // a scene without a picture shows its text
                 else -> blank.path

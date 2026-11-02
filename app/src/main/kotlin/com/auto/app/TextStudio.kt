@@ -162,7 +162,7 @@ fun StylePreview(text: String, style: OverlayStyle, ratio: Float, modifier: Modi
 // ───────────── the style editor (Text Studio and Captions use this one composable) ─────────────
 
 @Composable
-fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: List<NamedStyle>, lib: StyleLibrary, onSave: (String) -> Unit, onDeleteSaved: (String) -> Unit, animations: Boolean, positionControls: Boolean) {
+fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: List<NamedStyle>, lib: StyleLibrary, onSave: (String, OverlayStyle) -> Unit, onDeleteSaved: (String) -> Unit, animations: Boolean, positionControls: Boolean) {
     val sdk = Build.VERSION.SDK_INT
     Column(Modifier.fillMaxWidth()) {
         SecTitle("PRESETS")
@@ -179,7 +179,7 @@ fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: 
                 decorationBox = { inner -> if (name.isEmpty()) Text("Name for this style", color = C.Muted, fontSize = 14.sp); inner() },
                 modifier = Modifier.weight(1f).border(1.dp, C.Line, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp))
             Spacer(Modifier.width(8.dp))
-            OptionChip("Save style", false) { onSave(name); name = "" }
+            OptionChip("Save style", false) { onSave(name, style); name = "" }
         }
 
         SecTitle("FONT")

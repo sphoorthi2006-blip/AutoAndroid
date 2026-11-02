@@ -67,6 +67,20 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
         }
     }
 
+    /**
+     * Set one scene's length to ANY value (even longer than the narration). No magnet: the scene keeps its start, every LATER scene is pushed
+     * later (or pulled earlier when shortened) by the same difference, nothing is squeezed and nothing is clamped to the audio. The narration
+     * (audioMs) never changes; scenes that end up after the narration are simply not exported (see ExportPlan).
+     */
+    fun setLength(id: Int, durMs: Long): Timeline {
+        val i = clips.indexOfFirst { it.id == id }; if (i < 0) throw IllegalArgumentException("No clip with id $id")
+        val c = clips[i]; val d = max(MIN_CLIP_MS, durMs)
+        val later = clips.drop(i + 1)
+        val shift = if (later.isEmpty()) 0L else max(d - c.durMs, -(later.minOf { it.startMs }))   // never push a scene before 0
+        if (d == c.durMs && shift == 0L) return this
+        return withClips(clips.mapIndexed { k, x -> when { k == i -> x.copy(endMs = x.startMs + d); k > i -> x.copy(startMs = x.startMs + shift, endMs = x.endMs + shift); else -> x } })
+    }
+
     /** Cut one clip in two at atMs (both halves keep the picture and scene number). Returns this unchanged if either half would be too short. */
     fun split(id: Int, atMs: Long): Timeline {
         val c = clip(id)

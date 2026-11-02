@@ -5,7 +5,12 @@ import kotlin.math.max
 data class ExportSettings(val width: Int = 1280, val height: Int = 720, val fps: Int = 30) {
     companion object {
         val FPS = setOf(24, 30, 60)   // must be declared before the presets that use it
-        val P720 = ExportSettings(1280, 720, 30); val P1080 = ExportSettings(1920, 1080, 30)
+        val P720 = ExportSettings(1280, 720, 30); val P1080 = ExportSettings(1920, 1080, 30); val P4K = ExportSettings(3840, 2160, 30)
+        /** heightP = 720, 1080 or 2160 (4K); fps = 24, 30 or 60. All 16:9. */
+        fun preset(heightP: Int, fps: Int): ExportSettings {
+            val w = when (heightP) { 720 -> 1280; 1080 -> 1920; 2160 -> 3840; else -> throw IllegalArgumentException("Resolution must be 720, 1080 or 2160 (4K).") }
+            return ExportSettings(w, heightP, fps)
+        }
     }
     init { require(width > 0 && height > 0 && width % 2 == 0 && height % 2 == 0) { "Width and height must be even and positive." }; require(fps in FPS) { "Frame rate must be 24, 30 or 60." } }
 }
@@ -15,14 +20,21 @@ object ExportPlan {
     class Segment(val image: String?, val text: String, val heading: Boolean, val startMs: Long, val endMs: Long, val sceneNum: Int?) { val durMs get() = endMs - startMs }
     class Plan(val segments: List<Segment>, val totalMs: Long)
 
-    /** Gaps become blank segments, overlaps are cut so the later clip starts where the earlier one ends, and the last picture is held until the narration ends. */
-    fun fromTimeline(t: Timeline): Plan {
+    /**
+     * Gaps become blank segments, overlaps are cut so the later clip starts where the earlier one ends, and the last picture is held until the narration ends.
+     * clampToAudio (default, used whenever there is a narration): the video is exactly as long as the narration - the scene that crosses the end of the
+     * narration is cut there and scenes that start after it are left out (the narration track is never stretched or changed by picture edits).
+     */
+    fun fromTimeline(t: Timeline, clampToAudio: Boolean = true): Plan {
+        val limit = if (clampToAudio && t.audioMs > 0) t.audioMs else Long.MAX_VALUE
         val out = ArrayList<Segment>(); var cur = 0L
         for (c in t.clips.sortedBy { it.startMs }) {
-            if (c.endMs <= cur) continue
+            if (c.startMs >= limit) break
+            val end = minOf(c.endMs, limit)
+            if (end <= cur) continue
             if (c.startMs > cur) out.add(Segment(null, "", false, cur, c.startMs, null))
             val s = max(c.startMs, cur)
-            out.add(Segment(c.image, c.text, c.heading, s, c.endMs, c.sceneNum)); cur = c.endMs
+            out.add(Segment(c.image, c.text, c.heading, s, end, c.sceneNum)); cur = end
         }
         val total = max(cur, t.audioMs)
         if (out.isEmpty()) out.add(Segment(null, "", false, 0, max(total, 1), null))

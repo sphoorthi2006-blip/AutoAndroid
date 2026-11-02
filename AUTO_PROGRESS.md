@@ -77,3 +77,10 @@ Fully DONE: 1,2,3,4,5 and 8 (core part; app part uncompiled).  Partial: 7,9,25,2
 - NOT built yet (no buttons for them on purpose): Text sheet / text editing, Music, Fit/Fill, Colour, Animate, Duplicate, pinch zoom, clip edge drag handles, real waveform (the narration wave is decorative).
 - NOT verified: first compile (run the "Build APK" workflow; if it fails, read the buildlog branch) and a phone test.
 - Review fixes (after the first draft): Split now checks the playhead is inside the scene and shows a message otherwise (core silently ignored a too-short cut); edit errors also show as a toast (the status line is only visible in Inputs/Export); timeline scroll no longer fights the playhead - only real finger drags/flings seek, our own jump-to-scene scroll does not.
+
+## Session 5 - export settings, captions switch, free scene length (no magnet) - core tested (Check13), app NOT compiled here
+- Export sheet: resolution 720p / 1080p / 4K and 30 / 60 fps (ExportSettings.preset), always exported from the edited timeline. 4K / 60 fps depend on the phone's hardware encoder.
+- Captions switch (bottom bar "Captions" + Export sheet): ON = scene text shown over the picture in the preview and burned into the exported video (Exporter.captioned); OFF = neither. Scenes without a picture still show their text (that is their content).
+- Scene length: Timeline.setLength = ANY length, no magnet (later scenes move, nothing is squeezed, nothing clamped to the audio). Bottom tool bar: -1 s, +1 s, Length (type 90 / 1:30 / 10m, or quick buttons). The narration never changes.
+- Export is limited to the narration (ExportPlan.fromTimeline clampToAudio): the scene that crosses the end of the audio is cut there, scenes that start after it are left out. The timeline marks the end of the audio and dims what is after it.
+- Check13 (core/src/test/kotlin) is wired into scripts/run_parity.sh (CI "Check core").

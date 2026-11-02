@@ -9,7 +9,7 @@ OUT="$(mktemp -d)"
 mkdir -p /tmp/tt2 /tmp/tt3 /tmp/tt7
 cp testdata/timing/details.txt testdata/timing/script.txt testdata/timing/caps.srt /tmp/tt2/
 cp testdata/matching/scen.txt /tmp/tt3/
-"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
+"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt core/src/test/kotlin/Check13.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
 CP="$OUT:$(dirname "$(readlink -f "$(command -v "$KOTLINC")")")/../lib/kotlin-stdlib.jar"
 java -cp "$CP" Check4Kt > "$OUT/kt.out"
 sed 's/|None|/|null|/' testdata/matching/ref.out > "$OUT/ref.norm"
@@ -32,6 +32,8 @@ if java -cp "$CP" Check11Kt testdata/timing > "$OUT/kt11.out"; then echo "EXACT 
 if [ -f testdata/real/ps_clean.srt ]; then
   if java -cp "$CP" Check12Kt testdata/real > "$OUT/kt12.out"; then echo "TIMESTAMPS-FIRST ANALYSE (no details file): $(grep -c '^PASS' "$OUT/kt12.out") checks passed"; else echo "TIMESTAMPS-FIRST ANALYSE: FAILED"; grep FAIL "$OUT/kt12.out"; exit 1; fi
 else echo "TIMESTAMPS-FIRST ANALYSE: SKIPPED (testdata/real/ps_clean.srt is the owner's private script and is not in the public repo)"; fi
+# Free scene lengths (no magnet), export limited to the narration, export presets, typed times
+if java -cp "$CP" Check13Kt > "$OUT/kt13.out"; then echo "FREE SCENE LENGTH / EXPORT PRESETS: $(grep -c '^PASS' "$OUT/kt13.out") checks passed"; else echo "FREE SCENE LENGTH / EXPORT PRESETS: FAILED"; grep FAIL "$OUT/kt13.out"; exit 1; fi
 # Backend client + verified timing (Steps 10-16). Needs python3 with fastapi/uvicorn/numpy + ffmpeg; reported as SKIPPED (not passed) otherwise.
 if python3 -c "import fastapi, uvicorn, numpy" 2>/dev/null && command -v ffmpeg >/dev/null; then
   PORT=$((20000 + RANDOM % 20000)); rm -rf /tmp/tt10 && mkdir -p /tmp/tt10

@@ -45,8 +45,16 @@ class AutoState(private val act: ComponentActivity) {
     var sheet by mutableStateOf<String?>("inputs")
     var exportPct by mutableStateOf<Int?>(null)
     var jumpKey by mutableIntStateOf(0)           // bumped when the timeline must scroll to playMs
+    var captionsOn by mutableStateOf(true)        // captions switch: shown over the pictures in the preview AND burned into the exported video
+    var resP by mutableIntStateOf(720)            // export height: 720, 1080 or 2160 (4K)
+    var fps by mutableIntStateOf(30)              // export frame rate: 30 or 60
 
+    /** The whole timeline (scrubbing/editing): can be longer than the narration when a scene was extended. */
     fun totalMs(): Long { val t = timeline ?: return 0L; return max(t.audioMs, t.endMs) }
+    fun hasNarration() = narration != null
+    /** Where playing and the exported video stop: the end of the narration (picture edits never change it); without narration, the last picture. */
+    fun playEndMs(): Long { val t = timeline ?: return 0L; return if (narration != null) t.audioMs else max(t.audioMs, t.endMs) }
+    fun selectedClip(): ImageClip? { val id = selectedId ?: return null; return timeline?.clips?.firstOrNull { it.id == id } }
 
     // ---------- timeline edits ----------
     private fun sync() {
@@ -70,10 +78,9 @@ class AutoState(private val act: ComponentActivity) {
         edit { it.split(id, at) }
     }
     fun delete() { val id = selectedId ?: return; edit { it.delete(id, true) }; selectedId = null }
-    fun nudgeEnd(deltaMs: Long) {
-        val id = selectedId ?: return; val c = timeline?.clips?.firstOrNull { it.id == id } ?: return
-        edit { it.trim(id, Edge.END, c.endMs + deltaMs) }
-    }
+    /** Any length, no magnet: the scenes after this one move later/earlier, the narration stays as it is. */
+    fun setLength(ms: Long) { val id = selectedId ?: return; edit { it.setLength(id, ms) } }
+    fun addLength(deltaMs: Long) { val c = selectedClip() ?: return; setLength(c.durMs + deltaMs) }
     fun selectClip(id: Int?) {
         selectedId = id
         val c = id?.let { i -> timeline?.clips?.firstOrNull { it.id == i } } ?: return
@@ -88,7 +95,7 @@ class AutoState(private val act: ComponentActivity) {
     fun togglePlay() {
         if (timeline == null) return
         if (playing) { stopPlay(); return }
-        if (playMs >= totalMs() - 50) seekTo(0)
+        if (playMs >= playEndMs() - 50) seekTo(0)
         try { player?.let { it.seekTo(playMs.toInt()); it.start() } } catch (_: Exception) {}
         playing = true
     }
@@ -97,7 +104,7 @@ class AutoState(private val act: ComponentActivity) {
     fun tick(dtMs: Long) {
         val p = player
         playMs = if (p != null) try { p.currentPosition.toLong() } catch (_: Exception) { playMs + dtMs } else playMs + dtMs
-        if (playMs >= totalMs()) { playMs = totalMs(); stopPlay() }
+        if (playMs >= playEndMs()) { playMs = playEndMs(); stopPlay() }
     }
     fun release() { try { player?.release() } catch (_: Exception) {}; player = null }
 
@@ -200,6 +207,7 @@ class AutoState(private val act: ComponentActivity) {
                 val ed = TimelineEditor(Timeline.fromScenes(a.scenes, a.timing.duration))
                 act.runOnUiThread {
                     release(); player = mp; analysis = a; narration = audioF; editor = ed
+                    mp?.setOnCompletionListener { playMs = playEndMs(); playing = false }
                     selectedId = null; playMs = 0L; playing = false; warnings = msgs; busy = false
                     sync(); jumpKey++
                     status = "${a.scenes.size} scenes ready."; sheet = null
@@ -210,16 +218,16 @@ class AutoState(private val act: ComponentActivity) {
 
     // ---------- export (main thread) ----------
     fun export() {
-        val a = analysis ?: return; val tl = timeline ?: return
+        if (analysis == null) return; val tl = timeline ?: return
         if (exportPct != null) return
-        exportPct = 0; status = "Exporting..."; stopPlay()
+        val settings = try { ExportSettings.preset(resP, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
+        exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} $fps fps..."; stopPlay()
         try {
             val onP = { p: Int -> exportPct = p; status = "Exporting... $p%" }
             val onD = { where: String -> exportPct = null; status = "Done: $where" }
             val onE = { err: String -> exportPct = null; status = "Export failed: $err" }
-            // edited timeline (or whole script covered) -> exact-boundary plan from the timeline; untouched partial coverage -> older per-group export
-            if (a.match.full || editor?.canUndo == true) Exporter.exportTimeline(act, ExportPlan.fromTimeline(tl), narration, ExportSettings.P720, onP, onD, onE)
-            else Exporter.export(act, a, narration, onP, onD, onE)
+            // always from the edited timeline: the video is exactly as long as the narration (scenes after its end are left out, never squeezed in)
+            Exporter.exportTimeline(act, ExportPlan.fromTimeline(tl, clampToAudio = narration != null), narration, settings, captionsOn, onP, onD, onE)
         } catch (e: Exception) { exportPct = null; status = "Export failed: ${e.message}" }
     }
 }

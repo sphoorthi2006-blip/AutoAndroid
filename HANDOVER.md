@@ -89,3 +89,9 @@ Still UNAVAILABLE in RenderCaps: volume, music (step 27 = audio gain + music seq
 No UI can create text clips, fx or transitions yet (Text Studio = step 28+); the exporter code is ready for them and is only exercised when a Timeline contains them.
 Lessons: build with the GitHub token flow in section 6 (push redesign, dispatch workflow 403286994 on branch redesign, read branch buildlog on failure). In the Claude sandbox run bash scripts with `bash`, not `sh` (process substitution).
 Next steps (small): 27 audio gain + music in export; 28 Text Studio sheet (preview with OverlayRenderer); 29 Captions sheet; 30 Effects/Transitions sheet; 31 Media/Audio sheet + Projects page, then Checkpoint 03.
+
+## 6e. Batch 2b (steps 27+)
+| Step | What | Status |
+|---|---|---|
+| 27 | AudioGainProcessor.kt (volume/fades/mute via AudioMath.applyGain) on narration; music = extra looping audio sequence with own gain; RenderCaps volume+music WRITTEN, Check18 updated | see build result |
+ASSUMPTION (device): looping music may restart its fade per loop (processor frame counter resets at flush); looping sequence ends with the video.

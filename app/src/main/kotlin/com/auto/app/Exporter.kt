@@ -18,6 +18,7 @@ import android.provider.MediaStore
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.TextureOverlay
@@ -112,8 +113,17 @@ object Exporter {
         }
         val sequences = arrayListOf(EditedMediaItemSequence(video))
         if (narration != null) {
-            val a = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narration))).setRemoveVideo(true).build()
+            val ns = plan.mix.narration
+            val procs = if (ns.isIdentity) listOf<AudioProcessor>() else listOf<AudioProcessor>(AudioGainProcessor(ns, plan.totalMs))
+            val a = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narration))).setRemoveVideo(true).setEffects(Effects(procs, listOf())).build()
             sequences.add(EditedMediaItemSequence(listOf(a)))
+        }
+        // music bed: starts at 0, own gain, loops (looping sequence ends with the longest non-looping one = the video). Missing file = skipped.
+        plan.mix.music?.takeIf { File(it.path).exists() }?.let { m ->
+            val ms = m.settings
+            val procs = if (ms.isIdentity) listOf<AudioProcessor>() else listOf<AudioProcessor>(AudioGainProcessor(ms, plan.totalMs))
+            val item = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(File(m.path)))).setRemoveVideo(true).setEffects(Effects(procs, listOf())).build()
+            sequences.add(EditedMediaItemSequence(listOf(item), m.loop))
         }
         // text overlays (with their animations) are drawn over the whole composition, so their times are video times
         val compositionEffects = if (plan.texts.isEmpty()) Effects.EMPTY else Effects(listOf(), listOf(OverlayEffect(ImmutableList.of<TextureOverlay>(TextBitmapOverlay(ctx, s.width, s.height, plan.texts)))))

@@ -92,6 +92,23 @@ class AutoState(private val act: ComponentActivity) {
     }
     fun delete() { val id = selectedId ?: return; edit { it.delete(id, true) }; selectedId = null }
     /** Any length, no magnet: the scenes after this one move later/earlier, the narration stays as it is. */
+    // ---------- status + export extras (steps 37/38) ----------
+    val stage: Stage get() = when {
+        exportPct != null -> Stage.EXPORTING
+        busy -> Stage.ANALYSING
+        status.startsWith("Copying") -> Stage.IMPORTING
+        status.startsWith("Export failed") || status.startsWith("Could not") -> Stage.FAILED
+        timeline == null -> Stage.WAITING
+        status.startsWith("Done:") -> Stage.COMPLETED
+        else -> Stage.READY
+    }
+    var lastExportUri by mutableStateOf<Uri?>(null)
+    fun cancelExport() { if (exportPct == null) return; Exporter.cancel(); exportPct = null; status = "Export cancelled." }
+    fun shareExport() {
+        val u = lastExportUri ?: run { toast("Nothing to share yet: export a video first."); return }
+        val i = Intent(Intent.ACTION_SEND).apply { type = "video/mp4"; putExtra(Intent.EXTRA_STREAM, u); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        try { act.startActivity(Intent.createChooser(i, "Share video")) } catch (e: Exception) { toast("Could not share: ${e.message}") }
+    }
     // ---------- projects (step 36): saved in filesDir/projects through core ProjectStore ----------
     private val store by lazy { ProjectStore(File(act.filesDir, "projects")) }
     var projectId by mutableStateOf<String?>(null)
@@ -450,10 +467,10 @@ class AutoState(private val act: ComponentActivity) {
         if (analysis == null && !projectOpen) return; val tl = timeline ?: return
         if (exportPct != null) return
         val settings = try { ExportOptions.settings(Resolution.of(resP), aspect, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
-        exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} ${aspect.label} $fps fps..."; stopPlay()
+        lastExportUri = null; exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} ${aspect.label} $fps fps..."; stopPlay()
         try {
             val onP = { p: Int -> exportPct = p; status = "Exporting... $p%" }
-            val onD = { where: String -> exportPct = null; status = "Done: $where" }
+            val onD = { where: String -> exportPct = null; lastExportUri = Exporter.lastUri; status = "Done: $where" }
             val onE = { err: String -> exportPct = null; status = "Export failed: $err" }
             // always from the edited timeline: the video is exactly as long as the narration (scenes after its end are left out, never squeezed in)
             Exporter.exportTimeline(act, ExportPlan.fromTimeline(tl, clampToAudio = narration != null), narration, settings, captionsOn, onP, onD, onE)

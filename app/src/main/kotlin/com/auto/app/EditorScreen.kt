@@ -366,7 +366,7 @@ private fun Chip(label: String, on: Boolean) {
 }
 
 @Composable
-private fun InputsSheet(st: AutoState) {
+private fun InputsSheetBody(st: AutoState) {
     Column(Modifier.fillMaxSize()) {
         Text("Inputs", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
         GlowButton("Choose files or one ZIP") { st.pick(1) }
@@ -415,7 +415,7 @@ private fun PicturesSheet(st: AutoState) {
 }
 
 @Composable
-private fun WarningsSheet(st: AutoState) {
+private fun WarningsSheetBody(st: AutoState) {
     Column(Modifier.fillMaxSize()) {
         Text("Warnings", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
         if (st.warnings.isEmpty()) Text("Nothing to check.", color = C.Muted)
@@ -464,7 +464,16 @@ private fun ExportSheet(st: AutoState) {
         ToggleRow("Captions on the video", st.captionsOn) { st.captionsOn = !st.captionsOn }
         Text("${s.width}×${s.height} · ${s.fps} fps · captions ${if (st.captionsOn) "on" else "off"} · ${fmt(st.playEndMs())} long (same as the narration)", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
         if (st.resP == 2160 || st.fps == 60) Text("4K and 60 fps need a strong phone and take much longer. If the export fails, try 1080p / 30 fps.", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
+        StageChip(st)
+        val tlx = st.timeline
+        if (tlx != null) {
+            val notes = RenderCaps.notes(ExportPlan.fromTimeline(tlx, clampToAudio = st.hasNarration()), st.captionsOn)
+            if (notes.isNotEmpty()) { Text("What this export uses", color = C.Cyan, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)); for (n in notes) Text("• $n", color = C.Muted, fontSize = 12.sp) }
+        }
+        Text("The video is saved in Movies/Auto on this phone (Android 10 or newer).", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         GlowButton("Start export", enabled = st.timeline != null && !busy) { st.export() }
+        if (busy) GlowButton("Cancel export", outline = true) { st.cancelExport() }
+        if (st.lastExportUri != null && !busy) GlowButton("Share video", outline = true) { st.shareExport() }
         val p = st.exportPct
         if (p != null) Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(C.Lane)) {
             Box(Modifier.fillMaxWidth(p.coerceIn(0, 100) / 100f).fillMaxHeight().background(C.Glow))
@@ -494,4 +503,14 @@ private fun LengthSheet(st: AutoState) {
         Spacer(Modifier.height(4.dp))
         GlowButton("Apply", enabled = typed != null) { typed?.let { st.setLength(it) }; st.sheet = null }
     }
+}
+
+@Composable
+private fun InputsSheet(st: AutoState) {
+    Column(Modifier.fillMaxSize()) { StageChip(st); AnalysisCards(st); InputsSheetBody(st) }
+}
+
+@Composable
+private fun WarningsSheet(st: AutoState) {
+    Column(Modifier.fillMaxSize()) { StageChip(st); AnalysisCards(st); WarningsSheetBody(st) }
 }

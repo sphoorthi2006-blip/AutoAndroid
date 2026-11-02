@@ -42,6 +42,13 @@ import kotlin.math.min
 
 /** Builds the MP4: every scene = its picture for (end-start) seconds, the narration underneath. Scenes without a picture get a black screen with their text. Text over pictures, click sound and music are not done yet. */
 object Exporter {
+    /** The running export (main thread only): lets Cancel stop it. */
+    private var current: Transformer? = null
+    private var currentHandler: Handler? = null
+    /** MediaStore uri of the last published video (null when it could not be copied); used by Share. */
+    var lastUri: Uri? = null
+    fun cancel() { try { current?.cancel() } catch (_: Exception) {}; currentHandler?.removeCallbacksAndMessages(null); current = null }
+
     const val W = 1280
     const val H = 720
 
@@ -138,6 +145,7 @@ object Exporter {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) { handler.removeCallbacksAndMessages(null); onDone(publish(ctx, out)) }
                 override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) { handler.removeCallbacksAndMessages(null); onError(exportException.message ?: "Export failed") }
             }).build()
+        current = transformer; currentHandler = handler; lastUri = null
         transformer.start(Composition.Builder(sequences).setEffects(compositionEffects).build(), out.path)
         val holder = ProgressHolder()
         val poll = object : Runnable { override fun run() {
@@ -194,6 +202,7 @@ object Exporter {
             }
             val uri = ctx.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, v)!!
             ctx.contentResolver.openOutputStream(uri)!!.use { o -> f.inputStream().use { it.copyTo(o) } }
+            lastUri = uri
             "Movies/Auto/${f.name}"
         } catch (e: Exception) { "NOT copied to Movies (${e.message}). The file is only in the app cache, which Android may clear: ${f.path}" }
     }

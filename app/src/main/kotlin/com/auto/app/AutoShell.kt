@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -75,9 +77,9 @@ private fun NavBar(st: AutoState, shell: Shell) {
                     Page.Media -> { st.sheet = "pictures"; shell.openEditor() }
                     else -> shell.page = p
                 }
-            }.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(p.glyph, color = if (on) C.Cyan else C.Muted, fontSize = 20.sp)
-                Text(p.label, color = if (on) C.Cyan else C.Muted, fontSize = 11.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+            }.heightIn(min = 56.dp).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                AutoIcon(when (p) { Page.Home -> "home"; Page.Projects -> "projects"; Page.Editor -> "editor"; Page.Media -> "media"; Page.Settings -> "settings" }, if (on) C.Cyan else C.Muted, 24.dp)
+                Text(p.label, color = if (on) C.Cyan else C.Muted, fontSize = 12.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
             }
         }
     }

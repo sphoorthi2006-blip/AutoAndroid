@@ -74,13 +74,23 @@ fun BetaTag(id: String) {
         modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(C.Violet.copy(alpha = 0.25f)).padding(horizontal = 8.dp, vertical = 2.dp))
 }
 
+/** One neatly separated section of the style editor: title + card background + inner spacing. */
+@Composable
+fun Sec(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp).clip(shape).background(C.Bg).border(1.dp, C.Line, shape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, color = C.Cyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        content()
+    }
+}
+
 @Composable
 fun SecTitle(t: String) = Text(t, color = C.Cyan, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
 
 @Composable
 fun StudioSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, fmt: (Float) -> String, onCommit: (Float) -> Unit) {
     var v by remember(value) { mutableFloatStateOf(value.coerceIn(range.start, range.endInclusive)) }
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row(Modifier.fillMaxWidth()) {
             Text(label, color = C.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
             Text(fmt(v), color = C.Muted, fontSize = 13.sp)
@@ -165,7 +175,7 @@ fun StylePreview(text: String, style: OverlayStyle, ratio: Float, modifier: Modi
 fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: List<NamedStyle>, lib: StyleLibrary, onSave: (String, OverlayStyle) -> Unit, onDeleteSaved: (String) -> Unit, animations: Boolean, positionControls: Boolean) {
     val sdk = Build.VERSION.SDK_INT
     Column(Modifier.fillMaxWidth()) {
-        SecTitle("PRESETS")
+        Sec("PRESETS") {
         Row(Modifier.horizontalScroll(rememberScrollState())) { for (p in presets) OptionChip(p.name, style == p.style) { onChange(p.style) } }
         if (lib.items.isNotEmpty()) {
             Text("My styles", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
@@ -182,7 +192,8 @@ fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: 
             OptionChip("Save style", false) { onSave(name, style); name = "" }
         }
 
-        SecTitle("FONT")
+        }
+        Sec("FONT") {
         Row(Modifier.horizontalScroll(rememberScrollState())) { for (f in FontCatalog.faces) FontChip(f.id, f.label, style.font == f.id) { onChange(style.copy(font = f.id, italic = style.italic && f.hasItalic)) } }
         Row(Modifier.horizontalScroll(rememberScrollState())) {
             for (w in FontCatalog.offeredWeights(sdk)) OptionChip(w.label, FontCatalog.effectiveWeight(style.weight, sdk) == FontCatalog.effectiveWeight(w.value, sdk)) { onChange(style.copy(weight = w.value)) }
@@ -203,30 +214,35 @@ fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: 
         ToggleRow("Underline", style.underline) { onChange(style.copy(underline = !style.underline)) }
         ToggleRow("Strikethrough", style.strike) { onChange(style.copy(strike = !style.strike)) }
 
-        SecTitle("COLOUR")
+        }
+        Sec("COLOUR") {
         ColorRow("Text colour", style.color) { onChange(style.copy(color = it)) }
         StudioSlider("Opacity", style.opacity, 0f..1f, { "${(it * 100).toInt()}%" }) { onChange(style.copy(opacity = it)) }
         ToggleRow("Gradient text", style.gradientEnd != null) { onChange(style.copy(gradientEnd = if (style.gradientEnd == null) 0xFF7C3AED.toInt() else null)) }
         style.gradientEnd?.let { g -> ColorRow("Gradient end colour", g) { onChange(style.copy(gradientEnd = it)) } }
 
-        SecTitle("OUTLINE")
+        }
+        Sec("OUTLINE") {
         ColorRow("Outline colour", style.strokeColor) { onChange(style.copy(strokeColor = it)) }
         StudioSlider("Thickness", style.strokeEm, 0f..0.4f, ::em) { onChange(style.copy(strokeEm = it)) }
 
-        SecTitle("SHADOW")
+        }
+        Sec("SHADOW") {
         ColorRow("Shadow colour", style.shadowColor) { onChange(style.copy(shadowColor = it)) }
         StudioSlider("Shadow opacity (0 = no shadow)", style.shadowOpacity, 0f..1f, { "${(it * 100).toInt()}%" }) { onChange(style.copy(shadowOpacity = it)) }
         StudioSlider("Blur", style.shadowBlurEm, 0f..0.5f, ::em) { onChange(style.copy(shadowBlurEm = it)) }
         StudioSlider("Offset X", style.shadowDxEm, -0.5f..0.5f, ::em) { onChange(style.copy(shadowDxEm = it)) }
         StudioSlider("Offset Y", style.shadowDyEm, -0.5f..0.5f, ::em) { onChange(style.copy(shadowDyEm = it)) }
 
-        SecTitle("BACKGROUND BOX")
+        }
+        Sec("BACKGROUND BOX") {
         ColorRow("Box colour", style.bgColor) { onChange(style.copy(bgColor = it)) }
         StudioSlider("Box opacity (0 = no box)", style.bgOpacity, 0f..1f, { "${(it * 100).toInt()}%" }) { onChange(style.copy(bgOpacity = it)) }
         StudioSlider("Corner radius", style.bgRadiusEm, 0f..1f, ::em) { onChange(style.copy(bgRadiusEm = it)) }
         StudioSlider("Padding", style.paddingEm, 0f..1.5f, ::em) { onChange(style.copy(paddingEm = it)) }
 
-        SecTitle(if (positionControls) "POSITION (you can also drag it in the preview)" else "POSITION")
+        }
+        Sec(if (positionControls) "POSITION (you can also drag it in the preview)" else "POSITION") {
         StudioSlider("Vertical position", style.y, 0f..1f, { "${(it * 100).toInt()}%" }) { onChange(style.copy(y = it)) }
         if (positionControls) {
             StudioSlider("Horizontal position", style.x, 0f..1f, { "${(it * 100).toInt()}%" }) { onChange(style.copy(x = it)) }
@@ -234,14 +250,16 @@ fun StyleEditor(style: OverlayStyle, onChange: (OverlayStyle) -> Unit, presets: 
             StudioSlider("Rotation", style.rotationDeg, -180f..180f, ::deg) { onChange(style.copy(rotationDeg = it)) }
         }
 
+        }
         if (animations) {
-            SecTitle("ANIMATION")
+            Sec("ANIMATION") {
             Text("In", color = C.Text, fontSize = 14.sp)
             Row(Modifier.horizontalScroll(rememberScrollState())) { for (k in AnimKind.values().filter { it.allowedIn }) OptionChip(k.label, style.animIn == k) { onChange(style.copy(animIn = k)) } }
             if (style.animIn != AnimKind.NONE) StudioSlider("In duration", style.animInMs.toFloat(), 0f..3000f, ::ms) { onChange(style.copy(animInMs = it.toInt())) }
             Text("Out", color = C.Text, fontSize = 14.sp)
             Row(Modifier.horizontalScroll(rememberScrollState())) { for (k in AnimKind.values().filter { it.allowedOut }) OptionChip(k.label, style.animOut == k) { onChange(style.copy(animOut = k)) } }
             if (style.animOut != AnimKind.NONE) StudioSlider("Out duration", style.animOutMs.toFloat(), 0f..3000f, ::ms) { onChange(style.copy(animOutMs = it.toInt())) }
+            }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -254,7 +272,7 @@ fun TextStudioSheet(st: AutoState) {
     val tl = st.timeline
     if (tl == null) { Text("Press Analyse first: Text Studio edits the text of a project.", color = C.Muted, fontSize = 15.sp, modifier = Modifier.padding(16.dp)); return }
     val sel = st.selectedText()
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Text Studio", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             BetaTag("text")
@@ -269,7 +287,7 @@ fun TextStudioSheet(st: AutoState) {
             return@Column
         }
         StylePreview(sel.text.ifBlank { "Your text" }, sel.style, st.aspect.ratio, Modifier.padding(vertical = 6.dp))
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxWidth()) {
             TextInput(sel.id, sel.text, "Type your text") { st.editText(sel.id, text = it) }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TimeField("Starts (m:ss.mmm)", sel.startMs, Modifier.weight(1f)) { st.editText(sel.id, startMs = it) }

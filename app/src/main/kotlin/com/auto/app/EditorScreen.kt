@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -91,15 +92,25 @@ const val DP_PER_SEC = 60f
 fun EditorScreen(st: AutoState) {
     // playback clock: ~30 ticks a second while playing
     LaunchedEffect(st.playing) { while (st.playing) { delay(33); st.tick(33) } }
-    Box(Modifier.fillMaxSize().background(C.Bg)) {
-        Column(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(C.Bg)) {
+        val wide = maxWidth > maxHeight || maxWidth >= 600.dp   // landscape or tablet: preview left, tools right
+        if (wide) Column(Modifier.fillMaxSize()) {
+            TopBar(st)
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                Column(Modifier.weight(1f).fillMaxHeight()) { Stage(st, Modifier.weight(1f)); PlayRow(st) }
+                Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                    TimelineArea(st)
+                    if (st.selectedTextId != null) TextBar(st) else if (st.selectedId != null) ContextBar(st) else MainBar(st)
+                }
+            }
+        } else Column(Modifier.fillMaxSize()) {
             TopBar(st)
             Stage(st, Modifier.weight(1f))
             PlayRow(st)
             TimelineArea(st)
             if (st.selectedTextId != null) TextBar(st) else if (st.selectedId != null) ContextBar(st) else MainBar(st)
         }
-        SheetHost(st)
+        SheetHost(st, wide)
     }
 }
 
@@ -107,22 +118,25 @@ fun EditorScreen(st: AutoState) {
 @Composable
 private fun TopBar(st: AutoState) {
     Row(Modifier.fillMaxWidth().glow(C.Violet, 14.dp, RoundedCornerShape(0.dp)).background(C.Top).statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        TopIcon("‹", true) { st.onHome() }
-        TopIcon("↶", st.canUndo) { st.undo() }
-        TopIcon("↷", st.canRedo) { st.redo() }
+        TopIcon("back", true) { st.onHome() }
+        TopIcon("undo", st.canUndo) { st.undo() }
+        TopIcon("redo", st.canRedo) { st.redo() }
         Spacer(Modifier.weight(1f))
-        TopIcon("▤", true) { st.sheet = "scenes" }
-        TopIcon(if (st.warnings.isEmpty()) "⚠" else "⚠ ${st.warnings.size}", true) { st.sheet = "warnings" }
-        Box(Modifier.padding(start = 4.dp).clip(RoundedCornerShape(50)).background(C.Violet).clickable { st.sheet = "export" }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        TopIcon("scenes", true) { st.sheet = "scenes" }
+        TopIcon("warning", true, st.warnings.size) { st.sheet = "warnings" }
+        Box(Modifier.padding(start = 4.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(50)).background(C.Glow).clickable { st.sheet = "export" }.padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
             Text("Export", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
     }
 }
 
 @Composable
-private fun TopIcon(label: String, enabled: Boolean, onClick: () -> Unit) {
-    Box(Modifier.widthIn(min = 40.dp).height(40.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.4f), fontSize = 20.sp)
+private fun TopIcon(label: String, enabled: Boolean, badge: Int = 0, onClick: () -> Unit) {
+    Box(Modifier.widthIn(min = 48.dp).height(48.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AutoIcon(label, Color.White.copy(alpha = if (enabled) 1f else 0.4f), 22.dp)
+            if (badge > 0) Text("$badge", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 3.dp))
+        }
     }
 }
 
@@ -155,8 +169,8 @@ private fun Stage(st: AutoState, modifier: Modifier) {
 private fun PlayRow(st: AutoState) {
     Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         Text(fmt(st.playMs), color = C.Text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-        Box(Modifier.padding(horizontal = 16.dp).size(52.dp).glow(C.Cyan, 18.dp, CircleShape).background(Brush.linearGradient(listOf(C.Cyan, C.Violet)), CircleShape).clickable { st.togglePlay() }, contentAlignment = Alignment.Center) {
-            Text(if (st.playing) "❚❚" else "▶", color = Color.White, fontSize = 18.sp)
+        Box(Modifier.padding(horizontal = 16.dp).size(56.dp).glow(C.Cyan, 18.dp, CircleShape).background(Brush.linearGradient(listOf(C.Cyan, C.Violet)), CircleShape).clickable { st.togglePlay() }, contentAlignment = Alignment.Center) {
+            AutoIcon(if (st.playing) "pause" else "play", Color.White, 24.dp)
         }
         Text(fmt(st.playEndMs()), color = C.Muted, fontSize = 17.sp)
     }
@@ -239,8 +253,8 @@ private fun TimelineArea(st: AutoState) {
             Box(Modifier.align(Alignment.TopCenter).offset(y = 22.dp).width(3.dp).fillMaxHeight().glow(C.Cyan, 10.dp, RoundedCornerShape(2.dp)).background(Color.White))
         }
         // floating +
-        Box(Modifier.align(Alignment.BottomEnd).padding(12.dp).size(44.dp).glow(C.Violet, 16.dp, CircleShape).background(C.Glow, CircleShape).clickable { st.sheet = "pictures" }, contentAlignment = Alignment.Center) {
-            Text("+", color = Color.White, fontSize = 24.sp)
+        Box(Modifier.align(Alignment.BottomEnd).padding(12.dp).size(48.dp).glow(C.Violet, 16.dp, CircleShape).background(C.Glow, CircleShape).clickable { st.sheet = "pictures" }, contentAlignment = Alignment.Center) {
+            AutoIcon("plus", Color.White, 24.dp)
         }
     }
 }
@@ -257,15 +271,15 @@ private fun Thumb(path: String?, modifier: Modifier) {
 @Composable
 private fun MainBar(st: AutoState) {
     Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp)) {
-        Tab("⤒", "Inputs", st.sheet == "inputs") { st.sheet = "inputs" }
-        Tab("▦", "Scenes", st.sheet == "scenes") { st.sheet = "scenes" }
-        Tab("▣", "Media", st.sheet == "pictures") { st.sheet = "pictures" }
-        Tab("⚠", "Warnings", st.sheet == "warnings") { st.sheet = "warnings" }
-        Tab("Aa", "Text", st.sheet == "text") { st.sheet = "text" }
-        Tab("▭", "Captions", st.sheet == "captions") { st.sheet = "captions" }
-        Tab("♪", "Audio", st.sheet == "audio") { st.sheet = "audio" }
-        Tab("CC", if (st.captionsOn) "CC on" else "CC off", st.captionsOn) { st.captionsOn = !st.captionsOn }
-        Tab("⬆", "Export", st.sheet == "export") { st.sheet = "export" }
+        Tab("import", "Inputs", st.sheet == "inputs") { st.sheet = "inputs" }
+        Tab("scenes", "Scenes", st.sheet == "scenes") { st.sheet = "scenes" }
+        Tab("media", "Media", st.sheet == "pictures") { st.sheet = "pictures" }
+        Tab("warning", "Warnings", st.sheet == "warnings") { st.sheet = "warnings" }
+        Tab("text", "Text", st.sheet == "text") { st.sheet = "text" }
+        Tab("captions", "Captions", st.sheet == "captions") { st.sheet = "captions" }
+        Tab("music", "Audio", st.sheet == "audio") { st.sheet = "audio" }
+        Tab("cc", if (st.captionsOn) "CC on" else "CC off", st.captionsOn) { st.captionsOn = !st.captionsOn }
+        Tab("export", "Export", st.sheet == "export") { st.sheet = "export" }
     }
 }
 
@@ -273,34 +287,34 @@ private fun MainBar(st: AutoState) {
 private fun TextBar(st: AutoState) {
     val id = st.selectedTextId ?: return
     Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp)) {
-        Tab("✕", "Done", false) { st.selectText(null) }
-        Tab("Aa", "Edit", false) { st.sheet = "text" }
-        Tab("✂", "Split", false) { st.splitText(id) }
-        Tab("⧉", "Duplicate", false) { st.duplicateText(id) }
-        Tab("🗑", "Delete", false) { st.deleteText(id) }
+        Tab("close", "Done", false) { st.selectText(null) }
+        Tab("text", "Edit", false) { st.sheet = "text" }
+        Tab("split", "Split", false) { st.splitText(id) }
+        Tab("duplicate", "Duplicate", false) { st.duplicateText(id) }
+        Tab("delete", "Delete", false) { st.deleteText(id) }
     }
 }
 
 @Composable
 private fun ContextBar(st: AutoState) {
     Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp)) {
-        Tab("✕", "Done", false) { st.selectedId = null }
-        Tab("✂", "Split", false) { st.split() }
-        Tab("−", "−1 s", false) { st.addLength(-1000) }
-        Tab("+", "+1 s", false) { st.addLength(1000) }
-        Tab("⏱", "Length", false) { st.sheet = "length" }
-        Tab("◐", "Effects", st.sheet == "effects") { st.sheet = "effects" }
-        Tab("⇄", "Replace", false) { st.pick(3) }
-        Tab("🗑", "Delete", false) { st.delete() }
+        Tab("close", "Done", false) { st.selectedId = null }
+        Tab("split", "Split", false) { st.split() }
+        Tab("minus", "−1 s", false) { st.addLength(-1000) }
+        Tab("plus", "+1 s", false) { st.addLength(1000) }
+        Tab("length", "Length", false) { st.sheet = "length" }
+        Tab("effects", "Effects", st.sheet == "effects") { st.sheet = "effects" }
+        Tab("replace", "Replace", false) { st.pick(3) }
+        Tab("delete", "Delete", false) { st.delete() }
     }
 }
 
 @Composable
 private fun Tab(icon: String, label: String, active: Boolean, onClick: () -> Unit) {
-    Column(Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).widthIn(min = 70.dp).padding(horizontal = 8.dp, vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).widthIn(min = 72.dp).heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(44.dp).then(if (active) Modifier.glow(C.Cyan, 12.dp, CircleShape) else Modifier)
             .background(if (active) C.Glow else SolidColor(C.Lane), CircleShape), contentAlignment = Alignment.Center) {
-            Text(icon, color = if (active) Color.White else C.Text, fontSize = 19.sp)
+            AutoIcon(icon, if (active) Color.White else C.Text, 22.dp)
         }
         Text(label, color = if (active) C.Cyan else C.Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 3.dp))
     }
@@ -308,14 +322,14 @@ private fun Tab(icon: String, label: String, active: Boolean, onClick: () -> Uni
 
 // ───────────────────────── bottom sheets ─────────────────────────
 @Composable
-private fun BoxScope.SheetHost(st: AutoState) {
+private fun BoxScope.SheetHost(st: AutoState, wide: Boolean) {
     val open = st.sheet != null
     val shown = remember { mutableStateOf("inputs") }
     st.sheet?.let { shown.value = it }
-    AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
+    AnimatedVisibility(open && !wide, enter = fadeIn(), exit = fadeOut()) {
         Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { st.sheet = null })
     }
-    AnimatedVisibility(open, modifier = Modifier.align(Alignment.BottomCenter).fillMaxHeight(0.82f), enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+    AnimatedVisibility(open, modifier = (if (wide) Modifier.align(Alignment.BottomEnd).fillMaxWidth(0.5f).fillMaxHeight(0.96f) else Modifier.align(Alignment.BottomCenter).fillMaxHeight(0.82f)), enter = slideInVertically { it }, exit = slideOutVertically { it }) {
         val shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
         Column(Modifier.fillMaxSize().glow(C.Violet, 24.dp, shape).clip(shape).background(C.Card).border(1.dp, C.Cyan.copy(alpha = 0.45f), shape).navigationBarsPadding().imePadding().padding(horizontal = 16.dp)) {
             Box(Modifier.padding(vertical = 10.dp).align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(C.Line).clickable { st.sheet = null })
@@ -341,7 +355,7 @@ fun GlowButton(text: String, enabled: Boolean = true, outline: Boolean = false, 
     Box(Modifier.fillMaxWidth().padding(bottom = 10.dp).then(if (!outline && enabled) Modifier.glow(C.Violet, 16.dp, shape) else Modifier)
         .clip(shape).then(if (outline) Modifier.border(1.dp, C.Line, shape) else Modifier.background(if (enabled) C.Glow else SolidColor(C.Lane)))
         .clickable(enabled = enabled, onClick = onClick).padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = if (enabled) Color.White else C.Muted, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(text, color = if (enabled) Color.White else C.Muted.copy(alpha = 0.7f), fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
 
@@ -350,7 +364,7 @@ private fun SearchBox(value: String, hint: String, onChange: (String) -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(24.dp)
     Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).then(if (focused) Modifier.glow(C.Cyan, 16.dp, shape) else Modifier).border(1.dp, if (focused) C.Cyan else C.Line, shape).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("⌕", color = C.Muted, fontSize = 18.sp)
+        AutoIcon("analyse", C.Muted, 20.dp)
         Box(Modifier.weight(1f).padding(start = 10.dp)) {
             if (value.isEmpty()) Text(hint, color = C.Muted, fontSize = 15.sp)
             BasicTextField(value, onChange, singleLine = true, textStyle = TextStyle(color = C.Text, fontSize = 16.sp), cursorBrush = SolidColor(C.Cyan), modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused })
@@ -361,20 +375,20 @@ private fun SearchBox(value: String, hint: String, onChange: (String) -> Unit) {
 @Composable
 private fun Chip(label: String, on: Boolean) {
     val shape = RoundedCornerShape(50)
-    Box(Modifier.padding(end = 8.dp, bottom = 8.dp).then(if (on) Modifier.glow(C.Cyan, 10.dp, shape) else Modifier).clip(shape).background(if (on) C.Cyan.copy(alpha = 0.15f) else Color.Transparent)
-        .border(1.dp, if (on) C.Cyan else C.Line, shape).padding(horizontal = 14.dp, vertical = 9.dp)) {
-        Text(if (on) "✓ $label" else label, color = if (on) C.Cyan else C.Muted, fontSize = 14.sp)
+    Box(Modifier.padding(end = 8.dp, bottom = 8.dp).height(40.dp).clip(shape).background(if (on) C.Cyan.copy(alpha = 0.15f) else Color.Transparent)
+        .border(1.dp, if (on) C.Cyan else C.Line, shape).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+        Text(if (on) "✓ $label" else label, color = if (on) C.Cyan else C.Muted, fontSize = 14.sp, maxLines = 1, softWrap = false)
     }
 }
 
 @Composable
 private fun InputsSheetBody(st: AutoState) {
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxWidth()) {
         Text("Inputs", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
         GlowButton("Choose files or one ZIP") { st.pick(1) }
         GlowButton("Choose pictures (ZIP or images)") { st.pick(2) }
         GlowButton(if (st.busy) "Analysing…" else "Analyse", enabled = !st.busy, outline = true) { st.analyse() }
-        Row { Chip("Timestamps", "Timestamps" in st.kinds); Chip("Audio", "Audio" in st.kinds); Chip("Pictures", "Pictures" in st.kinds); Chip("Script", "Script" in st.kinds) }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) { Chip("Timestamps", "Timestamps" in st.kinds); Chip("Audio", "Audio" in st.kinds); Chip("Pictures", "Pictures" in st.kinds); Chip("Script", "Script" in st.kinds) }
         Text("All inputs are optional.", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp))
         Text(st.status, color = C.Text, fontSize = 14.sp)
     }
@@ -418,13 +432,13 @@ private fun PicturesSheet(st: AutoState) {
 
 @Composable
 private fun WarningsSheetBody(st: AutoState) {
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxWidth()) {
         Text("Warnings", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
         if (st.warnings.isEmpty()) Text("Nothing to check.", color = C.Muted)
-        LazyColumn(Modifier.weight(1f)) {
-            items(st.warnings) { w ->
+        Column {
+            for (w in st.warnings) run {
                 val shape = RoundedCornerShape(20.dp)
-                Text("⚠ $w", color = C.Text, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(shape).border(1.dp, C.Line, shape).padding(12.dp))
+                Text(w, color = C.Text, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(shape).border(1.dp, C.Line, shape).padding(12.dp))
             }
         }
     }
@@ -434,8 +448,8 @@ private fun WarningsSheetBody(st: AutoState) {
 fun OptionChip(label: String, on: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Box(Modifier.padding(end = 8.dp, bottom = 8.dp).then(if (on) Modifier.glow(C.Cyan, 10.dp, shape) else Modifier).clip(shape).background(if (on) C.Cyan.copy(alpha = 0.15f) else Color.Transparent)
-        .border(1.dp, if (on) C.Cyan else C.Line, shape).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp)) {
-        Text(label, color = if (on) C.Cyan else C.Text, fontSize = 15.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+        .border(1.dp, if (on) C.Cyan else C.Line, shape).clickable(onClick = onClick).heightIn(min = 48.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+        Text(label, color = if (on) C.Cyan else C.Text, fontSize = 15.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1, softWrap = false)
     }
 }
 
@@ -473,14 +487,15 @@ private fun ExportSheet(st: AutoState) {
             if (notes.isNotEmpty()) { Text("What this export uses", color = C.Cyan, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)); for (n in notes) Text("• $n", color = C.Muted, fontSize = 12.sp) }
         }
         Text("The video is saved in Movies/Auto on this phone (Android 10 or newer).", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
-        GlowButton("Start export", enabled = st.timeline != null && !busy) { st.export() }
+        GlowButton(if (st.timeline == null) "Start export (Press Analyse first)" else "Start export", enabled = st.timeline != null && !busy) { st.export() }
+        if (st.timeline == null) Text("Open Inputs, add your files and press Analyse. Then you can export.", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
         if (busy) GlowButton("Cancel export", outline = true) { st.cancelExport() }
         if (st.lastExportUri != null && !busy) GlowButton("Share video", outline = true) { st.shareExport() }
         val p = st.exportPct
         if (p != null) Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(C.Lane)) {
             Box(Modifier.fillMaxWidth(p.coerceIn(0, 100) / 100f).fillMaxHeight().background(C.Glow))
         }
-        Text(st.status, color = C.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
+        if (st.status.startsWith("Export") || st.status.startsWith("Done")) Text(st.status, color = C.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
     }
 }
 
@@ -509,10 +524,10 @@ private fun LengthSheet(st: AutoState) {
 
 @Composable
 private fun InputsSheet(st: AutoState) {
-    Column(Modifier.fillMaxSize()) { StageChip(st); AnalysisCards(st); InputsSheetBody(st) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { StageChip(st); AnalysisCards(st); InputsSheetBody(st) }
 }
 
 @Composable
 private fun WarningsSheet(st: AutoState) {
-    Column(Modifier.fillMaxSize()) { StageChip(st); AnalysisCards(st); WarningsSheetBody(st) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { StageChip(st); AnalysisCards(st); WarningsSheetBody(st) }
 }

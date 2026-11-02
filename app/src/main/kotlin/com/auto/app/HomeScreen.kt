@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,14 +37,14 @@ private class Shortcut(val glyph: String, val title: String, val ready: Boolean,
 @Composable
 fun HomeScreen(st: AutoState, shell: Shell) {
     val shortcuts = listOf(
-        Shortcut("＋", "New Project", true) { st.newProject(); shell.openEditor() },
-        Shortcut("◎", "Auto Analyse", true) { st.sheet = "inputs"; shell.openEditor() },
-        Shortcut("Aa", "Text Studio", true) { if (st.hasProject) { st.sheet = "text"; shell.openEditor() } else shell.message("Text Studio", "Add your files and press Analyse first. Text Studio edits the text of a project.") },
-        Shortcut("▭", "Captions", true) { if (st.hasProject) { st.sheet = "captions"; shell.openEditor() } else shell.message("Captions", "Add your files and press Analyse first. Captions belong to a project.") },
-        Shortcut("◐", "Effects", true) { if (st.hasProject) { st.sheet = "effects"; shell.openEditor() } else shell.message("Effects", "Add your files and press Analyse first. Effects belong to the pictures of a project.") },
-        Shortcut("▣", "Media Library", true) { st.sheet = if (st.hasProject) "pictures" else "inputs"; shell.openEditor() },
-        Shortcut("♪", "Music & Audio", true) { if (st.hasProject) { st.sheet = "audio"; shell.openEditor() } else shell.message("Music & Audio", "Add your files and press Analyse first. Audio belongs to a project.") },
-        Shortcut("⬆", "Export", true) { st.sheet = if (st.hasProject) "export" else "inputs"; shell.openEditor() },
+        Shortcut("new", "New Project", true) { st.newProject(); shell.openEditor() },
+        Shortcut("analyse", "Auto Analyse", true) { st.sheet = "inputs"; shell.openEditor() },
+        Shortcut("text", "Text Studio", true) { if (st.hasProject) { st.sheet = "text"; shell.openEditor() } else shell.message("Text Studio", "Add your files and press Analyse first. Text Studio edits the text of a project.") },
+        Shortcut("captions", "Captions", true) { if (st.hasProject) { st.sheet = "captions"; shell.openEditor() } else shell.message("Captions", "Add your files and press Analyse first. Captions belong to a project.") },
+        Shortcut("effects", "Effects", true) { if (st.hasProject) { st.sheet = "effects"; shell.openEditor() } else shell.message("Effects", "Add your files and press Analyse first. Effects belong to the pictures of a project.") },
+        Shortcut("media", "Media Library", true) { st.sheet = if (st.hasProject) "pictures" else "inputs"; shell.openEditor() },
+        Shortcut("music", "Music & Audio", true) { if (st.hasProject) { st.sheet = "audio"; shell.openEditor() } else shell.message("Music & Audio", "Add your files and press Analyse first. Audio belongs to a project.") },
+        Shortcut("export", "Export", true) { st.sheet = if (st.hasProject) "export" else "inputs"; shell.openEditor() },
     )
     Column(Modifier.fillMaxSize().background(C.Bg).verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -52,7 +53,7 @@ fun HomeScreen(st: AutoState, shell: Shell) {
                 Text("AUTO", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(if (st.hasProject) "Project open · ${st.timeline?.clips?.size ?: 0} scenes" else "No project open", color = C.Muted, fontSize = 12.sp)
             }
-            Box(Modifier.clip(RoundedCornerShape(12.dp)).clickable { shell.openSettings() }.padding(10.dp)) { Text("⚙", color = C.Muted, fontSize = 22.sp) }
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { shell.openSettings() }, contentAlignment = Alignment.Center) { AutoIcon("settings", C.Muted, 24.dp) }
         }
         Spacer(Modifier.height(26.dp))
         Text("Create something amazing", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 26.sp)
@@ -69,7 +70,7 @@ fun HomeScreen(st: AutoState, shell: Shell) {
             if (st.projects.isNotEmpty()) {
                 Text("Recent projects", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                 for (p in st.projects.take(3)) Text("${p.name} · ${p.scenes} scenes · ${com.auto.core.RelativeTime.label(p.updatedMs, System.currentTimeMillis())}", color = if (p.hasTimeline) C.Text else C.Muted, fontSize = 13.sp,
-                    modifier = Modifier.fillMaxWidth().clickable(enabled = p.hasTimeline) { st.openProject(p.id) { shell.openEditor() } }.padding(vertical = 6.dp))
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(enabled = p.hasTimeline) { st.openProject(p.id) { shell.openEditor() } }.padding(vertical = 12.dp))
             }
         }
         Spacer(Modifier.height(22.dp))
@@ -86,13 +87,12 @@ fun HomeScreen(st: AutoState, shell: Shell) {
 @Composable
 private fun Tile(sc: Shortcut) {
     val shape = RoundedCornerShape(16.dp)
-    Column(Modifier.fillMaxWidth().clip(shape).background(C.Card).border(1.dp, C.Line, shape).clickable(onClick = sc.onClick).padding(vertical = 12.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxWidth().heightIn(min = 96.dp).clip(shape).background(C.Card).border(1.dp, C.Line, shape).clickable(onClick = sc.onClick).padding(vertical = 12.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(if (sc.ready) C.Violet.copy(alpha = 0.25f) else C.Lane), contentAlignment = Alignment.Center) {
-            Text(sc.glyph, color = if (sc.ready) C.Cyan else C.Muted, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            AutoIcon(sc.glyph, if (sc.ready) C.Cyan else C.Muted, 22.dp)
         }
         Text(sc.title, color = if (sc.ready) C.Text else C.Muted, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
         if (!sc.ready) Text("Soon", color = C.Cyan, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(50)).background(C.Violet.copy(alpha = 0.25f)).padding(horizontal = 8.dp, vertical = 2.dp))
-        else Spacer(Modifier.height(18.dp))
     }
 }
 
@@ -101,7 +101,7 @@ private fun HomeButton(text: String, primary: Boolean, enabled: Boolean, onClick
     val shape = RoundedCornerShape(50)
     Box(Modifier.fillMaxWidth().then(if (primary && enabled) Modifier.glow(C.Violet, 14.dp, shape) else Modifier).clip(shape)
         .then(if (primary) Modifier.background(if (enabled) C.Glow else SolidColor(C.Lane)) else Modifier.border(1.dp, C.Line, shape))
-        .clickable(enabled = enabled, onClick = onClick).padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
+        .heightIn(min = 48.dp).clickable(enabled = enabled, onClick = onClick).padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
         Text(text, color = if (enabled) Color.White else C.Muted, fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 }

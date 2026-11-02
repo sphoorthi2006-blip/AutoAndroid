@@ -101,3 +101,10 @@ ASSUMPTION (device): looping music may restart its fade per loop (processor fram
 | 31 | CaptionsSheet.kt: cues list (text + typed times), import SRT/VTT/JSON (pick mode 4), From scenes, add/split/merge/shift/delete, reading-speed warnings, share SRT/VTT as text, caption style via the same StyleEditor, preview strip | COMPILES, not seen on a phone |
 RULE (steps 28-31): if the project has caption CUES they are what is shown in the preview and burned in the export (timed overlays, caption style); with no cues the scene text is burned into the pictures as before (Timeline.captionLineAt, Check19). Caption animations are not offered (the burn-in has none).
 Share SRT/VTT sends the text through the Android share sheet (not a file). Preview drag/resize hit boxes are approximations from widthFrac/sizeFrac. ASSUMPTIONS unchanged (see section 7 of the continue prompt) plus: caption cue overlays use the same composition-time assumption as text.
+
+## 6f. Batch 3 (steps 32+)
+| Step | What | Status |
+|---|---|---|
+| 32+33 | EffectsSheet.kt (sheet "effects": tab Effects = brightness/contrast/saturation/opacity sliders + Reset, blur/sharpen/vignette greyed with RenderCaps reason; tab Transitions = Fade/Slide in/Zoom in + duration + Apply to all in ONE edit, Dissolve/Wipe greyed). Stage preview uses ClipFx.rgbMatrix as ColorFilter. Tile on Home + Effects tab in the picture context bar | COMPILES (commit 7016d44), not seen on a phone |
+| 34 | AudioSheet.kt (sheet "audio": narration volume/fades/mute, music add (pick mode 5 -> filesDir/music)/volume/fades/loop/mute/remove, rule text, audioSplit+musicOffset greyed). Real narration waveform: AudioDecoder -> Waveform.peaks (20/s) in a background thread, cached in AutoState.peaks, drawn in TimelineArea. Home tile Music & Audio live | COMPILES (commit 2ecc2f4), not seen on a phone |
+Next: 35 Media Library, 36 Projects + 5-tab nav (+ Source_04.zip), 37+38, 39, 40, 41. Decision: waveform peaks are kept in memory per narration path (not on disk).

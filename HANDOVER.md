@@ -1,0 +1,65 @@
+# AUTO ANDROID: HANDOVER (Checkpoint 02: steps 12-21 done and verified in core; next = step 11, then 22+)
+
+Read this file first. You (a new Claude session or account) have no memory of earlier chats. Everything you need is in this zip.
+
+## 1. The job
+Redesign the Android app in this repo as a premium dark video editor (charcoal + violet), keeping the existing pipeline (import, ZIP, script/SRT/VTT parsing, scene analysis, picture matching, audio decoding, timeline, MP4 export). Only the Android app is redesigned; the desktop app (Auto_Desktop_srt_driven.zip) is a READ-ONLY reference (its fonts/bundled folder holds OFL fonts Inter, Noto Serif, Nimbus Mono, Z003 that we reuse).
+Owner rules (non-negotiable):
+- Work in numbered steps. Never mark a step complete unless it is saved AND verified. Say plainly what is only "written".
+- Never show a control that does nothing. Unavailable features are labelled "Soon / not available" and explain why.
+- Every 10 COMPLETED steps = one Auto_Android_Checkpoint_NN.json (valid JSON, same fields as docs/Auto_Android_Checkpoint_01.json) + one matching Auto_Android_Source_NN.zip. Checkpoint 02 = steps 12-21 (done). Step 11 is still open; Checkpoint 03 = next ten completed steps.
+- Do not put Markdown inside the JSON files.
+
+## 2. How the repo is laid out
+- core/ : pure Kotlin/JVM logic, NO Android classes. All new logic goes here with a CheckNN.kt test. This is where verification is possible.
+- app/ : Android + Jetpack Compose + Media3 Transformer 1.3.1. NEVER COMPILED by anyone yet (no Android SDK / Google Maven in the sandboxes used so far). Expect small compile errors on the first build.
+- scripts/run_parity.sh : runs every test. scripts/dev_check.sh CheckNN : runs one test, prints only failures + "ALL PASS".
+- docs/ : checkpoint 01 JSON and redesign-shell.patch (history only; its contents are already in this tree).
+- AUTO_ARCHITECTURE.md, AUTO_PROGRESS.md, AUTO_TODO.md : older project docs.
+
+## 3. How to run the tests (about 40 s)
+Needs JDK 17+ and a Kotlin compiler. No kotlinc? Download it from GitHub (works in restricted sandboxes):
+  curl -L -o k.zip https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip && unzip -q k.zip -d kt && export PATH=$PWD/kt/kotlinc/bin:$PATH
+Then:  KOTLINC=kotlinc bash scripts/run_parity.sh      (one test: bash scripts/dev_check.sh Check17)
+Last full result (all pass): picture matching identical to Python; ZIP OK; v19 identical; timeline 27; docx/validation/plan 21; confidence/pause/store 30; caption timing 14; free scene length 39; export shapes 19; style/fonts/animation/guides 52; effects/transitions/text track/plan 44; audio mix/waveform/caption tools 36. Two suites SKIP (owner's private data; python fastapi+ffmpeg missing). Nothing has been run on a phone.
+
+## 4. Step status
+Total planned: 21 steps to Checkpoint 02, then roughly 10 more app-wiring steps (22-31) to Checkpoint 03; later steps are estimates.
+
+| Step | Title | Status |
+|---|---|---|
+| 1-10 | Home, Settings, shell, export aspect ratios (see docs/checkpoint 01) | DONE (core verified; app uncompiled) |
+| 11 | Push branch, run GitHub Actions "Build APK", fix compile errors | BLOCKED: needs a machine with network to Google Maven. DO THIS FIRST on your PC: push, run workflow, read log on branch `buildlog` |
+| 12 | OverlayStyle: one style for captions and text (font, weight, colours, HEX, outline, shadow, background, position), 8 text + 6 caption presets, saved-style library, TextWrap | DONE + VERIFIED (Check15) |
+| 13 | TextAnim: fade/slide/pop/zoom/typewriter/bounce maths, alignment guides, safe area | DONE + VERIFIED (Check15) |
+| 14 | Effects (brightness/contrast/saturation/opacity as one colour matrix), transitions (Fade, Slide in, Zoom in), text track, duplicate clip, plan carries all | DONE + VERIFIED (Check16) |
+| 15 | AudioMix: volume, fades, mute, music bed, PCM gain, waveform peaks, saved in timeline JSON | DONE + VERIFIED (Check17) |
+| 16 | CaptionTools: import SRT/VTT/JSON, export SRT/VTT, split/merge/shift/add/delete, reading-speed checks | DONE + VERIFIED (Check17) |
+| 17 | MediaLibrary model: categories, search, sort, multi-select, file info | DONE + VERIFIED (Check18) |
+| 18 | ProjectPrefs: export prefs in manifest, recent-projects summaries for Home | DONE + VERIFIED (Check18) |
+| 19 | RenderCaps: which features the exporter renders (VERIFIED / WRITTEN / UNAVAILABLE). Nothing may become VERIFIED before a device test | DONE + VERIFIED (Check18). NOTE: statuses say WRITTEN for features whose exporter code is NOT written yet (step 22+): set them to UNAVAILABLE or write the code before showing any control |
+| 20 | Workflow status machine (Waiting, Importing, Analysing, Ready, Exporting, Completed, Failed) + analysis report | DONE + VERIFIED (Check18) |
+| 21 | DesignTokens: charcoal + violet palette, type scale, WCAG contrast check | DONE + VERIFIED (Check18); Auto_Android_Checkpoint_02.json + Auto_Android_Source_02.zip written |
+| 22+ | App wiring (all uncompiled until step 11 works): palette swap in Theme.kt; Exporter using OverlayStyle for captions; text overlays + animation via Media3 OverlayEffect/BitmapOverlay on the whole Composition (per-frame getOverlaySettings); per-clip RgbMatrix; Fade/Slide/Zoom via time-varying effects; AudioProcessor using AudioMath.applyGain + music sequence; Text Studio, Captions, Media, Audio, Effects sheets; Projects page wired to ProjectStore; bundle fonts from desktop fonts/bundled into app/src/main/res/font (names inter_regular, notoserif_regular, nimbusmono_regular, z003_mediumitalic) | pending |
+
+Lost work note: an earlier session did steps 12-14 but its files were lost; they were REBUILT and re-verified here (different code, same goals).
+
+## 5. Technical decisions to keep
+- All sizes in OverlayStyle are fractions of frame height (or of font size): preview and any export resolution/aspect look identical.
+- Effects limited to what Media3 1.3.1 can render: brightness, contrast, saturation, opacity (via RgbMatrix, needs opaque pictures). Blur, sharpen, vignette, dissolve, wipe are listed in EffectCatalog/TransitionKind as NOT rendered: never show sliders for them.
+- Transitions are entrances at the start of a picture (FADE also fades the previous one out = dip through black). There is no overlap/crossfade in 1.3.1.
+- Fonts: static files have only Regular/Bold; other weights need API 28+ (FontCatalog.offeredWeights(sdk) decides what the UI offers).
+- Narration is never trimmed or offset (video length == narration length). Music starts at 0, loops or stops; no start offset, no narration split, no video clips on the timeline (image-only pipeline).
+- Timeline JSON stays version 1; new fields (fx, transition, texts, captionStyle, mix) are optional so older project files load. Edits are immutable snapshots, so undo/redo works for every new operation.
+- Text/overlay time is the composition timeline: apply overlays at Composition level, not per picture item (unverified: confirm on a device).
+- Palette: current app uses navy/cyan/pink (object C in Theme.kt). Brief asks charcoal + violet: change VALUES of C, keep the names.
+
+## 6. Next exact action
+STEP 11 (owner): git clone https://github.com/sphoorthi2006-blip/AutoAndroid ; cd AutoAndroid ; git checkout -b redesign origin/mobile-editor-ui ; git am redesign-02.patch (delivered next to this zip) ; git push -u origin redesign ; GitHub > Actions > "Build APK" > Run workflow > branch "redesign". On failure the compiler log is pushed to branch `buildlog` (public; a Claude session can `git clone` it and read build.log). Fix errors in small commits, change no behaviour, repeat until the APK appears under Releases ("latest") / Actions artifacts. Earlier log (old commit 9d07393) showed Gradle resolves all dependencies on GitHub, so only Kotlin errors are expected.
+(Old text follows, partly done:)
+1. (Owner's PC) Step 11: push, run "Build APK", fix compile errors without changing behaviour.
+2. (done) Steps 17-21 are written and verified; Check18 is in run_parity.sh. After step 11 compiles, start step 22 (app wiring, list in section 4).
+3. Before each batch: run the suite, read this file, confirm the last completed step, do not redo finished work.
+
+## 7. Known problems
+- app/ never compiled (see step 11). Aspect ratios other than 16:9 never seen on a device. 4K/60 fps heavy for phones. Home "Recent project" shows only the open project. Overlay-on-Composition timing and RgbMatrix with images are assumptions to test on a device.

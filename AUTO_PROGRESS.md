@@ -84,3 +84,12 @@ Fully DONE: 1,2,3,4,5 and 8 (core part; app part uncompiled).  Partial: 7,9,25,2
 - Scene length: Timeline.setLength = ANY length, no magnet (later scenes move, nothing is squeezed, nothing clamped to the audio). Bottom tool bar: -1 s, +1 s, Length (type 90 / 1:30 / 10m, or quick buttons). The narration never changes.
 - Export is limited to the narration (ExportPlan.fromTimeline clampToAudio): the scene that crosses the end of the audio is cut there, scenes that start after it are left out. The timeline marks the end of the audio and dims what is after it.
 - Check13 (core/src/test/kotlin) is wired into scripts/run_parity.sh (CI "Check core").
+
+## Redesign shell on top of mobile-editor-ui (branch redesign-shell) - checkpoint 01
+Base = the phone editor (EditorScreen/AutoState, navy-cyan-pink look) that was already on mobile-editor-ui; nothing of it was replaced.
+Added: Home page (welcome, project card, 8 shortcuts: New Project / Auto Analyse / Media Library / Export work, Text Studio / Captions / Music & Audio / Effects are tagged "Soon"), Settings page (clear temporary files, about), 3-tab shell (Home / Editor / Settings), back button in the editor top bar, export ASPECT RATIO (16:9, 9:16, 1:1, 4:5) in the export sheet with the preview in the same shape, `AutoState.newProject()/clearTemp()`, core `ExportOptions` + Check14 (19 checks; 16:9 equals the existing presets).
+Verified: scripts/run_parity.sh (all existing suites + Check13 39 + Check14 19). NOT compiled: all Compose/app code (Android SDK unreachable where this was written) - first CI build may show small errors.
+Not built (tagged Soon, never faked): Text Studio, caption styling editor, audio studio/waveform, effects/transitions, separate Projects and Media tabs (the editor's Inputs/Scenes/Pictures sheets cover media), saved-project list (ProjectStore exists in core but is not wired to the UI).
+
+## Interim save after step 16 (see HANDOVER.md)
+Steps 12-16 rebuilt and verified in core: OverlayStyle, TextAnim/Guides, Effects/Transitions/text track/duplicate, AudioMix/Waveform, CaptionTools. Checks 15, 16, 17 added to scripts/run_parity.sh. App layer not yet using them. Step 11 (first real build) still blocked.

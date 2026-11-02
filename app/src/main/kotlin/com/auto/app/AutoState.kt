@@ -48,6 +48,9 @@ class AutoState(private val act: ComponentActivity) {
     var captionsOn by mutableStateOf(true)        // captions switch: shown over the pictures in the preview AND burned into the exported video
     var resP by mutableIntStateOf(720)            // export height: 720, 1080 or 2160 (4K)
     var fps by mutableIntStateOf(30)              // export frame rate: 30 or 60
+    var aspect by mutableStateOf(AspectRatio.R16_9)   // export shape: 16:9, 9:16, 1:1 or 4:5 (pictures are scaled to fit, black bars)
+    var onHome: () -> Unit = {}                   // set by the shell: back to the Home page
+    val hasProject get() = timeline != null
 
     /** The whole timeline (scrubbing/editing): can be longer than the narration when a scene was extended. */
     fun totalMs(): Long { val t = timeline ?: return 0L; return max(t.audioMs, t.endMs) }
@@ -216,12 +219,41 @@ class AutoState(private val act: ComponentActivity) {
         }
     }
 
+    // ---------- new project / temporary files ----------
+    private val tempDirs = listOf("in", "bundle", "zips", "Pictures", "work", "export", "replaced")
+
+    /** Forgets the current files, analysis and timeline and opens the Inputs sheet. Ignored while analysing or exporting. */
+    fun newProject() {
+        if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
+        stopPlay(); release()
+        inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
+        analysis = null; narration = null; editor = null
+        timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
+        status = "Choose your files in Inputs, then press Analyse."; sheet = "inputs"
+        thread { for (d in tempDirs) File(act.cacheDir, d).deleteRecursively() }
+    }
+
+    /** Deletes the imported copies, extracted pictures and old exports in the app's temporary folder (the current project is closed too). Returns the freed size to `done`. */
+    fun clearTemp(done: (Long) -> Unit) {
+        if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
+        stopPlay(); release()
+        inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
+        analysis = null; narration = null; editor = null
+        timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
+        status = "Choose your files in Inputs, then press Analyse."
+        thread {
+            val n = tempDirs.sumOf { d -> File(act.cacheDir, d).walkTopDown().filter { it.isFile }.sumOf { it.length() } }
+            for (d in tempDirs) File(act.cacheDir, d).deleteRecursively()
+            act.runOnUiThread { done(n) }
+        }
+    }
+
     // ---------- export (main thread) ----------
     fun export() {
         if (analysis == null) return; val tl = timeline ?: return
         if (exportPct != null) return
-        val settings = try { ExportSettings.preset(resP, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
-        exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} $fps fps..."; stopPlay()
+        val settings = try { ExportOptions.settings(Resolution.of(resP), aspect, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
+        exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} ${aspect.label} $fps fps..."; stopPlay()
         try {
             val onP = { p: Int -> exportPct = p; status = "Exporting... $p%" }
             val onD = { where: String -> exportPct = null; status = "Done: $where" }

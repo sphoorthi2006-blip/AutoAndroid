@@ -70,7 +70,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.auto.core.ExportSettings
+import com.auto.core.AspectRatio
+import com.auto.core.ExportOptions
+import com.auto.core.Resolution
 import com.auto.core.ImageClip
 import com.auto.core.TimeText
 import kotlinx.coroutines.Dispatchers
@@ -103,6 +105,7 @@ fun EditorScreen(st: AutoState) {
 @Composable
 private fun TopBar(st: AutoState) {
     Row(Modifier.fillMaxWidth().glow(C.Violet, 14.dp, RoundedCornerShape(0.dp)).background(C.Top).statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        TopIcon("‹", true) { st.onHome() }
         TopIcon("↶", st.canUndo) { st.undo() }
         TopIcon("↷", st.canRedo) { st.redo() }
         Spacer(Modifier.weight(1f))
@@ -131,7 +134,7 @@ private fun Stage(st: AutoState, modifier: Modifier) {
     }
     Box(modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
         val shape = RoundedCornerShape(24.dp)
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).glow(C.Violet, 22.dp, shape).clip(shape).background(C.Screen).border(1.dp, C.Cyan.copy(alpha = 0.4f), shape), contentAlignment = Alignment.Center) {
+        Box(Modifier.then(if (st.aspect.ratio >= 1f) Modifier.fillMaxWidth() else Modifier.fillMaxHeight()).aspectRatio(st.aspect.ratio).glow(C.Violet, 22.dp, shape).clip(shape).background(C.Screen).border(1.dp, C.Cyan.copy(alpha = 0.4f), shape), contentAlignment = Alignment.Center) {
             val b = bmp
             if (tl == null) {
                 Text("Open Inputs to add your files", color = C.Muted, fontSize = 15.sp)
@@ -426,11 +429,14 @@ private fun ToggleRow(label: String, on: Boolean, onToggle: () -> Unit) {
 @Composable
 private fun ExportSheet(st: AutoState) {
     val busy = st.exportPct != null
-    val s = ExportSettings.preset(st.resP, st.fps)
+    val s = ExportOptions.settings(Resolution.of(st.resP), st.aspect, st.fps)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text("Export MP4", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
         Text("Resolution", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
         Row { OptionChip("720p", st.resP == 720) { st.resP = 720 }; OptionChip("1080p", st.resP == 1080) { st.resP = 1080 }; OptionChip("4K", st.resP == 2160) { st.resP = 2160 } }
+        Text("Aspect ratio", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+        Row { for (a in AspectRatio.values()) OptionChip(a.label, st.aspect == a) { st.aspect = a } }
+        Text("Pictures that do not match the shape are scaled to fit, with black bars.", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
         Text("Frame rate", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
         Row { OptionChip("30 fps", st.fps == 30) { st.fps = 30 }; OptionChip("60 fps", st.fps == 60) { st.fps = 60 } }
         ToggleRow("Captions on the video", st.captionsOn) { st.captionsOn = !st.captionsOn }

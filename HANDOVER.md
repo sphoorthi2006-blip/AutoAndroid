@@ -93,5 +93,11 @@ Next steps (small): 27 audio gain + music in export; 28 Text Studio sheet (previ
 ## 6e. Batch 2b (steps 27+)
 | Step | What | Status |
 |---|---|---|
-| 27 | AudioGainProcessor.kt (volume/fades/mute via AudioMath.applyGain) on narration; music = extra looping audio sequence with own gain; RenderCaps volume+music WRITTEN, Check18 updated | see build result |
+| 27 | AudioGainProcessor.kt (volume/fades/mute via AudioMath.applyGain) on narration; music = extra looping audio sequence with own gain; RenderCaps volume+music WRITTEN, Check18 updated | COMPILES (commit 0f9222e), not seen on a phone |
 ASSUMPTION (device): looping music may restart its fade per loop (processor frame counter resets at flush); looping sequence ends with the video.
+| 28 | TextStudio.kt: StyleEditor (font chips in own font, weights by API, size/spacing/line, align, case, italic/underline/strike, colour+HEX+opacity, gradient end, outline, shadow, box, position, animation in/out) + presets + saved styles (filesDir/styles.json) + StylePreview + sheet "text" (+ Text, edit text/times, split/duplicate/delete). Core: StudioTools.kt + Check19 | COMPILES (347f3c3), not seen on a phone |
+| 29 | PreviewOverlay.kt: captions + text clips drawn in the editor stage with OverlayRenderer + AnimMath; drag selected text (snap, safe area, guide lines), corner handle = resize + rotate; one edit on finger lift | COMPILES, not seen on a phone |
+| 30 | TextLane.kt: text lane on the timeline (timeline area 256 dp); tap select, double tap Text Studio, long-press drag move, edge handles trim; TextBar (Edit/Split/Duplicate/Delete) | COMPILES, not seen on a phone |
+| 31 | CaptionsSheet.kt: cues list (text + typed times), import SRT/VTT/JSON (pick mode 4), From scenes, add/split/merge/shift/delete, reading-speed warnings, share SRT/VTT as text, caption style via the same StyleEditor, preview strip | COMPILES, not seen on a phone |
+RULE (steps 28-31): if the project has caption CUES they are what is shown in the preview and burned in the export (timed overlays, caption style); with no cues the scene text is burned into the pictures as before (Timeline.captionLineAt, Check19). Caption animations are not offered (the burn-in has none).
+Share SRT/VTT sends the text through the Android share sheet (not a file). Preview drag/resize hit boxes are approximations from widthFrac/sizeFrac. ASSUMPTIONS unchanged (see section 7 of the continue prompt) plus: caption cue overlays use the same composition-time assumption as text.

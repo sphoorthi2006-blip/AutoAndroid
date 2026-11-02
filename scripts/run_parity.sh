@@ -44,6 +44,8 @@ if java -cp "$CP" Check16Kt > "$OUT/kt16.out"; then echo "EFFECTS / TRANSITIONS 
 if java -cp "$CP" Check17Kt > "$OUT/kt17.out"; then echo "AUDIO MIX / WAVEFORM / CAPTION TOOLS: $(grep -c '^PASS' "$OUT/kt17.out") checks passed"; else echo "AUDIO / CAPTION TOOLS: FAILED"; grep FAIL "$OUT/kt17.out"; exit 1; fi
 # Steps 17-21: media library, project prefs/recent list, render capabilities, workflow status, design tokens
 if java -cp "$CP" Check18Kt > "$OUT/kt18.out"; then echo "MEDIA LIBRARY / PREFS / RENDER CAPS / WORKFLOW / TOKENS: $(grep -c '^PASS' "$OUT/kt18.out") checks passed"; else echo "STEPS 17-21: FAILED"; grep FAIL "$OUT/kt18.out"; exit 1; fi
+# Steps 28-31: studio tools (stamps, text at playhead, caption cues, style library)
+if java -cp "$CP" Check19Kt > "$OUT/kt19.out"; then echo "STUDIO TOOLS / CAPTION CUES / STYLE LIBRARY: $(grep -c '^PASS' "$OUT/kt19.out") checks passed"; else echo "STEPS 28-31: FAILED"; grep FAIL "$OUT/kt19.out"; exit 1; fi
 # Backend client + verified timing (Steps 10-16). Needs python3 with fastapi/uvicorn/numpy + ffmpeg; reported as SKIPPED (not passed) otherwise.
 if python3 -c "import fastapi, uvicorn, numpy" 2>/dev/null && command -v ffmpeg >/dev/null; then
   PORT=$((20000 + RANDOM % 20000)); rm -rf /tmp/tt10 && mkdir -p /tmp/tt10

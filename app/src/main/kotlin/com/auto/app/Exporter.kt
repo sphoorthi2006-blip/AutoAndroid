@@ -15,6 +15,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.effect.OverlayEffect
@@ -33,6 +34,7 @@ import com.google.common.collect.ImmutableList
 import com.auto.core.ExportSettings
 import com.auto.core.OverlayStyle
 import com.auto.core.Pipeline
+import com.auto.core.TransitionKind
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -91,8 +93,14 @@ object Exporter {
     fun exportTimeline(ctx: Context, plan: ExportPlan.Plan, narration: File?, s: ExportSettings, captions: Boolean, onProgress: (Int) -> Unit, onDone: (String) -> Unit, onError: (String) -> Unit) {
         val work = File(ctx.cacheDir, "export").apply { mkdirs() }
         val blank = blankImage(work, s.width, s.height)
-        val effects = Effects(listOf(), listOf(Presentation.createForWidthAndHeight(s.width, s.height, Presentation.LAYOUT_SCALE_TO_FIT)))
         val video = plan.segments.mapIndexed { k, g ->
+            // fit to the output frame first, then (only when this picture needs it) slide/zoom movement and colour/opacity/fade
+            val list = ArrayList<Effect>()
+            list.add(Presentation.createForWidthAndHeight(s.width, s.height, Presentation.LAYOUT_SCALE_TO_FIT))
+            val own = g.transition; val nextFade = g.nextTransition?.kind == TransitionKind.FADE
+            if (own.kind == TransitionKind.SLIDE || own.kind == TransitionKind.ZOOM) list.add(ClipMove(own, g.nextTransition, g.durMs))
+            if (!g.fx.isIdentity || own.kind == TransitionKind.FADE || own.kind == TransitionKind.ZOOM || nextFade) list.add(ClipColor(g.fx, own, g.nextTransition, g.durMs))
+            val effects = Effects(listOf(), list)
             val img = when {
                 g.image != null && captions && g.text.isNotBlank() -> captioned(ctx, work, k, g.image!!, g.text, s.width, s.height, plan.captionStyle).path   // captions switch ON
                 g.image != null -> g.image!!

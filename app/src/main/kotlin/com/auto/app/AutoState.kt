@@ -89,6 +89,10 @@ class AutoState(private val act: ComponentActivity) {
     }
     fun delete() { val id = selectedId ?: return; edit { it.delete(id, true) }; selectedId = null }
     /** Any length, no magnet: the scenes after this one move later/earlier, the narration stays as it is. */
+    fun setFx(id: Int, fx: com.auto.core.ClipFx) = edit { it.setFx(id, fx) }
+    fun setTransition(id: Int, t: com.auto.core.TransitionSpec) = edit { it.setTransition(id, t) }
+    /** One undo step for the whole loop. */
+    fun setTransitionAll(t: com.auto.core.TransitionSpec) = edit { tl -> tl.clips.fold(tl) { acc, c -> acc.setTransition(c.id, t) } }
     fun setLength(ms: Long) { val id = selectedId ?: return; edit { it.setLength(id, ms) } }
     fun addLength(deltaMs: Long) { val c = selectedClip() ?: return; setLength(c.durMs + deltaMs) }
     fun selectClip(id: Int?) {

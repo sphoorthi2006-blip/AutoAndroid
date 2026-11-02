@@ -139,7 +139,7 @@ private fun Stage(st: AutoState, modifier: Modifier) {
             if (tl == null) {
                 Text("Open Inputs to add your files", color = C.Muted, fontSize = 15.sp)
             } else if (b != null) {
-                Image(b, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                Image(b, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, colorFilter = clip?.fx?.takeIf { !it.isIdentity }?.let { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(it.rgbMatrix().let { m -> floatArrayOf(m[0],m[4],m[8],0f,m[12]*255f, m[1],m[5],m[9],0f,m[13]*255f, m[2],m[6],m[10],0f,m[14]*255f, 0f,0f,0f,1f,0f) })) })
                 // captions + text clips are drawn in PreviewOverlays (same renderer as the export)
             } else if (clip != null) {   // no picture: black screen with the scene's text (as in the exported video)
                 Text(if (clip.heading) clip.text.uppercase() else clip.text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp))
@@ -286,6 +286,7 @@ private fun ContextBar(st: AutoState) {
         Tab("−", "−1 s", false) { st.addLength(-1000) }
         Tab("+", "+1 s", false) { st.addLength(1000) }
         Tab("⏱", "Length", false) { st.sheet = "length" }
+        Tab("◐", "Effects", st.sheet == "effects") { st.sheet = "effects" }
         Tab("⇄", "Replace", false) { st.pick(3) }
         Tab("🗑", "Delete", false) { st.delete() }
     }
@@ -324,6 +325,7 @@ private fun BoxScope.SheetHost(st: AutoState) {
                 "length" -> LengthSheet(st)
                 "text" -> TextStudioSheet(st)
                 "captions" -> CaptionsSheet(st)
+                "effects" -> EffectsSheet(st)
             }
         }
     }

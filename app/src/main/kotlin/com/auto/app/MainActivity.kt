@@ -7,8 +7,6 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.ViewGroup
 import android.widget.Button
-import android.text.InputType
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -28,9 +26,6 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var scenesView: TextView
     private lateinit var exportBtn: Button
-    private lateinit var serverUrl: EditText
-    private lateinit var serverToken: EditText
-    private val prefs by lazy { getSharedPreferences("auto", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,9 +33,6 @@ class MainActivity : Activity() {
         fun btn(text: String, onClick: () -> Unit) = Button(this).apply { this.text = text; setOnClickListener { onClick() } }.also { root.addView(it) }
         root.addView(TextView(this).apply { text = "Auto"; textSize = 26f })
         root.addView(TextView(this).apply { textSize = 13f; text = "Step 1: pick ONE ZIP with everything (details, script, captions, narration, pictures), or several files: touch and hold the first file, then tap the others." })
-        root.addView(TextView(this).apply { textSize = 13f; text = "AI audio server (recommended: exact word timing from Whisper + alignment + VAD). Leave empty to use the old caption-based timing." })
-        serverUrl = EditText(this).apply { hint = "https://your-server.example"; setSingleLine(); inputType = InputType.TYPE_TEXT_VARIATION_URI; setText(prefs.getString("url", "")) }.also { root.addView(it) }
-        serverToken = EditText(this).apply { hint = "server token"; setSingleLine(); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD; setText(prefs.getString("token", "")) }.also { root.addView(it) }
         btn("1. Choose files or one ZIP (details, script, captions, narration)") { pick(1) }
         btn("2. Choose pictures (ZIP files or images)") { pick(2) }
         btn("3. Analyse") { analyse() }
@@ -114,40 +106,31 @@ class MainActivity : Activity() {
     }
 
     private fun analyse() {
-        if (inFiles.isEmpty() || (bundleZips.isEmpty() && zips.isEmpty() && pics.isEmpty())) { status.text = "Choose a ZIP with everything (step 1), or the files (step 1) and the pictures (step 2), first."; return }
-        status.text = "Analysing... (decoding audio can take a minute)"; exportBtn.isEnabled = false; scenesView.text = ""
+        if (inFiles.isEmpty() && bundleZips.isEmpty() && zips.isEmpty() && pics.isEmpty()) { status.text = "Add at least one of: the captions (timestamps) file, the narration audio, the pictures or the script."; return }
+        status.text = "Analysing..."; exportBtn.isEnabled = false; scenesView.text = ""
         thread {
             try {
+                // Same inputs as the desktop app: timestamps (captions), audio, pictures, script. NO details file. None is mandatory.
                 val entries = inFiles.map { f -> Entry(f.name, f.length(), if (f.extension.lowercase().let { ".$it" } in com.auto.core.Bundle.AUDIO_EXT) AudioDecoder.durationSec(f) else null, { TextFiles.read(f) }) }
                 val b = com.auto.core.Bundle.classify(entries, bundleZips.size + zips.size + pics.size)
                 fun file(e: Entry?) = e?.let { x -> inFiles.first { it.name == x.name } }
-                val detailsF = file(b.details) ?: throw PipelineError(b.notes.joinToString(" ").ifEmpty { "No scene details file found." })
                 val scriptText = file(b.script)?.let { TextFiles.read(it) } ?: ""
-                val captionWords = file(b.timestamps)?.let { Captions.parse(it.readText(), it.name) }
+                val tsF = file(b.timestamps)
+                val captionRaw = tsF?.readText()
+                // cue rows exactly as written; a word-level JSON file is grouped into sentences instead (same as the desktop)
+                val tsName = tsF?.name ?: ""
+                val rows = captionRaw?.let { Captions.parseRows(it, tsName) ?: Captions.parseCues(Captions.parse(it, tsName)) }
                 val audioF = file(b.audio)
-                val url = serverUrl.text.toString().trim(); val tok = serverToken.text.toString().trim()
-                prefs.edit().putString("url", url).putString("token", tok).apply()
-                var words = captionWords; var verified = false; val extra = ArrayList<String>()
-                if (url.isNotEmpty()) {
-                    // The AI server is the source of truth for timing. If it fails we STOP and say why - no silent fall-back to guessed timing.
-                    val f = audioF ?: throw PipelineError("The AI server needs the narration audio file. Add it in step 1 (or clear the server address).")
-                    val capText = file(b.timestamps)?.let { TextFiles.read(it) } ?: ""
-                    val r = BackendClient(BackendConfig(url, tok)).analyze(f, scriptText, capText) { st, fr -> runOnUiThread { status.text = "AI analysis: $st (${(fr * 100).toInt()}%)" } }
-                    words = r.words; verified = true
-                    extra.add("AI audio analysis OK (${r.alignment.ifEmpty { "whisper" }} word times, ${r.words.size} words" + (r.captionMatch?.let { ", captions match audio ${(it * 100).toInt()}%" } ?: "") + ").")
-                    extra.addAll(r.warnings.map { "Audio: $it" })
-                } else extra.add("No AI server set: timing comes from the caption file and simple pause detection, which can place pictures early. Set a server for exact timing.")
-                val dec = audioF?.let { AudioDecoder.decode(it) }
+                val audioSec = audioF?.let { AudioDecoder.durationSec(it) } ?: 0.0
                 val sources = ArrayList<File>(bundleZips + zips)
                 if (pics.isNotEmpty()) sources.add(File(cacheDir, "Pictures"))
                 val work = File(cacheDir, "work").apply { deleteRecursively(); mkdirs() }
-                val a = Pipeline.analyse(TextFiles.read(detailsF), scriptText, words, dec?.first, dec?.second ?: 0.0, sources, work, verified = verified)
+                val a = CaptionPipeline.analyse(rows, scriptText, null, audioSec, sources, work, hasAudio = audioF != null)
                 analysis = a; narration = audioF
                 val sb = StringBuilder()
-                for (s in a.scenes) sb.append(String.format(Locale.ROOT, "%3d %7.2f-%-7.2f %s%s%s\n", s.num, s.start, s.end,
-                    s.image?.let { Matching.nameOf(it) } ?: "(MISSING)", if (s.conf == "?") "  ?" else "", if (s.cutCheck) "  !" else ""))
+                for (s in a.scenes) sb.append(String.format(Locale.ROOT, "%3d %7.2f-%-7.2f %s\n", s.num, s.start, s.end, s.image?.let { Matching.nameOf(it) } ?: "(black screen + text)"))
                 val v = Validation.check(a)
-                val msg = (extra + v.errors.map { "ERROR: $it" } + v.warnings + b.notes + a.warnings).distinct().joinToString("\n\n")
+                val msg = (v.errors.map { "ERROR: $it" } + v.warnings + b.notes.filterNot { it.startsWith("MISSING: scene details") } + a.warnings).distinct().joinToString("\n\n")
                 runOnUiThread { status.text = "${a.scenes.size} scenes ready.\n\n$msg"; scenesView.text = sb.toString(); exportBtn.isEnabled = true }
             } catch (e: Exception) { runOnUiThread { status.text = "Problem: ${e.message ?: e.toString()}" } }
         }

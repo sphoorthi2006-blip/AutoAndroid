@@ -121,6 +121,27 @@ object Align {
         return Pair(sceneLines.mapIndexed { i, l -> Scene(l, cuts[i], if (i + 1 < cuts.size) cuts[i + 1] else total) }, rep)
     }
 
+    /** One caption cue per scene (same count, same words): the picture changes ARE the cue start times (lead seconds early, never before the previous
+     *  cue's end). Nothing is re-aligned and nothing is snapped to the audio. Null when the cues do not line up with the scenes one-to-one.
+     *  Port of engine.exact_cue_scenes. */
+    fun exactCueScenes(rows0: List<Cue>?, sceneLines: List<String>, total: Double, lead: Double = 0.06): Pair<List<Scene>, AlignReport>? {
+        val rows = (rows0 ?: return null).filter { Details.tokens(it.text).isNotEmpty() }
+        if (rows.isEmpty() || rows.size != sceneLines.size) return null
+        val sims = rows.zip(sceneLines).map { (r, line) ->
+            val a = Details.tokens(r.text).toSet(); val b = Details.tokens(line).toSet()
+            (a intersect b).size.toDouble() / max((a union b).size, 1)
+        }
+        if (sims.average() < 0.85 || sims.min() < 0.4) return null
+        val cuts = arrayListOf(0.0)
+        for (k in 1 until rows.size) {
+            val gap = rows[k].start - rows[k - 1].end
+            cuts.add(max(rows[k].start - min(lead, max(gap, 0.0) / 2), cuts.last() + 0.25))
+        }
+        val endAll = max(total, rows.last().end)
+        val scenes = sceneLines.mapIndexed { i, l -> Scene(l, cuts[i], if (i + 1 < cuts.size) cuts[i + 1] else endAll) }
+        return Pair(scenes, AlignReport(sims.average(), rows.sumOf { Details.tokens(it.text).size }))
+    }
+
     /** No audio and no captions: each scene lasts as long as its own words take to say (2.5 words/s, min 1.5 s). */
     fun estimate(sceneLines: List<String>, scriptText: String = ""): List<Scene> {
         val sl = if (scriptText.isNotEmpty()) Details.linesOf(scriptText) else emptyList()
@@ -137,7 +158,7 @@ object Align {
 class TimingResult(val scenes: List<Scene>, val warnings: List<String>, val report: AlignReport?, val duration: Double)
 
 /** The timing part of analyse(): details items + captions (+ audio) -> scenes. audio = 16 kHz mono samples or null; audioSeconds = its length. */
-fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double, verified: Boolean = false): TimingResult {
+fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double, verified: Boolean = false, rows: List<Cue>? = null): TimingResult {
     val warnings = ArrayList<String>()
     val lines = items.map { it.spoken }
     val scenes: List<Scene>; var rep: AlignReport? = null
@@ -151,9 +172,17 @@ fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord
         for ((k, it) in items.withIndex()) if (k > 0 && it.section.isNotEmpty() && it.section != items[k - 1].section) heads[k] = it.section
         // verified = word times come from speech recognition + forced alignment of the real audio (backend). They are exact, so the energy-based
         // pause snapping (which exists to repair APPROXIMATE caption times, and can move a cut early) is not applied.
-        val r = Align.align(words, lines, scriptText, if (verified) null else audio, heads, if (verified) 0.06 else 0.12); scenes = r.first; rep = r.second
-        if (verified) warnings.add("Picture changes use the exact spoken-word times from the audio analysis.")
-        if (audio != null && !verified) {
+        // The same holds for caption files that keep the real pauses (TurboScribe style) and for one-cue-per-scene files: their times are exact.
+        val exact = if (!verified) Align.exactCueScenes(rows, lines, max(audioSeconds, words.last().end)) else null
+        val keepTimes = verified || exact != null || Captions.pauseAware(rows)
+        if (exact != null) { scenes = exact.first; rep = exact.second
+            warnings.add("Picture changes are the exact start times of the caption lines (one caption per scene) - no re-alignment, no snapping.")
+        } else {
+            val r = Align.align(words, lines, scriptText, if (keepTimes) null else audio, heads, if (keepTimes) 0.06 else 0.12); scenes = r.first; rep = r.second
+            if (verified) warnings.add("Picture changes use the exact spoken-word times from the audio analysis.")
+            else if (keepTimes) warnings.add("The captions keep the real pauses, so their times are used as they are (no pause snapping).")
+        }
+        if (audio != null && !keepTimes) {
             val res = try { AudioPauses.anchorCuts(audio, scenes.map { it.text }, scenes.map { it.start }) } catch (e: Exception) { null }
             if (res != null) {
                 val (cuts, odd) = res

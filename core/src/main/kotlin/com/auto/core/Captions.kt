@@ -31,10 +31,26 @@ object Captions {
         for (w in ws) { val d = (bb - a) * (w.length + 1) / tot; out.add(TimedWord(w, t, t + d)); t += d }
     }
 
-    /** raw = file text, fileName only used to spot ".json". Understands SRT, VTT, Whisper JSON (segments or words), and timed text lines. */
-    fun parse(raw0: String, fileName: String = ""): List<TimedWord> {
+    /** Caption rows exactly as written (start, end = next start when the file gives none). Null for JSON files (word-level, no cue rows). */
+    fun parseRows(raw0: String, fileName: String = ""): List<Cue>? {
         val raw = WATERMARK.replace(raw0, "")
-        if (fileName.lowercase().endsWith(".json") || JSON_START.containsMatchIn(raw)) return parseJson(raw)
+        if (fileName.lowercase().endsWith(".json") || JSON_START.containsMatchIn(raw)) return null
+        val rows = readRows(raw)
+        return rows.mapIndexed { k, (a, b0, txt) ->
+            val b = b0 ?: if (k + 1 < rows.size) rows[k + 1].first else a + max(txt.split(WS).count { it.isNotEmpty() } / WORDS_PER_SECOND, 1.0)
+            Cue(a, b, txt)
+        }
+    }
+
+    /** True when the captions keep the real pauses (TurboScribe / Whisper style: many gaps between cues). Clipchamp-style captions are cut into
+     *  even, back-to-back pieces (no gaps) - those times are only approximate. Port of engine.pause_aware. */
+    fun pauseAware(rows: List<Cue>?, minGap: Double = 0.1, share: Double = 0.3): Boolean {
+        if (rows == null || rows.size < 10) return false
+        val gaps = (0 until rows.size - 1).count { rows[it + 1].start - rows[it].end > minGap }
+        return gaps.toDouble() / (rows.size - 1) >= share
+    }
+
+    private fun readRows(raw: String): List<Triple<Double, Double?, String>> {
         val rows = ArrayList<Triple<Double, Double?, String>>()
         val lines = raw.replace("\r", "").split("\n").map { it.trimEnd() }
         var i = 0
@@ -57,12 +73,15 @@ object Captions {
             }
             i++
         }
+        return rows
+    }
+
+    /** raw = file text, fileName only used to spot ".json". Understands SRT, VTT, Whisper JSON (segments or words), and timed text lines. */
+    fun parse(raw0: String, fileName: String = ""): List<TimedWord> {
+        val raw = WATERMARK.replace(raw0, "")
+        if (fileName.lowercase().endsWith(".json") || JSON_START.containsMatchIn(raw)) return parseJson(raw)
         val out = ArrayList<TimedWord>()
-        for ((k, r) in rows.withIndex()) {
-            val (a, b0, txt) = r
-            val b = b0 ?: if (k + 1 < rows.size) rows[k + 1].first else a + max(txt.split(WS).count { it.isNotEmpty() } / WORDS_PER_SECOND, 1.0)
-            spread(txt, a, b, out)
-        }
+        for (c in parseRows(raw0, fileName).orEmpty()) spread(c.text, c.start, c.end, out)
         if (out.isEmpty()) throw PipelineError("No timestamps were found in the timestamps file. Use SRT, or lines like '[00:01.20 - 00:03.50] text'.")
         return out
     }

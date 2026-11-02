@@ -72,6 +72,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.auto.core.AspectRatio
 import com.auto.core.ExportOptions
+import com.auto.core.ExportPlan
+import com.auto.core.RenderCaps
 import com.auto.core.Resolution
 import com.auto.core.ImageClip
 import com.auto.core.TimeText

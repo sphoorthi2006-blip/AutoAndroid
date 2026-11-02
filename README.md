@@ -27,7 +27,7 @@ Every upload to GitHub is checked automatically (Actions tab): the Kotlin core m
 - .github/workflows/android.yml builds the APK on GitHub (Actions -> Build APK -> Artifacts -> Auto-debug-apk)
 
 ## Not done yet
-1. Text over pictures, click sound, music and overlay in the exported video
+1. (done in later steps: text, captions, effects, music, click sound - see HANDOVER.md)
 2. Picture folders (only ZIP files and loose images can be chosen)
 3. Storyboard / player / timeline screens (for now: a text list of scenes)
 4. Fixing whatever the first real build and phone test show

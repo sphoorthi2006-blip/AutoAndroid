@@ -69,3 +69,27 @@ Fully DONE: 1,2,3,4,5 and 8 (core part; app part uncompiled).  Partial: 7,9,25,2
 - Owner: a server URL + token typed by hand is not an "AI feature". Removed from MainActivity (fields, saved prefs, BackendClient call) and the INTERNET permission. The app is fully offline now: captions, audio, pictures, script.
 - Script without captions now always uses the ESTIMATED timing (with a warning) - there is no speech recognition in the app.
 - Left in the repo, unused by the app: backend/ (FastAPI) and core/BackendClient.kt + Check10 (their tests still run). A real built-in AI feature (on-device speech timing) would be a separate step: it needs a decision on which on-device model to ship.
+
+## Session 4 - phone editor screen (Canva-style, navy + glow) - NOT compiled here
+- Replaced the plain text screen with a Jetpack Compose editor: gradient top bar (undo/redo, scenes, warnings, Export), 16:9 preview with the scene's picture + text, play row, scrolling timeline under a fixed playhead (picture / text / narration tracks), bottom tab bar (Inputs, Scenes, Pictures, Warnings, Export) opening bottom sheets, and a tool bar for a selected scene (Done, Split, Shorter, Longer, Replace, Delete).
+- Files: app/Theme.kt, app/AutoState.kt (old MainActivity logic moved here + TimelineEditor edits + MediaPlayer playback), app/EditorScreen.kt, app/MainActivity.kt (thin host). Gradle: Compose BOM 2024.06.00, activity-compose 1.9.0, kotlin compose plugin 2.0.21. Manifest theme -> dark.
+- Edits use core Timeline/TimelineEditor (split, trim, delete, replaceImage, undo/redo). Export uses the edited timeline when something was edited or the script is fully covered.
+- NOT built yet (no buttons for them on purpose): Text sheet / text editing, Music, Fit/Fill, Colour, Animate, Duplicate, pinch zoom, clip edge drag handles, real waveform (the narration wave is decorative).
+- NOT verified: first compile (run the "Build APK" workflow; if it fails, read the buildlog branch) and a phone test.
+- Review fixes (after the first draft): Split now checks the playhead is inside the scene and shows a message otherwise (core silently ignored a too-short cut); edit errors also show as a toast (the status line is only visible in Inputs/Export); timeline scroll no longer fights the playhead - only real finger drags/flings seek, our own jump-to-scene scroll does not.
+
+## Session 5 - export settings, captions switch, free scene length (no magnet) - core tested (Check13), app NOT compiled here
+- Export sheet: resolution 720p / 1080p / 4K and 30 / 60 fps (ExportSettings.preset), always exported from the edited timeline. 4K / 60 fps depend on the phone's hardware encoder.
+- Captions switch (bottom bar "Captions" + Export sheet): ON = scene text shown over the picture in the preview and burned into the exported video (Exporter.captioned); OFF = neither. Scenes without a picture still show their text (that is their content).
+- Scene length: Timeline.setLength = ANY length, no magnet (later scenes move, nothing is squeezed, nothing clamped to the audio). Bottom tool bar: -1 s, +1 s, Length (type 90 / 1:30 / 10m, or quick buttons). The narration never changes.
+- Export is limited to the narration (ExportPlan.fromTimeline clampToAudio): the scene that crosses the end of the audio is cut there, scenes that start after it are left out. The timeline marks the end of the audio and dims what is after it.
+- Check13 (core/src/test/kotlin) is wired into scripts/run_parity.sh (CI "Check core").
+
+## Redesign shell on top of mobile-editor-ui (branch redesign-shell) - checkpoint 01
+Base = the phone editor (EditorScreen/AutoState, navy-cyan-pink look) that was already on mobile-editor-ui; nothing of it was replaced.
+Added: Home page (welcome, project card, 8 shortcuts: New Project / Auto Analyse / Media Library / Export work, Text Studio / Captions / Music & Audio / Effects are tagged "Soon"), Settings page (clear temporary files, about), 3-tab shell (Home / Editor / Settings), back button in the editor top bar, export ASPECT RATIO (16:9, 9:16, 1:1, 4:5) in the export sheet with the preview in the same shape, `AutoState.newProject()/clearTemp()`, core `ExportOptions` + Check14 (19 checks; 16:9 equals the existing presets).
+Verified: scripts/run_parity.sh (all existing suites + Check13 39 + Check14 19). NOT compiled: all Compose/app code (Android SDK unreachable where this was written) - first CI build may show small errors.
+Not built (tagged Soon, never faked): Text Studio, caption styling editor, audio studio/waveform, effects/transitions, separate Projects and Media tabs (the editor's Inputs/Scenes/Pictures sheets cover media), saved-project list (ProjectStore exists in core but is not wired to the UI).
+
+## Interim save after step 16 (see HANDOVER.md)
+Steps 12-16 rebuilt and verified in core: OverlayStyle, TextAnim/Guides, Effects/Transitions/text track/duplicate, AudioMix/Waveform, CaptionTools. Checks 15, 16, 17 added to scripts/run_parity.sh. App layer not yet using them. Step 11 (first real build) still blocked.

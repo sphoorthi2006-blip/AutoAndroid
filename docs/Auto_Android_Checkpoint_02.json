@@ -1,0 +1,180 @@
+{
+ "project_name": "Auto Android - premium redesign shell on the phone editor",
+ "project_version": "0.2 (versionCode 2); core redesign layer added",
+ "checkpoint_number": 2,
+ "completed_step_range": "12-21",
+ "supersedes": "Auto_Android_Checkpoint_01.json (steps 1-10 remain done; read it for their details)",
+ "base": {
+  "repo": "https://github.com/sphoorthi2006-blip/AutoAndroid",
+  "base_branch": "mobile-editor-ui",
+  "base_commit": "21b3f05",
+  "new_branch": "redesign",
+  "patch_file": "redesign-02.patch (delivered next to the zip; git am onto origin/mobile-editor-ui)"
+ },
+ "project_summary": "Auto turns narration, captions (SRT/VTT/JSON), script and pictures into a timed picture video and exports MP4 on Android (Media3 Transformer). :core is pure Kotlin tested against Python reference outputs; :app is Compose. The Android app is being redesigned as a premium video-editing app. Desktop project Auto_Desktop_srt_driven is reference only and must not be modified.",
+ "completed_steps": [
+  {
+   "step": 12,
+   "title": "OverlayStyle: one style for captions and text, FontCatalog (8 families, weights by API level), ColorText HEX, 8 text + 6 caption presets, StyleLibrary, TextWrap",
+   "verified_by": "Check15",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 13,
+   "title": "TextAnim: AnimKind, AnimMath (fade/slide/pop/zoom/typewriter/bounce), Guides (snap, safe area)",
+   "verified_by": "Check15",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 14,
+   "title": "Effects (ClipFx colour matrix, EffectCatalog), Transitions (fade/slide in/zoom in), text track, duplicate clip, ExportPlan carries fx/transitions/captions/texts",
+   "verified_by": "Check16",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 15,
+   "title": "AudioMix: AudioSettings, MusicTrack, AudioMath gain + PCM applyGain, Waveform peaks, mix stored in Timeline JSON",
+   "verified_by": "Check17",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 16,
+   "title": "CaptionTools: import SRT/VTT/JSON, export SRT/VTT, split/merge/shift/add/delete, reading-speed checks",
+   "verified_by": "Check17",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 17,
+   "title": "MediaLibrary: categories, search, sort, multi-select, file info",
+   "verified_by": "Check18",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 18,
+   "title": "ProjectPrefs: ExportPrefs in manifest settings, recent-project summaries",
+   "verified_by": "Check18",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 19,
+   "title": "RenderCaps: feature registry VERIFIED/WRITTEN/UNAVAILABLE and plan notes",
+   "verified_by": "Check18",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 20,
+   "title": "Workflow: status state machine and analysis report",
+   "verified_by": "Check18",
+   "status": "done and verified in :core (no device)"
+  },
+  {
+   "step": 21,
+   "title": "DesignTokens: charcoal+violet palette, type scale, spacing, WCAG contrast",
+   "verified_by": "Check18",
+   "status": "done and verified in :core (no device)"
+  }
+ ],
+ "pending_steps": [
+  {
+   "step": 11,
+   "title": "Push branch redesign, run Build APK workflow, fix compile errors (BLOCKED for Claude sandboxes: needs push rights; owner pushes, Claude reads branch buildlog)"
+  },
+  {
+   "step": 22,
+   "title": "Palette swap in Theme.kt (values of object C to DesignTokens), keep names"
+  },
+  {
+   "step": 23,
+   "title": "Exporter: caption burn-in from OverlayStyle (Canvas Paint: font, stroke, shadow, box)"
+  },
+  {
+   "step": 24,
+   "title": "Exporter: text overlays + animation (BitmapOverlay/OverlayEffect on the Composition)"
+  },
+  {
+   "step": 25,
+   "title": "Exporter: per-clip RgbMatrix (fx) and fade/slide/zoom transitions"
+  },
+  {
+   "step": 26,
+   "title": "Exporter: audio gain processor + music sequence"
+  },
+  {
+   "step": 27,
+   "title": "Text Studio sheet"
+  },
+  {
+   "step": 28,
+   "title": "Captions sheet"
+  },
+  {
+   "step": 29,
+   "title": "Media / Audio / Effects sheets, Projects page"
+  },
+  {
+   "step": 30,
+   "title": "Landscape/tablet pass and device test, then checkpoint 03"
+  }
+ ],
+ "failed_steps": [],
+ "features_implemented": [
+  "All items in completed_steps exist as tested core logic. NONE of it is visible in the app yet."
+ ],
+ "features_still_under_development": [
+  "Every screen using the new core (Text Studio, Captions sheet, Media, Audio, Effects, Projects), exporter support for styles/overlays/fx/audio, palette swap, bundled fonts (copy Inter/Noto Serif/Nimbus Mono/Z003 from the desktop fonts/bundled into res/font)"
+ ],
+ "files_created": [
+  "core: OverlayStyle.kt TextAnim.kt Effects.kt AudioMix.kt CaptionTools.kt MediaLibrary.kt ProjectPrefs.kt RenderCaps.kt Workflow.kt DesignTokens.kt",
+  "tests: Check15.kt Check16.kt Check17.kt Check18.kt",
+  "scripts/dev_check.sh",
+  "HANDOVER.md",
+  "docs/ (checkpoint 01 json, redesign-shell.patch)"
+ ],
+ "files_modified": [
+  "core: Timeline.kt (fx, transition, TextClip, texts, captionStyle, mix, new edit ops, JSON), ExportPlan.kt (Segment fx/transition/nextTransition, Plan captions/texts/captionStyle/mix)",
+  "scripts/run_parity.sh (Check15-18)",
+  "AUTO_PROGRESS.md"
+ ],
+ "important_source_code_changes": [
+  "Timeline JSON stays version 1; new keys are optional so old files load; default values are not written",
+  "Overlay sizes are fractions of frame height; one OverlayStyle for captions and text",
+  "Core name clash avoided: enum TextAlign (Align object already exists in Align.kt)"
+ ],
+ "gradle_and_dependency_changes": "None in this checkpoint.",
+ "current_architecture": "AutoShell (pages, Soon dialog) -> HomeScreen / EditorScreen / SettingsScreen. All state and logic in AutoState (Compose state) which calls :core (CaptionPipeline, Timeline/TimelineEditor, ExportPlan, ExportOptions) and Exporter (Media3). Palette object C in Theme.kt.",
+ "build_status": "core compiles with kotlinc 2.0.21 and every suite passes. :app has NEVER been compiled. An older GitHub Actions log (commit 9d07393 on branch buildlog) shows dependencies resolve on GitHub and only Kotlin errors in MainActivity.kt stopped it; the current branch has not been built.",
+ "testing_results": {
+  "run_parity.sh": "picture matching identical; ZIP OK; v19 identical; timeline 27; docx/validation/plan 21; confidence/pause/store 30; caption timing 14; free scene length 39; export shapes 19; style/fonts/animation/guides 52; effects/transitions/text/plan 44; audio/caption tools 36; media/prefs/caps/workflow/tokens 48",
+  "skipped": "timestamps-first analyse (private data), backend client (fastapi/ffmpeg missing)",
+  "patch": "redesign-02.patch applies cleanly with git am to a fresh clone of mobile-editor-ui and the suite passes there",
+  "device": "nothing run on a device"
+ },
+ "known_bugs": [
+  "App code uncompiled",
+  "RenderCaps marks features WRITTEN although their exporter code is not written yet (steps 23-26); do not show those controls until the code exists",
+  "Overlay timing on Composition, RgbMatrix on images and fonts weights are assumptions to test on a device",
+  "Two earlier checks had test bugs (temp prefix, check order) and were fixed in the tests, not in the code"
+ ],
+ "important_technical_decisions": [
+  "Base is mobile-editor-ui; its editor is kept, not replaced",
+  "No control that does nothing: unavailable tools are tagged Soon and explain themselves",
+  "Shell uses the existing palette C so the app looks consistent; the original brief asked charcoal + violet, so that is an open decision (step 18)",
+  "Export options come only from core ExportOptions (tested); every new logic goes in :core with a CheckNN test",
+  "Editor page is full screen with its own tabs; the bottom bar shows on Home and Settings only",
+  "Effects limited to what Media3 1.3.1 renders (brightness, contrast, saturation, opacity); blur/sharpen/vignette/dissolve/wipe are UNAVAILABLE",
+  "Transitions are entrances at the start of a picture; FADE also fades the previous picture out",
+  "Narration is never trimmed or offset; music starts at 0 and loops or stops; no video clips, no narration split",
+  "Font weights other than Regular/Bold need Android 9+ (FontCatalog.offeredWeights)",
+  "Palette: change VALUES of object C in Theme.kt to DesignTokens, keep names"
+ ],
+ "next_exact_development_step": "Step 11: owner pushes branch redesign (see HANDOVER.md section 6) and runs Build APK; Claude reads branch buildlog and fixes compile errors without changing behaviour. Then step 22.",
+ "continuation_instructions": "You are continuing the Auto Android redesign with no memory of earlier chats. 1) Unzip Auto_Android_Source_02.zip (matches this checkpoint) or clone the repo and apply redesign-02.patch on origin/mobile-editor-ui. 2) Read HANDOVER.md first, then AUTO_ARCHITECTURE.md. 3) Install kotlinc (see HANDOVER.md section 3) and run KOTLINC=kotlinc bash scripts/run_parity.sh before and after every change. 4) Rules: numbered steps; never mark a step complete unless saved and verified; no control that does nothing; redesign only the Android app (desktop zip is reference only); every 10 completed steps produce Auto_Android_Checkpoint_NN.json and Auto_Android_Source_NN.zip. 5) Do step 11 first, then continue at step 22, keeping every important_technical_decision.",
+ "required_source_files_and_context": [
+  "Auto_Android_Source_02.zip",
+  "HANDOVER.md",
+  "Auto_Android_Checkpoint_01.json (older history)",
+  "Auto_Desktop_srt_driven.zip (reference only, for fonts and features)"
+ ],
+ "source_zip": "Auto_Android_Source_02.zip",
+ "source_manifest_sha256": "f04158e3d94434318e7a88ac2e6ad90c60b108b438e56d0c5c7d0fef5ccd6416"
+}

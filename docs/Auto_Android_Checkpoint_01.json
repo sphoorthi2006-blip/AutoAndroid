@@ -1,0 +1,244 @@
+{
+  "project_name": "Auto Android - premium redesign shell on the phone editor",
+  "project_version": "0.2 (versionCode 2)",
+  "checkpoint_number": 1,
+  "completed_step_range": "1-10",
+  "supersedes": "An earlier Checkpoint 01 / Source 01 built on the older 'main' branch. Discard it: this one is built on GitHub branch mobile-editor-ui (sphoorthi2006-blip/AutoAndroid), which already had the phone editor, 4K/60fps export and burned-in captions.",
+  "base": {
+    "repo": "https://github.com/sphoorthi2006-blip/AutoAndroid",
+    "base_branch": "mobile-editor-ui",
+    "base_commit": "21b3f05",
+    "new_branch": "redesign-shell",
+    "patch_file": "redesign-shell.patch (git am)"
+  },
+  "project_summary": "Auto turns narration, captions (SRT/VTT/JSON), script and pictures into a timed picture video and exports MP4 on Android (Media3 Transformer). :core is pure Kotlin tested against Python reference outputs; :app is Compose. The Android app is being redesigned as a premium video-editing app. Desktop project Auto_Desktop_srt_driven is reference only and must not be modified.",
+  "completed_steps": [
+    {
+      "step": 1,
+      "title": "Inspect Android + desktop projects and the real GitHub state; choose mobile-editor-ui as the base",
+      "status": "done"
+    },
+    {
+      "step": 2,
+      "title": "core ExportOptions: Resolution (720p/1080p/4K) x AspectRatio (16:9, 9:16, 1:1, 4:5) -> even sizes",
+      "status": "core-verified"
+    },
+    {
+      "step": 3,
+      "title": "Check14 (19 checks) + run_parity.sh wiring",
+      "status": "core-verified"
+    },
+    {
+      "step": 4,
+      "title": "AutoState: aspect, newProject(), clearTemp(), hasProject, onHome hook; export uses ExportOptions",
+      "status": "written, not compiled"
+    },
+    {
+      "step": 5,
+      "title": "Export sheet: aspect-ratio chips + note; Stage preview in the chosen shape",
+      "status": "written, not compiled"
+    },
+    {
+      "step": 6,
+      "title": "Editor top bar: back-to-Home button",
+      "status": "written, not compiled"
+    },
+    {
+      "step": 7,
+      "title": "HomeScreen: welcome, project card, 8 shortcuts (4 working, 4 Soon)",
+      "status": "written, not compiled"
+    },
+    {
+      "step": 8,
+      "title": "SettingsScreen: clear temporary files, about",
+      "status": "written, not compiled"
+    },
+    {
+      "step": 9,
+      "title": "AutoShell: Home/Editor/Settings bottom bar, back handling, 'Soon' dialog; MainActivity hosts it",
+      "status": "written, not compiled"
+    },
+    {
+      "step": 10,
+      "title": "Docs (AUTO_PROGRESS.md), versionName 0.2, patch + ZIP + this checkpoint",
+      "status": "done"
+    }
+  ],
+  "pending_steps": [
+    {
+      "step": 11,
+      "title": "Push redesign-shell, run the Build APK workflow, fix compile errors (AUTO build log is saved on branch buildlog)"
+    },
+    {
+      "step": 12,
+      "title": "Caption style model in :core + Check test (font, size, colour, outline, shadow, background, position)"
+    },
+    {
+      "step": 13,
+      "title": "Captions sheet in the editor: edit text/timing, style presets, live preview, burn-in uses the style"
+    },
+    {
+      "step": 14,
+      "title": "Text Studio on top of the caption/text style model (only what the exporter can render)"
+    },
+    {
+      "step": 15,
+      "title": "Wire ProjectStore: save/open projects, Projects list"
+    },
+    {
+      "step": 16,
+      "title": "Audio sheet: volume, fade, waveform"
+    },
+    {
+      "step": 17,
+      "title": "Effects/transitions the Transformer pipeline can render"
+    },
+    {
+      "step": 18,
+      "title": "Palette decision: keep navy-cyan-pink editor look or move everything to charcoal + violet"
+    },
+    {
+      "step": 19,
+      "title": "Landscape/tablet layout pass"
+    },
+    {
+      "step": 20,
+      "title": "Device test pass and checkpoint 02"
+    }
+  ],
+  "failed_steps": [],
+  "features_implemented": [
+    "Home page with working shortcuts New Project, Auto Analyse, Media Library, Export",
+    "Settings: clear temporary files",
+    "Bottom navigation Home / Editor / Settings",
+    "Export aspect ratios 16:9, 9:16, 1:1, 4:5 (pictures scaled to fit with black bars), preview in the same shape",
+    "(already on the base branch) phone editor with timeline, split/delete/undo/redo, free scene length, playback, captions burned in, export 720p/1080p/4K at 30/60 fps"
+  ],
+  "features_still_under_development": [
+    "Text Studio",
+    "Caption style editor",
+    "Audio studio/waveform",
+    "Effects and transitions",
+    "Saved-project list (ProjectStore not wired to UI)",
+    "Separate Projects and Media tabs"
+  ],
+  "files_created": [
+    "app/src/main/kotlin/com/auto/app/AutoShell.kt",
+    "app/src/main/kotlin/com/auto/app/HomeScreen.kt",
+    "app/src/main/kotlin/com/auto/app/SettingsScreen.kt",
+    "core/src/main/kotlin/com/auto/core/ExportOptions.kt",
+    "core/src/test/kotlin/Check14.kt"
+  ],
+  "files_modified": [
+    "app/src/main/kotlin/com/auto/app/AutoState.kt",
+    "app/src/main/kotlin/com/auto/app/EditorScreen.kt",
+    "app/src/main/kotlin/com/auto/app/MainActivity.kt",
+    "app/build.gradle.kts",
+    "scripts/run_parity.sh",
+    "AUTO_PROGRESS.md"
+  ],
+  "important_source_code_changes": [
+    "MainActivity now sets content AutoShell(st); EditorScreen unchanged except preview shape, export-sheet aspect row, top-bar back button",
+    "AutoState.export uses ExportOptions.settings(Resolution.of(resP), aspect, fps); exporter itself untouched (it already takes any even width/height)",
+    "ExportOptions 16:9 results equal ExportSettings.P720/P1080/P4K and preset(): tested"
+  ],
+  "gradle_and_dependency_changes": {
+    "versionName": "0.2",
+    "versionCode": 2,
+    "dependencies": "none added (the base already has Compose BOM 2024.06.00, material3, activity-compose, media3 1.3.1)"
+  },
+  "current_architecture": "AutoShell (pages, Soon dialog) -> HomeScreen / EditorScreen / SettingsScreen. All state and logic in AutoState (Compose state) which calls :core (CaptionPipeline, Timeline/TimelineEditor, ExportPlan, ExportOptions) and Exporter (Media3). Palette object C in Theme.kt.",
+  "build_status": "core compiles with kotlinc 2.0.21. App NOT compiled: Android SDK / Google Maven unreachable where this was written. CI result of the base branch could not be read (GitHub API rate limit).",
+  "testing_results": {
+    "run_parity.sh": "Picture matching identical; ZIP OK; v19 identical; timeline engine 27; docx/validation/export plan 21; confidence/pause/project store 30; exact caption timing 14; free scene length/export presets (Check13) 39; export shapes (Check14) 19",
+    "skipped": "timestamps-first analyse (private data), backend client (fastapi/ffmpeg missing)",
+    "patch": "redesign-shell.patch applies cleanly with git am onto a fresh clone of mobile-editor-ui",
+    "device": "nothing run on a device"
+  },
+  "known_bugs": [
+    "App code uncompiled: expect small errors on first build",
+    "Aspect ratios other than 16:9 are untested on a device (caption burn-in sizing uses width/height so it should follow)",
+    "4K / 60 fps already flagged on the base branch as heavy for phones",
+    "Home 'Recent project' shows only the open project, not saved ones"
+  ],
+  "important_technical_decisions": [
+    "Base is mobile-editor-ui; its editor is kept, not replaced",
+    "No control that does nothing: unavailable tools are tagged Soon and explain themselves",
+    "Shell uses the existing palette C so the app looks consistent; the original brief asked charcoal + violet, so that is an open decision (step 18)",
+    "Export options come only from core ExportOptions (tested); every new logic goes in :core with a CheckNN test",
+    "Editor page is full screen with its own tabs; the bottom bar shows on Home and Settings only"
+  ],
+  "next_exact_development_step": "Step 11: push branch redesign-shell (git am redesign-shell.patch on mobile-editor-ui, git push -u origin redesign-shell), run the Build APK workflow on it, read build.log from branch buildlog, fix compile errors, change no behaviour.",
+  "continuation_instructions": "You are continuing the Auto Android redesign. You have no access to earlier conversations. 1) Get the source: unzip Auto_Android_Source_01.zip (matches this checkpoint) or clone https://github.com/sphoorthi2006-blip/AutoAndroid and check out branch redesign-shell. 2) Read AUTO_ARCHITECTURE.md, AUTO_PROGRESS.md (last section) and AUTO_TODO.md. 3) Brief: premium video-editing app look and features (Home, editor/timeline, Text Studio, Captions, Media, Audio, Effects/Transitions, Analysis, Export), reuse the existing pipeline, never show a fake control, redesign only the Android app. 4) Work in numbered steps; after every 10 completed steps produce Auto_Android_Checkpoint_NN.json (same fields, valid JSON) and a synchronized Auto_Android_Source_NN.zip. 5) Never mark a step complete unless saved and verified; say plainly what is only written. 6) Run scripts/run_parity.sh (set KOTLINC) before and after core changes. 7) Start with next_exact_development_step and keep every important_technical_decision.",
+  "required_source_files_and_context": [
+    "Auto_Android_Source_01.zip",
+    "redesign-shell.patch",
+    "Auto_Desktop_srt_driven.zip (reference only)"
+  ],
+  "source_zip": "Auto_Android_Source_01.zip",
+  "source_manifest_sha256": {
+    ".github/workflows/android.yml": "67cb49029972afb61523eac1c2a31be33ce75b71c00906b4e22a86b6373e0979",
+    ".github/workflows/check.yml": "42ffcbd2fb687451d902f0a0018a3dc22a84cfb54ee605f8a156e5a12bd4be23",
+    ".gitignore": "3e4b324f4cccd31a423d4f0c920876b4e2f8f267f271f8c549d43038858b7298",
+    "AUTO_ARCHITECTURE.md": "f56cc48c3c67c8866b06e964624a9ba25a22c35caf587cd6384e7ac0c41e5598",
+    "AUTO_PROGRESS.md": "55132b20a0f471a968eb205243a148482de168537952ef4943125f246cc8e5d6",
+    "AUTO_TODO.md": "529c734fd0feb21e7ccce95065a62577a90894cb6d15f9816985d92ab40347ab",
+    "README.md": "31a4a60112dcb76af71dd37528132ececa65ad8daed95950ad5cc99089498741",
+    "app/build.gradle.kts": "e24742e23a482971fa3ff44b36dda062ae2d5a13b757e51e535defd64313f1bc",
+    "app/src/main/AndroidManifest.xml": "1ccdd779fb0de8c4d2920bd411656bdfad9ec9360cb891d2608de6c3669588c7",
+    "app/src/main/kotlin/com/auto/app/AudioDecoder.kt": "07c6e22a094b27219a2741c1b30ff7392ff9f39f8186145367166c4ce4cbbfdb",
+    "app/src/main/kotlin/com/auto/app/AutoShell.kt": "85eced387a9871598494af524c85bf0ccd5ffa0511d361f97e13660c6c68bc02",
+    "app/src/main/kotlin/com/auto/app/AutoState.kt": "da0a3ba163b009740c12cf6d8e0e545454455a28f9bf58a9919c21b66869100d",
+    "app/src/main/kotlin/com/auto/app/EditorScreen.kt": "22d1e9458bab5c12938b3faeb538b69377ac342517441185794b0f24da92e7df",
+    "app/src/main/kotlin/com/auto/app/Exporter.kt": "71779808f86a8a3f7380d3e4d0c85078f45911abbdc220f94966f3898f4024cf",
+    "app/src/main/kotlin/com/auto/app/HomeScreen.kt": "1fb4adc1199db7050fdca80deefb2e58a37bc48d7bcc40e99c0b5a9ad051e5ea",
+    "app/src/main/kotlin/com/auto/app/MainActivity.kt": "6da8731d04eeb6011a2667878bd476930f3cdaec9d47f6cc3358b7fbe30db1aa",
+    "app/src/main/kotlin/com/auto/app/SettingsScreen.kt": "5052243e9b7010dce08df96ca0051f9892c0a4b14d3149972262a3bfd4f0ac27",
+    "app/src/main/kotlin/com/auto/app/Theme.kt": "737bb439ed495a729d8e30598059f6dc2f1d4f53f65fa62ff50527565fb7ac22",
+    "backend/README.md": "236ea3786056fddc3ee2cd4b39ffc107111ed826fd988ebc84c23638d00c927d",
+    "backend/auto_backend/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backend/auto_backend/app.py": "2e88ce26e8b893ad1a193993c28038efcd0767ce0ca49cb42b2be00046a4d38d",
+    "backend/auto_backend/engine.py": "0e05d51984107605b9b5788a94e52a89045456896deab7ed162fc521a86c07d1",
+    "backend/requirements.txt": "2f2e23a7458ca47233aed6892c4dee114e9286082f31c27c49b376c1ee4d983c",
+    "backend/tests/serve_fake.py": "617791092daf5a7c99b72126e8751c41a9e079c883bb0d5c0bef350337666762",
+    "backend/tests/test_backend.py": "349558b4d5ac513afdc597f6c7f03e250c95ce491470bdd135d6cae94404aa97",
+    "build.gradle.kts": "82933575e5caa0c1b2352477f2273e60a96a0203f981ae4e6ce0626b51a8f931",
+    "core/build.gradle.kts": "c6f56de27a94685cdf10fdb07601e23d1597398555395debf163aca822113762",
+    "core/src/main/kotlin/com/auto/core/Align.kt": "aecf5e875d17b290e18ce1e0809aed67038f0b092d9df207916d95c30b993eaa",
+    "core/src/main/kotlin/com/auto/core/AudioPauses.kt": "b724291a5730337da51472f48076aaa748f913163511a8638da2023605e88768",
+    "core/src/main/kotlin/com/auto/core/BackendClient.kt": "ab645336b02d7ac8adc10cb2b904e94ce145ed66fa9db76a16ec552b0144bdc8",
+    "core/src/main/kotlin/com/auto/core/Bundle.kt": "2ca8a2555a10306bf0d2482daa8fce50a432da58cee614d2c0fecb37a46856f7",
+    "core/src/main/kotlin/com/auto/core/CaptionPipeline.kt": "1801a709e9689ff51fcb8cf89a595a45434115359dd92970faa8e1acc6255ab5",
+    "core/src/main/kotlin/com/auto/core/Captions.kt": "ab0f0d9154de3d6c5458e6711774c0dc3d9bed0375c60e4769ce29217982878e",
+    "core/src/main/kotlin/com/auto/core/Confidence.kt": "6b3484e3c106cc6e03fc05e19f7ef7211b5bd09b77b640fb7476ffde72c6d8d9",
+    "core/src/main/kotlin/com/auto/core/Details.kt": "135c86b50051b19a141fb2ddfc448d87f15dcb4818d6c6c8e9898a19d08b3090",
+    "core/src/main/kotlin/com/auto/core/ExportOptions.kt": "6dc0f858867c747c0b3351dbbe5d5a268f34b0f85dd50209e7c2b3f79cb1c335",
+    "core/src/main/kotlin/com/auto/core/ExportPlan.kt": "b02347969ff2790a65dc4c95f7c019f2a6b01f68183069a4da6a3ad19cc2e1cd",
+    "core/src/main/kotlin/com/auto/core/Json.kt": "92c4ed09c33f47011eaa001f21d74d08f691a196705a64647a94e1e05922e52f",
+    "core/src/main/kotlin/com/auto/core/Matching.kt": "61386ef7aba360cf3f5db04b7fcb05b061c4a95a8d1970ed719c8339acee0470",
+    "core/src/main/kotlin/com/auto/core/Pipeline.kt": "945c5e11ced94b5213901ec7ac1c4c06a4e4a80c139501849ad2ff1d8a48b1b2",
+    "core/src/main/kotlin/com/auto/core/ProjectStore.kt": "06cb6a7db66ed50af9fadc76ae8b2e3a35930d54184339bbd6f47d0772377d98",
+    "core/src/main/kotlin/com/auto/core/TextFiles.kt": "a9a2cfa9455cda22f217d3f89a37c70f515ebec13d3f11fa2b6d4d9abdc2adff",
+    "core/src/main/kotlin/com/auto/core/TimeText.kt": "0b5a2d57f58825f080bf4ef130deef03b1eb8631a429184b6b2ec8d0ec20ab36",
+    "core/src/main/kotlin/com/auto/core/Timeline.kt": "f49793be38ad7bda8dccdb896eaca2ecc509e72b0169423c8e5808fb9b5ccf81",
+    "core/src/main/kotlin/com/auto/core/Validation.kt": "f2e3f1013cc0c3453e65d76ea8aba8f8ae333da58a02466bdf96abfc37cfb4e1",
+    "core/src/test/kotlin/Check.kt": "6873a8e5d3ff137303d3e1d4c68760aa3c0af6252facb178cf0f8fe91f0687b6",
+    "core/src/test/kotlin/Check10.kt": "5086a95c42e0b3be2135ad146f8bb3083850f35a221e6f896aff88c722601664",
+    "core/src/test/kotlin/Check11.kt": "f176e69e4866b52ebe390dfd0d5d78ebde10e04a941b6b28b0578645dc96504c",
+    "core/src/test/kotlin/Check12.kt": "b1607f4d095c60bae16326d33fe93525ab432e8b10e35635547b0736603c27aa",
+    "core/src/test/kotlin/Check13.kt": "9ca002ff72c9f7389e0e3e95d74f9bc44456f107a29fe8cbee9fd373cc786817",
+    "core/src/test/kotlin/Check14.kt": "898afe4989c5bb3297f32cad46bff782b1fb75c9a9f3b5f4788b32ccf5ca50cd",
+    "core/src/test/kotlin/Check2.kt": "cca5e3afc158a072abe0e8e8be23df37256d33db90629b038e1f1f462cc59df6",
+    "core/src/test/kotlin/Check3.kt": "119a691bed0de792b1b2c1aaf27159eb55eb5254795121b7f20c3628a29c5d87",
+    "core/src/test/kotlin/Check4.kt": "d70220614d3430f717a868f39bd61a8fb1b7d01c9ca1f647d30b1141d2e5e0da",
+    "core/src/test/kotlin/Check5.kt": "be004d7104076412f29c8f109b895026064cc3916170503f8831645df5ff7247",
+    "core/src/test/kotlin/Check6.kt": "b665c159e95018331a06b092a4f8ec2036b0515e31945033ccadc51cf07252fa",
+    "core/src/test/kotlin/Check7.kt": "beb2bc4045aa8aa3574a6562dc5b914194c51acd70eca11691af59243de9b62b",
+    "core/src/test/kotlin/Check8.kt": "54806296126b8015ef694527b91b38c278ae1b54d6d8bfb7eb17964f3f12b95f",
+    "core/src/test/kotlin/Check9.kt": "32e8b3abe9b095aefb06319335d9d7254c3ddef5b1a6eb044b467891ba49b1bd",
+    "gradle.properties": "a62205638a2d8b28a3e1ce6ac769e6e58f615572b4e4769031eead1d3b6beea8",
+    "scripts/make_check8_data.py": "74652438b357a10e780c57a7dc435672ab91e35e34ade4ad6e3a5b8bf58e57c0",
+    "scripts/run_parity.sh": "62f11cce5538c1017b5d8f3f453dfe4a5b1c6e7ba793f22018669634ef7d7fc5",
+    "settings.gradle.kts": "978b680283afd32398652a4f5b9aed3a9de6b0857156a04489c01b3e3ee065d6"
+  }
+}

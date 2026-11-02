@@ -1,0 +1,534 @@
+From e9a85954d33eda541ca6d1f92217acb977d7933f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 2 Nov 2026 08:07:25 +0000
+Subject: [PATCH] Home + Settings + shell, export aspect ratios (16:9, 9:16,
+ 1:1, 4:5), new project / clear temp; Check14
+
+---
+ AUTO_PROGRESS.md                              |   6 +
+ app/build.gradle.kts                          |   4 +-
+ app/src/main/kotlin/com/auto/app/AutoShell.kt |  76 +++++++++++++
+ app/src/main/kotlin/com/auto/app/AutoState.kt |  36 +++++-
+ .../main/kotlin/com/auto/app/EditorScreen.kt  |  12 +-
+ .../main/kotlin/com/auto/app/HomeScreen.kt    | 103 ++++++++++++++++++
+ .../main/kotlin/com/auto/app/MainActivity.kt  |   4 +-
+ .../kotlin/com/auto/app/SettingsScreen.kt     |  54 +++++++++
+ .../kotlin/com/auto/core/ExportOptions.kt     |  29 +++++
+ core/src/test/kotlin/Check14.kt               |  35 ++++++
+ scripts/run_parity.sh                         |   4 +-
+ 11 files changed, 353 insertions(+), 10 deletions(-)
+ create mode 100644 app/src/main/kotlin/com/auto/app/AutoShell.kt
+ create mode 100644 app/src/main/kotlin/com/auto/app/HomeScreen.kt
+ create mode 100644 app/src/main/kotlin/com/auto/app/SettingsScreen.kt
+ create mode 100644 core/src/main/kotlin/com/auto/core/ExportOptions.kt
+ create mode 100644 core/src/test/kotlin/Check14.kt
+
+diff --git a/AUTO_PROGRESS.md b/AUTO_PROGRESS.md
+index 0ef7fc9..37da680 100644
+--- a/AUTO_PROGRESS.md
++++ b/AUTO_PROGRESS.md
+@@ -84,3 +84,9 @@ Fully DONE: 1,2,3,4,5 and 8 (core part; app part uncompiled).  Partial: 7,9,25,2
+ - Scene length: Timeline.setLength = ANY length, no magnet (later scenes move, nothing is squeezed, nothing clamped to the audio). Bottom tool bar: -1 s, +1 s, Length (type 90 / 1:30 / 10m, or quick buttons). The narration never changes.
+ - Export is limited to the narration (ExportPlan.fromTimeline clampToAudio): the scene that crosses the end of the audio is cut there, scenes that start after it are left out. The timeline marks the end of the audio and dims what is after it.
+ - Check13 (core/src/test/kotlin) is wired into scripts/run_parity.sh (CI "Check core").
++
++## Redesign shell on top of mobile-editor-ui (branch redesign-shell) - checkpoint 01
++Base = the phone editor (EditorScreen/AutoState, navy-cyan-pink look) that was already on mobile-editor-ui; nothing of it was replaced.
++Added: Home page (welcome, project card, 8 shortcuts: New Project / Auto Analyse / Media Library / Export work, Text Studio / Captions / Music & Audio / Effects are tagged "Soon"), Settings page (clear temporary files, about), 3-tab shell (Home / Editor / Settings), back button in the editor top bar, export ASPECT RATIO (16:9, 9:16, 1:1, 4:5) in the export sheet with the preview in the same shape, `AutoState.newProject()/clearTemp()`, core `ExportOptions` + Check14 (19 checks; 16:9 equals the existing presets).
++Verified: scripts/run_parity.sh (all existing suites + Check13 39 + Check14 19). NOT compiled: all Compose/app code (Android SDK unreachable where this was written) - first CI build may show small errors.
++Not built (tagged Soon, never faked): Text Studio, caption styling editor, audio studio/waveform, effects/transitions, separate Projects and Media tabs (the editor's Inputs/Scenes/Pictures sheets cover media), saved-project list (ProjectStore exists in core but is not wired to the UI).
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 24d9fae..13c54fb 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -11,8 +11,8 @@ android {
+         applicationId = "com.auto.app"
+         minSdk = 26
+         targetSdk = 34
+-        versionCode = 1
+-        versionName = "0.1"
++        versionCode = 2
++        versionName = "0.2"
+     }
+     compileOptions {
+         sourceCompatibility = JavaVersion.VERSION_17
+diff --git a/app/src/main/kotlin/com/auto/app/AutoShell.kt b/app/src/main/kotlin/com/auto/app/AutoShell.kt
+new file mode 100644
+index 0000000..0d839c2
+--- /dev/null
++++ b/app/src/main/kotlin/com/auto/app/AutoShell.kt
+@@ -0,0 +1,76 @@
++package com.auto.app
++
++import androidx.activity.compose.BackHandler
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.foundation.layout.padding
++import androidx.compose.material3.AlertDialog
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.Stable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++
++enum class Page(val glyph: String, val label: String) { Home("⌂", "Home"), Editor("✂", "Editor"), Settings("⚙", "Settings") }
++
++/** Which page is showing + the small "this is not built yet" dialog. The Editor page is full screen (it has its own bottom tabs), so the bar shows on Home and Settings only. */
++@Stable
++class Shell {
++    var page by mutableStateOf(Page.Home)
++    var notice by mutableStateOf<Pair<String, String>?>(null)
++    fun openEditor() { page = Page.Editor }
++    fun openSettings() { page = Page.Settings }
++    fun soon(feature: String) { notice = feature to "$feature is not built yet, so its controls are not shown. It is planned for a later batch." }
++    fun message(title: String, text: String) { notice = title to text }
++}
++
++@Composable
++fun AutoShell(st: AutoState) {
++    val shell = remember { Shell() }
++    st.onHome = { shell.page = Page.Home }
++    BackHandler(enabled = shell.page != Page.Home) { if (st.sheet != null) st.sheet = null else shell.page = Page.Home }
++    Box(Modifier.fillMaxSize().background(C.Bg)) {
++        Column(Modifier.fillMaxSize()) {
++            Box(Modifier.weight(1f).fillMaxWidth()) {
++                when (shell.page) {
++                    Page.Home -> HomeScreen(st, shell)
++                    Page.Editor -> EditorScreen(st)
++                    Page.Settings -> SettingsScreen(st, shell)
++                }
++            }
++            if (shell.page != Page.Editor) NavBar(shell)
++        }
++        shell.notice?.let { n ->
++            AlertDialog(onDismissRequest = { shell.notice = null }, containerColor = C.Card, titleContentColor = C.Text, textContentColor = C.Muted,
++                title = { Text(n.first, fontWeight = FontWeight.Bold) }, text = { Text(n.second) },
++                confirmButton = { TextButton(onClick = { shell.notice = null }) { Text("OK", color = C.Cyan) } })
++        }
++    }
++}
++
++@Composable
++private fun NavBar(shell: Shell) {
++    Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().padding(vertical = 8.dp)) {
++        for (p in Page.values()) {
++            val on = shell.page == p
++            Column(Modifier.weight(1f).clickable { shell.page = p }.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
++                Text(p.glyph, color = if (on) C.Cyan else C.Muted, fontSize = 20.sp)
++                Text(p.label, color = if (on) C.Cyan else C.Muted, fontSize = 11.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
++            }
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/auto/app/AutoState.kt b/app/src/main/kotlin/com/auto/app/AutoState.kt
+index 8aaffc6..64bec8f 100644
+--- a/app/src/main/kotlin/com/auto/app/AutoState.kt
++++ b/app/src/main/kotlin/com/auto/app/AutoState.kt
+@@ -48,6 +48,9 @@ class AutoState(private val act: ComponentActivity) {
+     var captionsOn by mutableStateOf(true)        // captions switch: shown over the pictures in the preview AND burned into the exported video
+     var resP by mutableIntStateOf(720)            // export height: 720, 1080 or 2160 (4K)
+     var fps by mutableIntStateOf(30)              // export frame rate: 30 or 60
++    var aspect by mutableStateOf(AspectRatio.R16_9)   // export shape: 16:9, 9:16, 1:1 or 4:5 (pictures are scaled to fit, black bars)
++    var onHome: () -> Unit = {}                   // set by the shell: back to the Home page
++    val hasProject get() = timeline != null
+ 
+     /** The whole timeline (scrubbing/editing): can be longer than the narration when a scene was extended. */
+     fun totalMs(): Long { val t = timeline ?: return 0L; return max(t.audioMs, t.endMs) }
+@@ -216,12 +219,41 @@ class AutoState(private val act: ComponentActivity) {
+         }
+     }
+ 
++    // ---------- new project / temporary files ----------
++    private val tempDirs = listOf("in", "bundle", "zips", "Pictures", "work", "export", "replaced")
++
++    /** Forgets the current files, analysis and timeline and opens the Inputs sheet. Ignored while analysing or exporting. */
++    fun newProject() {
++        if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
++        stopPlay(); release()
++        inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
++        analysis = null; narration = null; editor = null
++        timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
++        status = "Choose your files in Inputs, then press Analyse."; sheet = "inputs"
++        thread { for (d in tempDirs) File(act.cacheDir, d).deleteRecursively() }
++    }
++
++    /** Deletes the imported copies, extracted pictures and old exports in the app's temporary folder (the current project is closed too). Returns the freed size to `done`. */
++    fun clearTemp(done: (Long) -> Unit) {
++        if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
++        stopPlay(); release()
++        inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
++        analysis = null; narration = null; editor = null
++        timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
++        status = "Choose your files in Inputs, then press Analyse."
++        thread {
++            val n = tempDirs.sumOf { d -> File(act.cacheDir, d).walkTopDown().filter { it.isFile }.sumOf { it.length() } }
++            for (d in tempDirs) File(act.cacheDir, d).deleteRecursively()
++            act.runOnUiThread { done(n) }
++        }
++    }
++
+     // ---------- export (main thread) ----------
+     fun export() {
+         if (analysis == null) return; val tl = timeline ?: return
+         if (exportPct != null) return
+-        val settings = try { ExportSettings.preset(resP, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
+-        exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} $fps fps..."; stopPlay()
++        val settings = try { ExportOptions.settings(Resolution.of(resP), aspect, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
++        exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} ${aspect.label} $fps fps..."; stopPlay()
+         try {
+             val onP = { p: Int -> exportPct = p; status = "Exporting... $p%" }
+             val onD = { where: String -> exportPct = null; status = "Done: $where" }
+diff --git a/app/src/main/kotlin/com/auto/app/EditorScreen.kt b/app/src/main/kotlin/com/auto/app/EditorScreen.kt
+index 82c606b..e488fa0 100644
+--- a/app/src/main/kotlin/com/auto/app/EditorScreen.kt
++++ b/app/src/main/kotlin/com/auto/app/EditorScreen.kt
+@@ -70,7 +70,9 @@ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+-import com.auto.core.ExportSettings
++import com.auto.core.AspectRatio
++import com.auto.core.ExportOptions
++import com.auto.core.Resolution
+ import com.auto.core.ImageClip
+ import com.auto.core.TimeText
+ import kotlinx.coroutines.Dispatchers
+@@ -103,6 +105,7 @@ fun EditorScreen(st: AutoState) {
+ @Composable
+ private fun TopBar(st: AutoState) {
+     Row(Modifier.fillMaxWidth().glow(C.Violet, 14.dp, RoundedCornerShape(0.dp)).background(C.Top).statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
++        TopIcon("‹", true) { st.onHome() }
+         TopIcon("↶", st.canUndo) { st.undo() }
+         TopIcon("↷", st.canRedo) { st.redo() }
+         Spacer(Modifier.weight(1f))
+@@ -131,7 +134,7 @@ private fun Stage(st: AutoState, modifier: Modifier) {
+     }
+     Box(modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
+         val shape = RoundedCornerShape(24.dp)
+-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).glow(C.Violet, 22.dp, shape).clip(shape).background(C.Screen).border(1.dp, C.Cyan.copy(alpha = 0.4f), shape), contentAlignment = Alignment.Center) {
++        Box(Modifier.then(if (st.aspect.ratio >= 1f) Modifier.fillMaxWidth() else Modifier.fillMaxHeight()).aspectRatio(st.aspect.ratio).glow(C.Violet, 22.dp, shape).clip(shape).background(C.Screen).border(1.dp, C.Cyan.copy(alpha = 0.4f), shape), contentAlignment = Alignment.Center) {
+             val b = bmp
+             if (tl == null) {
+                 Text("Open Inputs to add your files", color = C.Muted, fontSize = 15.sp)
+@@ -426,11 +429,14 @@ private fun ToggleRow(label: String, on: Boolean, onToggle: () -> Unit) {
+ @Composable
+ private fun ExportSheet(st: AutoState) {
+     val busy = st.exportPct != null
+-    val s = ExportSettings.preset(st.resP, st.fps)
++    val s = ExportOptions.settings(Resolution.of(st.resP), st.aspect, st.fps)
+     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+         Text("Export MP4", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+         Text("Resolution", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+         Row { OptionChip("720p", st.resP == 720) { st.resP = 720 }; OptionChip("1080p", st.resP == 1080) { st.resP = 1080 }; OptionChip("4K", st.resP == 2160) { st.resP = 2160 } }
++        Text("Aspect ratio", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
++        Row { for (a in AspectRatio.values()) OptionChip(a.label, st.aspect == a) { st.aspect = a } }
++        Text("Pictures that do not match the shape are scaled to fit, with black bars.", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+         Text("Frame rate", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+         Row { OptionChip("30 fps", st.fps == 30) { st.fps = 30 }; OptionChip("60 fps", st.fps == 60) { st.fps = 60 } }
+         ToggleRow("Captions on the video", st.captionsOn) { st.captionsOn = !st.captionsOn }
+diff --git a/app/src/main/kotlin/com/auto/app/HomeScreen.kt b/app/src/main/kotlin/com/auto/app/HomeScreen.kt
+new file mode 100644
+index 0000000..8f41af2
+--- /dev/null
++++ b/app/src/main/kotlin/com/auto/app/HomeScreen.kt
+@@ -0,0 +1,103 @@
++package com.auto.app
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.statusBarsPadding
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++
++/** One shortcut tile. ready = false: drawn dimmer, tagged "Soon", and tapping it says so (never a silent no-op). */
++private class Shortcut(val glyph: String, val title: String, val ready: Boolean, val onClick: () -> Unit)
++
++@Composable
++fun HomeScreen(st: AutoState, shell: Shell) {
++    val shortcuts = listOf(
++        Shortcut("＋", "New Project", true) { st.newProject(); shell.openEditor() },
++        Shortcut("◎", "Auto Analyse", true) { st.sheet = "inputs"; shell.openEditor() },
++        Shortcut("Aa", "Text Studio", false) { shell.soon("Text Studio") },
++        Shortcut("▭", "Captions", false) { shell.soon("Captions editor") },
++        Shortcut("▣", "Media Library", true) { st.sheet = if (st.hasProject) "pictures" else "inputs"; shell.openEditor() },
++        Shortcut("♪", "Music & Audio", false) { shell.soon("Music & Audio studio") },
++        Shortcut("✦", "Effects", false) { shell.soon("Effects and transitions") },
++        Shortcut("⬆", "Export", true) { st.sheet = if (st.hasProject) "export" else "inputs"; shell.openEditor() },
++    )
++    Column(Modifier.fillMaxSize().background(C.Bg).verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 16.dp)) {
++        Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
++            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.Glow), contentAlignment = Alignment.Center) { Text("A", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp) }
++            Column(Modifier.weight(1f).padding(start = 10.dp)) {
++                Text("AUTO", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
++                Text(if (st.hasProject) "Project open · ${st.timeline?.clips?.size ?: 0} scenes" else "No project open", color = C.Muted, fontSize = 12.sp)
++            }
++            Box(Modifier.clip(RoundedCornerShape(12.dp)).clickable { shell.openSettings() }.padding(10.dp)) { Text("⚙", color = C.Muted, fontSize = 22.sp) }
++        }
++        Spacer(Modifier.height(26.dp))
++        Text("Create something amazing", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 26.sp)
++        Text("Everything you need to create professional videos.", color = C.Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
++        Spacer(Modifier.height(18.dp))
++        val card = RoundedCornerShape(22.dp)
++        Column(Modifier.fillMaxWidth().clip(card).background(C.Card).border(1.dp, C.Line, card).padding(16.dp)) {
++            HomeButton("＋  New Project", primary = true, enabled = true) { st.newProject(); shell.openEditor() }
++            Spacer(Modifier.height(8.dp))
++            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                Box(Modifier.weight(1f)) { HomeButton("Import Project", primary = false, enabled = true) { st.sheet = "inputs"; shell.openEditor() } }
++                Box(Modifier.weight(1f)) { HomeButton("Continue Editing", primary = false, enabled = st.hasProject) { st.sheet = null; shell.openEditor() } }
++            }
++            if (st.hasProject) Text("Recent project: ${st.timeline?.clips?.size ?: 0} scenes · ${fmt(st.playEndMs())}", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
++        }
++        Spacer(Modifier.height(22.dp))
++        Text("Quick shortcuts", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(bottom = 10.dp))
++        for (row in shortcuts.chunked(4)) {
++            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                for (sc in row) Box(Modifier.weight(1f)) { Tile(sc) }
++            }
++        }
++        Spacer(Modifier.height(24.dp))
++    }
++}
++
++@Composable
++private fun Tile(sc: Shortcut) {
++    val shape = RoundedCornerShape(16.dp)
++    Column(Modifier.fillMaxWidth().clip(shape).background(C.Card).border(1.dp, C.Line, shape).clickable(onClick = sc.onClick).padding(vertical = 12.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
++        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(if (sc.ready) C.Violet.copy(alpha = 0.25f) else C.Lane), contentAlignment = Alignment.Center) {
++            Text(sc.glyph, color = if (sc.ready) C.Cyan else C.Muted, fontSize = 18.sp, fontWeight = FontWeight.Bold)
++        }
++        Text(sc.title, color = if (sc.ready) C.Text else C.Muted, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
++        if (!sc.ready) Text("Soon", color = C.Cyan, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(50)).background(C.Violet.copy(alpha = 0.25f)).padding(horizontal = 8.dp, vertical = 2.dp))
++        else Spacer(Modifier.height(18.dp))
++    }
++}
++
++@Composable
++private fun HomeButton(text: String, primary: Boolean, enabled: Boolean, onClick: () -> Unit) {
++    val shape = RoundedCornerShape(50)
++    Box(Modifier.fillMaxWidth().then(if (primary && enabled) Modifier.glow(C.Violet, 14.dp, shape) else Modifier).clip(shape)
++        .then(if (primary) Modifier.background(if (enabled) C.Glow else SolidColor(C.Lane)) else Modifier.border(1.dp, C.Line, shape))
++        .clickable(enabled = enabled, onClick = onClick).padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
++        Text(text, color = if (enabled) Color.White else C.Muted, fontWeight = FontWeight.Bold, fontSize = 14.sp)
++    }
++}
+diff --git a/app/src/main/kotlin/com/auto/app/MainActivity.kt b/app/src/main/kotlin/com/auto/app/MainActivity.kt
+index 199bba8..2786999 100644
+--- a/app/src/main/kotlin/com/auto/app/MainActivity.kt
++++ b/app/src/main/kotlin/com/auto/app/MainActivity.kt
+@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
+ import androidx.activity.enableEdgeToEdge
+ import androidx.activity.result.contract.ActivityResultContracts
+ 
+-/** Thin host: the phone editor screen is in EditorScreen.kt, its logic in AutoState.kt. */
++/** Thin host: pages are in AutoShell.kt / HomeScreen.kt / SettingsScreen.kt, the editor in EditorScreen.kt, its logic in AutoState.kt. */
+ class MainActivity : ComponentActivity() {
+     private lateinit var st: AutoState
+     private var mode = 1
+@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
+         enableEdgeToEdge()
+         st = AutoState(this)
+         st.pick = { m -> mode = m; picker.launch(arrayOf("*/*")) }
+-        setContent { EditorScreen(st) }
++        setContent { AutoShell(st) }
+     }
+ 
+     override fun onDestroy() { st.release(); super.onDestroy() }
+diff --git a/app/src/main/kotlin/com/auto/app/SettingsScreen.kt b/app/src/main/kotlin/com/auto/app/SettingsScreen.kt
+new file mode 100644
+index 0000000..f7d8143
+--- /dev/null
++++ b/app/src/main/kotlin/com/auto/app/SettingsScreen.kt
+@@ -0,0 +1,54 @@
++package com.auto.app
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.statusBarsPadding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++
++@Composable
++fun SettingsScreen(st: AutoState, shell: Shell) {
++    val card = RoundedCornerShape(20.dp)
++    Column(Modifier.fillMaxSize().background(C.Bg).verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 16.dp)) {
++        Text("Settings", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 26.sp, modifier = Modifier.padding(top = 18.dp, bottom = 14.dp))
++        Column(Modifier.fillMaxWidth().clip(card).background(C.Card).border(1.dp, C.Line, card).padding(16.dp)) {
++            Text("Storage", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
++            Text("Deletes the imported copies, extracted pictures and old exports in the app's temporary folder, and closes the current project. Videos already saved in Movies/Auto are kept.", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
++            val shape = RoundedCornerShape(50)
++            Box(Modifier.fillMaxWidth().clip(shape).border(1.dp, C.Line, shape).clickable {
++                st.clearTemp { n -> shell.message("Temporary files cleared", "Freed ${size(n)}. Import your files again to continue.") }
++            }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) { Text("Clear temporary files", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
++        }
++        Spacer(Modifier.height(10.dp))
++        Column(Modifier.fillMaxWidth().clip(card).background(C.Card).border(1.dp, C.Line, card).padding(16.dp)) {
++            Text("About", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
++            Text("Auto 0.2", color = C.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
++            Text("Export: MP4 (H.264 + AAC), 720p / 1080p / 4K, 16:9 · 9:16 · 1:1 · 4:5, 24 / 30 / 60 fps in the engine (the sheet offers 30 and 60).", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
++        }
++    }
++}
++
++private fun size(b: Long): String = when {
++    b < 1024 -> "$b B"
++    b < 1024L * 1024 -> String.format(java.util.Locale.ROOT, "%.1f KB", b / 1024.0)
++    b < 1024L * 1024 * 1024 -> String.format(java.util.Locale.ROOT, "%.1f MB", b / 1048576.0)
++    else -> String.format(java.util.Locale.ROOT, "%.2f GB", b / 1073741824.0)
++}
+diff --git a/core/src/main/kotlin/com/auto/core/ExportOptions.kt b/core/src/main/kotlin/com/auto/core/ExportOptions.kt
+new file mode 100644
+index 0000000..6bb4882
+--- /dev/null
++++ b/core/src/main/kotlin/com/auto/core/ExportOptions.kt
+@@ -0,0 +1,29 @@
++package com.auto.core
++
++import kotlin.math.roundToInt
++
++/** Output resolution = length of the SHORTER side in pixels (720p, 1080p, 4K = 2160). */
++enum class Resolution(val label: String, val shortSide: Int) { P720("720p", 720), P1080("1080p", 1080), P2160("4K", 2160);
++    companion object { fun of(heightP: Int) = values().firstOrNull { it.shortSide == heightP } ?: throw IllegalArgumentException("Resolution must be 720, 1080 or 2160 (4K).") }
++}
++
++/** Aspect ratio as width:height. Pictures that do not match are scaled to fit (black bars) by the exporter. */
++enum class AspectRatio(val label: String, val w: Int, val h: Int) {
++    R16_9("16:9", 16, 9), R9_16("9:16", 9, 16), R1_1("1:1", 1, 1), R4_5("4:5", 4, 5);
++    val ratio get() = w.toFloat() / h
++}
++
++/** Resolution x aspect ratio -> even pixel width/height (video encoders need even sizes). 16:9 gives exactly the old presets. */
++object ExportOptions {
++    private fun even(v: Double): Int { val n = v.roundToInt(); return if (n % 2 == 0) n else n + 1 }
++
++    fun size(res: Resolution, aspect: AspectRatio): Pair<Int, Int> {
++        val s = res.shortSide
++        return if (aspect.w >= aspect.h) Pair(even(s.toDouble() * aspect.w / aspect.h), s)
++        else Pair(s, even(s.toDouble() * aspect.h / aspect.w))
++    }
++
++    fun settings(res: Resolution, aspect: AspectRatio, fps: Int = 30): ExportSettings {
++        val (w, h) = size(res, aspect); return ExportSettings(w, h, fps)
++    }
++}
+diff --git a/core/src/test/kotlin/Check14.kt b/core/src/test/kotlin/Check14.kt
+new file mode 100644
+index 0000000..8dab6ce
+--- /dev/null
++++ b/core/src/test/kotlin/Check14.kt
+@@ -0,0 +1,35 @@
++import com.auto.core.*
++
++var fails14 = 0
++fun ok14(name: String, cond: Boolean) { println((if (cond) "PASS " else "FAIL ") + name); if (!cond) fails14++ }
++
++/** Export shapes: resolution x aspect ratio -> pixel sizes, and 16:9 must equal the existing presets. */
++fun main() {
++    fun sz(r: Resolution, a: AspectRatio) = ExportOptions.size(r, a)
++    ok14("720p 16:9 = 1280x720", sz(Resolution.P720, AspectRatio.R16_9) == Pair(1280, 720))
++    ok14("720p 9:16 = 720x1280", sz(Resolution.P720, AspectRatio.R9_16) == Pair(720, 1280))
++    ok14("720p 1:1 = 720x720", sz(Resolution.P720, AspectRatio.R1_1) == Pair(720, 720))
++    ok14("720p 4:5 = 720x900", sz(Resolution.P720, AspectRatio.R4_5) == Pair(720, 900))
++    ok14("1080p 16:9 = 1920x1080", sz(Resolution.P1080, AspectRatio.R16_9) == Pair(1920, 1080))
++    ok14("1080p 9:16 = 1080x1920", sz(Resolution.P1080, AspectRatio.R9_16) == Pair(1080, 1920))
++    ok14("1080p 1:1 = 1080x1080", sz(Resolution.P1080, AspectRatio.R1_1) == Pair(1080, 1080))
++    ok14("1080p 4:5 = 1080x1350", sz(Resolution.P1080, AspectRatio.R4_5) == Pair(1080, 1350))
++    ok14("4K 16:9 = 3840x2160", sz(Resolution.P2160, AspectRatio.R16_9) == Pair(3840, 2160))
++    ok14("4K 9:16 = 2160x3840", sz(Resolution.P2160, AspectRatio.R9_16) == Pair(2160, 3840))
++    ok14("4K 4:5 = 2160x2700", sz(Resolution.P2160, AspectRatio.R4_5) == Pair(2160, 2700))
++    var allEven = true; var allValid = true
++    for (r in Resolution.values()) for (a in AspectRatio.values()) for (f in ExportSettings.FPS) {
++        val (w, h) = sz(r, a); if (w % 2 != 0 || h % 2 != 0) allEven = false
++        try { ExportOptions.settings(r, a, f) } catch (e: Exception) { allValid = false }
++    }
++    ok14("every offered size is even", allEven)
++    ok14("every combination builds valid ExportSettings (24/30/60 fps)", allValid)
++    ok14("16:9 equals the existing P720 / P1080 / P4K presets", ExportOptions.settings(Resolution.P720, AspectRatio.R16_9) == ExportSettings.P720 && ExportOptions.settings(Resolution.P1080, AspectRatio.R16_9) == ExportSettings.P1080 && ExportOptions.settings(Resolution.P2160, AspectRatio.R16_9) == ExportSettings.P4K)
++    ok14("16:9 equals ExportSettings.preset at 60 fps", ExportOptions.settings(Resolution.P1080, AspectRatio.R16_9, 60) == ExportSettings.preset(1080, 60))
++    ok14("Resolution.of maps 720/1080/2160", Resolution.of(720) == Resolution.P720 && Resolution.of(1080) == Resolution.P1080 && Resolution.of(2160) == Resolution.P2160)
++    ok14("Resolution.of refuses other heights", try { Resolution.of(480); false } catch (e: IllegalArgumentException) { true })
++    ok14("bad fps is refused", try { ExportOptions.settings(Resolution.P720, AspectRatio.R16_9, 25); false } catch (e: IllegalArgumentException) { true })
++    ok14("ratio values", AspectRatio.R16_9.ratio > 1f && AspectRatio.R9_16.ratio < 1f && AspectRatio.R1_1.ratio == 1f && AspectRatio.R4_5.ratio == 0.8f)
++    println(if (fails14 == 0) "ALL PASS" else "FAILED $fails14")
++    if (fails14 > 0) kotlin.system.exitProcess(1)
++}
+diff --git a/scripts/run_parity.sh b/scripts/run_parity.sh
+index 4ba4bff..b073a22 100755
+--- a/scripts/run_parity.sh
++++ b/scripts/run_parity.sh
+@@ -9,7 +9,7 @@ OUT="$(mktemp -d)"
+ mkdir -p /tmp/tt2 /tmp/tt3 /tmp/tt7
+ cp testdata/timing/details.txt testdata/timing/script.txt testdata/timing/caps.srt /tmp/tt2/
+ cp testdata/matching/scen.txt /tmp/tt3/
+-"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt core/src/test/kotlin/Check13.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
++"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt core/src/test/kotlin/Check13.kt core/src/test/kotlin/Check14.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
+ CP="$OUT:$(dirname "$(readlink -f "$(command -v "$KOTLINC")")")/../lib/kotlin-stdlib.jar"
+ java -cp "$CP" Check4Kt > "$OUT/kt.out"
+ sed 's/|None|/|null|/' testdata/matching/ref.out > "$OUT/ref.norm"
+@@ -34,6 +34,8 @@ if [ -f testdata/real/ps_clean.srt ]; then
+ else echo "TIMESTAMPS-FIRST ANALYSE: SKIPPED (testdata/real/ps_clean.srt is the owner's private script and is not in the public repo)"; fi
+ # Free scene lengths (no magnet), export limited to the narration, export presets, typed times
+ if java -cp "$CP" Check13Kt > "$OUT/kt13.out"; then echo "FREE SCENE LENGTH / EXPORT PRESETS: $(grep -c '^PASS' "$OUT/kt13.out") checks passed"; else echo "FREE SCENE LENGTH / EXPORT PRESETS: FAILED"; grep FAIL "$OUT/kt13.out"; exit 1; fi
++# Export shapes (resolution x aspect ratio) used by the redesigned export sheet
++if java -cp "$CP" Check14Kt > "$OUT/kt14.out"; then echo "EXPORT SHAPES (RESOLUTION x ASPECT): $(grep -c '^PASS' "$OUT/kt14.out") checks passed"; else echo "EXPORT SHAPES: FAILED"; grep FAIL "$OUT/kt14.out"; exit 1; fi
+ # Backend client + verified timing (Steps 10-16). Needs python3 with fastapi/uvicorn/numpy + ffmpeg; reported as SKIPPED (not passed) otherwise.
+ if python3 -c "import fastapi, uvicorn, numpy" 2>/dev/null && command -v ffmpeg >/dev/null; then
+   PORT=$((20000 + RANDOM % 20000)); rm -rf /tmp/tt10 && mkdir -p /tmp/tt10
+-- 
+2.43.0
+

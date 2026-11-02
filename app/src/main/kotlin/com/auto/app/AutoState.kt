@@ -279,12 +279,15 @@ class AutoState(private val act: ComponentActivity) {
         try { player?.seekTo(playMs.toInt()) } catch (_: Exception) {}
         clickIdx = ClickTrack.firstIndex(clickTimes(), playMs, false)   // seeking / scrubbing never clicks
     }
+    private var graceTicks = 0                                       // first ticks after Play use the clock: the player can still report the old position right after a seek
     fun togglePlay() {
         if (timeline == null) return
         if (playing) { stopPlay(); return }
+        if (playEndMs() <= 0L) { status = "Nothing to play yet: the timeline has no length."; return }
         if (playMs >= playEndMs() - 50) seekTo(0)
         clickIdx = ClickTrack.firstIndex(clickTimes(), playMs, true)    // playing from 0:00 clicks for the first picture too
-        try { player?.let { it.seekTo(playMs.toInt()); it.start() } } catch (_: Exception) {}
+        try { player?.let { it.seekTo(playMs.toInt()); it.start() } } catch (e: Exception) { status = "Audio could not start (${e.message}); playing without sound." }
+        graceTicks = 3
         playing = true
         fireClicks()
     }
@@ -292,7 +295,9 @@ class AutoState(private val act: ComponentActivity) {
     /** Called every ~33 ms while playing. */
     fun tick(dtMs: Long) {
         val p = player
-        playMs = if (p != null) try { p.currentPosition.toLong() } catch (_: Exception) { playMs + dtMs } else playMs + dtMs
+        val live = p != null && graceTicks <= 0 && (try { p.isPlaying } catch (_: Exception) { false })
+        if (graceTicks > 0) graceTicks--
+        playMs = if (live) try { p!!.currentPosition.toLong() } catch (_: Exception) { playMs + dtMs } else playMs + dtMs
         fireClicks()
         if (playMs >= playEndMs()) { playMs = playEndMs(); stopPlay() }
     }

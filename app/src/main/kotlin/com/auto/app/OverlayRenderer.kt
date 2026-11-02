@@ -24,8 +24,8 @@ object OverlayRenderer {
 
     private fun mulAlpha(argb: Int, a: Float): Int = ((((argb ushr 24) * a.coerceIn(0f, 1f)) + 0.5f).toInt() shl 24) or (argb and 0xFFFFFF)
 
-    fun draw(ctx: Context, c: Canvas, w: Int, h: Int, text: String, style: OverlayStyle, f: AnimFrame = AnimFrame.REST) {
-        val st = style.clamped()
+    fun draw(ctx: Context, c: Canvas, w: Int, h: Int, text: String, textStyle: OverlayStyle, f: AnimFrame = AnimFrame.REST) {
+        val st = textStyle.clamped()
         if (f.alpha <= 0f || text.isBlank()) return
         val size = st.sizeFrac * h
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {

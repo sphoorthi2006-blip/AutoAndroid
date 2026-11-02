@@ -24,7 +24,10 @@ class MainActivity : Activity() {
     private var analysis: Pipeline.Analysis? = null
     private var narration: File? = null
     private lateinit var status: TextView
-    private lateinit var scenesView: TextView
+    private lateinit var warnBox: LinearLayout
+    private lateinit var scenesBox: LinearLayout
+    private lateinit var scroll: ScrollView
+    private var sceneRows: List<TextView> = emptyList()
     private lateinit var exportBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,8 +41,10 @@ class MainActivity : Activity() {
         btn("3. Analyse") { analyse() }
         exportBtn = btn("4. Export MP4") { export() }.also { it.isEnabled = false }
         status = TextView(this).apply { textSize = 14f; setPadding(0, 24, 0, 24) }.also { root.addView(it) }
-        scenesView = TextView(this).apply { textSize = 12f; typeface = android.graphics.Typeface.MONOSPACE }.also { root.addView(it) }
-        setContentView(ScrollView(this).apply { addView(root, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)) })
+        warnBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }.also { root.addView(it) }
+        scenesBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 24, 0, 0) }.also { root.addView(it) }
+        scroll = ScrollView(this).apply { addView(root, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)) }
+        setContentView(scroll)
         status.text = "Choose your ZIP (or files and pictures), then press Analyse."
     }
 
@@ -107,7 +112,7 @@ class MainActivity : Activity() {
 
     private fun analyse() {
         if (inFiles.isEmpty() && bundleZips.isEmpty() && zips.isEmpty() && pics.isEmpty()) { status.text = "Add at least one of: the captions (timestamps) file, the narration audio, the pictures or the script."; return }
-        status.text = "Analysing..."; exportBtn.isEnabled = false; scenesView.text = ""
+        status.text = "Analysing..."; exportBtn.isEnabled = false; warnBox.removeAllViews(); scenesBox.removeAllViews()
         thread {
             try {
                 // Same inputs as the desktop app: timestamps (captions), audio, pictures, script. NO details file. None is mandatory.
@@ -127,13 +132,39 @@ class MainActivity : Activity() {
                 val work = File(cacheDir, "work").apply { deleteRecursively(); mkdirs() }
                 val a = CaptionPipeline.analyse(rows, scriptText, null, audioSec, sources, work, hasAudio = audioF != null)
                 analysis = a; narration = audioF
-                val sb = StringBuilder()
-                for (s in a.scenes) sb.append(String.format(Locale.ROOT, "%3d %7.2f-%-7.2f %s\n", s.num, s.start, s.end, s.image?.let { Matching.nameOf(it) } ?: "(black screen + text)"))
                 val v = Validation.check(a)
-                val msg = (v.errors.map { "ERROR: $it" } + v.warnings + b.notes.filterNot { it.startsWith("MISSING: scene details") } + a.warnings).distinct().joinToString("\n\n")
-                runOnUiThread { status.text = "${a.scenes.size} scenes ready.\n\n$msg"; scenesView.text = sb.toString(); exportBtn.isEnabled = true }
+                val msgs = (v.errors.map { "ERROR: $it" } + v.warnings + b.notes.filterNot { it.startsWith("MISSING: scene details") } + a.warnings).distinct()
+                runOnUiThread { show(a, msgs) }
             } catch (e: Exception) { runOnUiThread { status.text = "Problem: ${e.message ?: e.toString()}" } }
         }
+    }
+
+    /** Scene list + the warnings as a clickable list: tap a warning that names a scene ("Scene 12 ...", "Scenes 5-9 ...") and the list jumps to it. */
+    private fun show(a: Pipeline.Analysis, msgs: List<String>) {
+        status.text = "${a.scenes.size} scenes ready, ${msgs.size} note(s). Tap a note to jump to its scene. Nothing is blocked: notes are only things to check."
+        warnBox.removeAllViews(); scenesBox.removeAllViews()
+        sceneRows = a.scenes.map { sc ->
+            TextView(this).apply {
+                textSize = 12f; typeface = android.graphics.Typeface.MONOSPACE
+                text = String.format(Locale.ROOT, "%3d %7.2f-%-7.2f %s", sc.num, sc.start, sc.end, sc.image?.let { Matching.nameOf(it) } ?: "(black screen + text)")
+            }.also { scenesBox.addView(it) }
+        }
+        val num = Regex("[Ss]cenes? (\\d+)")
+        for (m in msgs) {
+            TextView(this).apply {
+                textSize = 13f; setPadding(0, 10, 0, 10); text = "\u2022 $m"
+                val sc = num.find(m)?.groupValues?.get(1)?.toIntOrNull()
+                if (sc != null && sc in 1..sceneRows.size) { setTextColor(0xFFB45309.toInt()); isClickable = true; setOnClickListener { jumpTo(sc) } }
+            }.also { warnBox.addView(it) }
+        }
+        exportBtn.isEnabled = true
+    }
+
+    private fun jumpTo(scene: Int) {
+        sceneRows.forEach { it.setBackgroundColor(0) }
+        val row = sceneRows.getOrNull(scene - 1) ?: return
+        row.setBackgroundColor(0xFFFFF3B0.toInt())
+        scroll.post { scroll.smoothScrollTo(0, maxOf(0, scenesBox.top + row.top - 200)) }
     }
 
     private fun export() {

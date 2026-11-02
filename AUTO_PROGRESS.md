@@ -69,3 +69,11 @@ Fully DONE: 1,2,3,4,5 and 8 (core part; app part uncompiled).  Partial: 7,9,25,2
 - Owner: a server URL + token typed by hand is not an "AI feature". Removed from MainActivity (fields, saved prefs, BackendClient call) and the INTERNET permission. The app is fully offline now: captions, audio, pictures, script.
 - Script without captions now always uses the ESTIMATED timing (with a warning) - there is no speech recognition in the app.
 - Left in the repo, unused by the app: backend/ (FastAPI) and core/BackendClient.kt + Check10 (their tests still run). A real built-in AI feature (on-device speech timing) would be a separate step: it needs a decision on which on-device model to ship.
+
+## Session 4 - phone editor screen (Canva-style, navy + glow) - NOT compiled here
+- Replaced the plain text screen with a Jetpack Compose editor: gradient top bar (undo/redo, scenes, warnings, Export), 16:9 preview with the scene's picture + text, play row, scrolling timeline under a fixed playhead (picture / text / narration tracks), bottom tab bar (Inputs, Scenes, Pictures, Warnings, Export) opening bottom sheets, and a tool bar for a selected scene (Done, Split, Shorter, Longer, Replace, Delete).
+- Files: app/Theme.kt, app/AutoState.kt (old MainActivity logic moved here + TimelineEditor edits + MediaPlayer playback), app/EditorScreen.kt, app/MainActivity.kt (thin host). Gradle: Compose BOM 2024.06.00, activity-compose 1.9.0, kotlin compose plugin 2.0.21. Manifest theme -> dark.
+- Edits use core Timeline/TimelineEditor (split, trim, delete, replaceImage, undo/redo). Export uses the edited timeline when something was edited or the script is fully covered.
+- NOT built yet (no buttons for them on purpose): Text sheet / text editing, Music, Fit/Fill, Colour, Animate, Duplicate, pinch zoom, clip edge drag handles, real waveform (the narration wave is decorative).
+- NOT verified: first compile (run the "Build APK" workflow; if it fails, read the buildlog branch) and a phone test.
+- Review fixes (after the first draft): Split now checks the playhead is inside the scene and shows a message otherwise (core silently ignored a too-short cut); edit errors also show as a toast (the status line is only visible in Inputs/Export); timeline scroll no longer fights the playhead - only real finger drags/flings seek, our own jump-to-scene scroll does not.

@@ -111,8 +111,8 @@ private fun TopBar(st: AutoState) {
         Spacer(Modifier.weight(1f))
         TopIcon("▤", true) { st.sheet = "scenes" }
         TopIcon(if (st.warnings.isEmpty()) "⚠" else "⚠ ${st.warnings.size}", true) { st.sheet = "warnings" }
-        Box(Modifier.padding(start = 4.dp).clip(RoundedCornerShape(50)).background(Color.White).clickable { st.sheet = "export" }.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text("Export", color = Color(0xFF2A1B8A), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Box(Modifier.padding(start = 4.dp).clip(RoundedCornerShape(50)).background(C.Violet).clickable { st.sheet = "export" }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text("Export", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
     }
 }

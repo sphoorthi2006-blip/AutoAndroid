@@ -12,26 +12,28 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.auto.core.DesignTokens
 import java.util.Locale
 import kotlin.math.max
 
-/** Navy colour set with glowing cyan -> violet -> pink gradients (same palette as the mobile layout prototype). */
+/** Dark premium palette: charcoal surfaces, violet primary, lavender secondary. Values come from core DesignTokens (WCAG-checked in Check18); the NAMES are the old ones so no screen had to change
+ *  (Cyan = lavender secondary accent, Pink = danger/warning red, Violet = primary). Gradients are kept subtle and the top bar is flat. */
 object C {
-    val Bg = Color(0xFF060B1E)
-    val Card = Color(0xFF0E1736)
-    val Lane = Color(0xFF12204A)
-    val Line = Color(0xFF1F2D5C)
-    val Text = Color(0xFFEAF1FF)
-    val Muted = Color(0xFF8FA0C8)
-    val Cyan = Color(0xFF22D3EE)
-    val Violet = Color(0xFF6A4DFF)
-    val Pink = Color(0xFFFF4DCB)
-    val Navy = Color(0xFF1B2A8A)
-    val Screen = Color(0xFF050818)
-    val Glow = Brush.horizontalGradient(listOf(Cyan, Violet, Pink))
-    val Top = Brush.horizontalGradient(listOf(Navy, Violet, Cyan))
-    val Wave = Brush.horizontalGradient(listOf(Violet, Color(0xFFC026D3)))
-    val TextTrack = Brush.horizontalGradient(listOf(Cyan, Color(0xFF38BDF8)))
+    val Bg = Color(DesignTokens.BG)
+    val Card = Color(DesignTokens.SURFACE)
+    val Lane = Color(DesignTokens.SURFACE_HI)
+    val Line = Color(DesignTokens.LINE)
+    val Text = Color(DesignTokens.TEXT)
+    val Muted = Color(DesignTokens.TEXT_MUTED)
+    val Cyan = Color(DesignTokens.LAVENDER)
+    val Violet = Color(DesignTokens.PRIMARY)
+    val Pink = Color(DesignTokens.DANGER)
+    val Navy = Color(0xFF2E1065)
+    val Screen = Color(0xFF050507)
+    val Glow = Brush.horizontalGradient(listOf(Color(DesignTokens.PRIMARY), Color(DesignTokens.PRIMARY_HI)))
+    val Top = Brush.horizontalGradient(listOf(Color(DesignTokens.SURFACE), Color(DesignTokens.SURFACE)))
+    val Wave = Brush.horizontalGradient(listOf(Color(DesignTokens.PRIMARY), Color(0xFF9F67FF)))
+    val TextTrack = Brush.horizontalGradient(listOf(Color(DesignTokens.LAVENDER), Color(0xFFA78BFA)))
 }
 
 /** A coloured halo around a shape (used for the selected clip, active tab, focused search box, play button...). */

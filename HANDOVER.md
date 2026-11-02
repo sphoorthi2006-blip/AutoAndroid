@@ -40,6 +40,8 @@ Total planned: 21 steps to Checkpoint 02, then roughly 10 more app-wiring steps 
 | 19 | RenderCaps: which features the exporter renders (VERIFIED / WRITTEN / UNAVAILABLE). Nothing may become VERIFIED before a device test | DONE + VERIFIED (Check18). NOTE: statuses say WRITTEN for features whose exporter code is NOT written yet (step 22+): set them to UNAVAILABLE or write the code before showing any control |
 | 20 | Workflow status machine (Waiting, Importing, Analysing, Ready, Exporting, Completed, Failed) + analysis report | DONE + VERIFIED (Check18) |
 | 21 | DesignTokens: charcoal + violet palette, type scale, WCAG contrast check | DONE + VERIFIED (Check18); Auto_Android_Checkpoint_02.json + Auto_Android_Source_02.zip written |
+| 19b | RenderCaps honesty fix: only pictures, aspect and captions (what Exporter.kt really contains) are offered; captionStyle, text, textAnim, fx, transitions, volume, music are UNAVAILABLE ("Planned: export code not written"). New guard test: every offered feature id must be in RenderCaps.exporterImplements. When step 22+ writes an exporter feature, add its id there and flip its status to WRITTEN in the same commit | DONE + VERIFIED (Check18, 50+ checks) |
+| 22a | Palette swap: Theme.kt object C now reads DesignTokens (charcoal + violet + lavender, Pink name = danger red, flat top bar); Export button in the editor is the violet primary | WRITTEN ONLY: app/ still never compiled, never seen on a device |
 | 22+ | App wiring (all uncompiled until step 11 works): palette swap in Theme.kt; Exporter using OverlayStyle for captions; text overlays + animation via Media3 OverlayEffect/BitmapOverlay on the whole Composition (per-frame getOverlaySettings); per-clip RgbMatrix; Fade/Slide/Zoom via time-varying effects; AudioProcessor using AudioMath.applyGain + music sequence; Text Studio, Captions, Media, Audio, Effects sheets; Projects page wired to ProjectStore; bundle fonts from desktop fonts/bundled into app/src/main/res/font (names inter_regular, notoserif_regular, nimbusmono_regular, z003_mediumitalic) | pending |
 
 Lost work note: an earlier session did steps 12-14 but its files were lost; they were REBUILT and re-verified here (different code, same goals).
@@ -60,6 +62,12 @@ STEP 11 (owner): git clone https://github.com/sphoorthi2006-blip/AutoAndroid ; c
 1. (Owner's PC) Step 11: push, run "Build APK", fix compile errors without changing behaviour.
 2. (done) Steps 17-21 are written and verified; Check18 is in run_parity.sh. After step 11 compiles, start step 22 (app wiring, list in section 4).
 3. Before each batch: run the suite, read this file, confirm the last completed step, do not redo finished work.
+
+## 6b. Session log (after Checkpoint 02)
+- GitHub repo https://github.com/sphoorthi2006-blip/AutoAndroid had NO `redesign` branch (branches: main, mobile-editor-ui, srt-first-port, warnings-list, buildlog). So step 11 was not done; buildlog still only holds the old 9d07393 log.
+- The Claude sandbox cannot reach dl.google.com, maven.google.com, repo.maven.apache.org or services.gradle.org (only github.com and a few package hosts), and has no push credentials. So an APK cannot be built or pushed from there. Only core/ can be verified. Step 11 must be done by the owner (section 6).
+- Baseline reproduced with kotlinc 2.0.21: every suite passed exactly as listed in section 3.
+- Steps 19b and 22a above were done. Checkpoint 03 is NOT due: it needs ten completed and verified steps.
 
 ## 7. Known problems
 - app/ never compiled (see step 11). Aspect ratios other than 16:9 never seen on a device. 4K/60 fps heavy for phones. Home "Recent project" shows only the open project. Overlay-on-Composition timing and RgbMatrix with images are assumptions to test on a device.

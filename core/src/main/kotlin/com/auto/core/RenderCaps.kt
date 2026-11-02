@@ -10,17 +10,20 @@ class Feature(val id: String, val label: String, val status: CapStatus, val reas
 
 object RenderCaps {
     private const val LIB = "Needs a newer video library than the one in this app (Media3 1.3.1)."
+    private const val SOON = "Planned: the export code for this is not written yet, so it is not offered."
+    /** Ids whose drawing code really exists in app/Exporter.kt. HONESTY GUARD (Check18): no feature may be offered (status != UNAVAILABLE) unless its id is in this set. Add an id here in the same commit that writes its exporter code. */
+    val exporterImplements = setOf("pictures", "aspect", "captions")
     val features = listOf(
         Feature("pictures", "Pictures + narration", CapStatus.WRITTEN),   // the base export was written before this redesign and has never run on a device either
         Feature("aspect", "Aspect ratios 16:9, 9:16, 1:1, 4:5", CapStatus.WRITTEN),
         Feature("captions", "Captions burned into the video", CapStatus.WRITTEN),
-        Feature("captionStyle", "Caption styles (font, colour, outline, shadow, box)", CapStatus.WRITTEN),
-        Feature("text", "Text overlays", CapStatus.WRITTEN),
-        Feature("textAnim", "Text animations", CapStatus.WRITTEN),
-        Feature("fx", "Brightness / contrast / saturation / opacity", CapStatus.WRITTEN),
-        Feature("transitions", "Fade, slide-in and zoom-in transitions", CapStatus.WRITTEN),
-        Feature("volume", "Narration volume, fades, mute", CapStatus.WRITTEN),
-        Feature("music", "Music bed", CapStatus.WRITTEN),
+        Feature("captionStyle", "Caption styles (font, colour, outline, shadow, box)", CapStatus.UNAVAILABLE, SOON),
+        Feature("text", "Text overlays", CapStatus.UNAVAILABLE, SOON),
+        Feature("textAnim", "Text animations", CapStatus.UNAVAILABLE, SOON),
+        Feature("fx", "Brightness / contrast / saturation / opacity", CapStatus.UNAVAILABLE, SOON),
+        Feature("transitions", "Fade, slide-in and zoom-in transitions", CapStatus.UNAVAILABLE, SOON),
+        Feature("volume", "Narration volume, fades, mute", CapStatus.UNAVAILABLE, SOON),
+        Feature("music", "Music bed", CapStatus.UNAVAILABLE, SOON),
         Feature("blur", "Blur", CapStatus.UNAVAILABLE, LIB), Feature("sharpen", "Sharpen", CapStatus.UNAVAILABLE, LIB), Feature("vignette", "Vignette", CapStatus.UNAVAILABLE, LIB),
         Feature("dissolve", "Dissolve (cross-fade between pictures)", CapStatus.UNAVAILABLE, "Pictures cannot overlap in this version of the export."),
         Feature("wipe", "Wipe", CapStatus.UNAVAILABLE, "Pictures cannot overlap in this version of the export."),

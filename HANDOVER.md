@@ -29,7 +29,7 @@ Total planned: 21 steps to Checkpoint 02, then roughly 10 more app-wiring steps 
 | Step | Title | Status |
 |---|---|---|
 | 1-10 | Home, Settings, shell, export aspect ratios (see docs/checkpoint 01) | DONE (core verified; app uncompiled) |
-| 11 | Push branch, run GitHub Actions "Build APK", fix compile errors | BLOCKED: needs a machine with network to Google Maven. DO THIS FIRST on your PC: push, run workflow, read log on branch `buildlog` |
+| 11 | Push branch, run GitHub Actions "Build APK", fix compile errors | DONE + VERIFIED 2026-11-02: branch `redesign` (commit 37881b7) pushed; Build APK run 41421134804 succeeded with NO source changes (app/ compiles; debug APK 10.9 MB at Releases "latest"); Check core run 41421111198 succeeded. NOT run on a phone yet. |
 | 12 | OverlayStyle: one style for captions and text (font, weight, colours, HEX, outline, shadow, background, position), 8 text + 6 caption presets, saved-style library, TextWrap | DONE + VERIFIED (Check15) |
 | 13 | TextAnim: fade/slide/pop/zoom/typewriter/bounce maths, alignment guides, safe area | DONE + VERIFIED (Check15) |
 | 14 | Effects (brightness/contrast/saturation/opacity as one colour matrix), transitions (Fade, Slide in, Zoom in), text track, duplicate clip, plan carries all | DONE + VERIFIED (Check16) |
@@ -71,3 +71,7 @@ STEP 11 (owner): git clone https://github.com/sphoorthi2006-blip/AutoAndroid ; c
 
 ## 7. Known problems
 - app/ never compiled (see step 11). Aspect ratios other than 16:9 never seen on a device. 4K/60 fps heavy for phones. Home "Recent project" shows only the open project. Overlay-on-Composition timing and RgbMatrix with images are assumptions to test on a device.
+
+
+## 6c. Session log: step 11 done
+- Pushed `redesign` and dispatched Build APK from the chat with a short-lived token. First-ever compile of app/ passed without edits. Next: step 22 (Exporter work) then device test. Owner must install app-debug.apk from Releases and report crashes/visual problems.

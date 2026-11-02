@@ -91,6 +91,35 @@ class AutoState(private val act: ComponentActivity) {
     }
     fun delete() { val id = selectedId ?: return; edit { it.delete(id, true) }; selectedId = null }
     /** Any length, no magnet: the scenes after this one move later/earlier, the narration stays as it is. */
+    // ---------- media library (step 35) ----------
+    fun say(msg: String) { status = msg; toast(msg) }
+    /** Everything the app has: project assets (pictures on the timeline, the music bed) and imported files (picked pictures, music, replaced pictures). Call off the main thread. */
+    fun scanMedia(): List<MediaAsset> {
+        val out = LinkedHashMap<String, MediaAsset>()
+        fun add(f: File, origin: MediaOrigin) {
+            if (!f.isFile) return
+            out[f.path] = MediaAsset(f.path, f.name, MediaLibrary.classify(f.name), f.length(), f.lastModified(), origin)
+        }
+        for (d in listOf(File(act.cacheDir, "Pictures"), File(act.cacheDir, "replaced"), File(act.cacheDir, "in"), File(act.filesDir, "music")))
+            d.listFiles()?.forEach { add(it, MediaOrigin.IMPORTED) }
+        val tl = timeline
+        tl?.clips?.mapNotNull { it.image }?.distinct()?.forEach { add(File(it), MediaOrigin.PROJECT) }
+        tl?.mix?.music?.let { add(File(it.path), MediaOrigin.PROJECT) }
+        return out.values.toList()
+    }
+    /** Pictures replace the picture of the selected scene (one at a time); audio becomes the music bed. */
+    fun addMediaToProject(list: List<MediaAsset>) {
+        val pic = list.filter { it.kind == MediaKind.IMAGE }; val aud = list.filter { it.kind == MediaKind.AUDIO }
+        if (pic.isNotEmpty()) {
+            val id = selectedId
+            if (id == null) say("Select a scene on the timeline first: the picture replaces its picture.")
+            else { edit { it.replaceImage(id, pic.first().path) }; say(if (pic.size > 1) "First picture used (one scene is selected)." else "Picture replaced.") }
+        }
+        aud.firstOrNull()?.let { a ->
+            val ms = try { ((AudioDecoder.durationSec(File(a.path)) ?: 0.0) * 1000).toLong() } catch (_: Throwable) { 0L }
+            edit { it.setMix(it.mix.copy(music = MusicTrack(a.path, a.name, durationMs = ms))) }; say("Music added: ${a.name}.")
+        }
+    }
     // ---------- audio (step 34) ----------
     fun setNarrationAudio(a: AudioSettings) = edit { it.setMix(it.mix.copy(narration = a)) }
     fun setMusic(m: MusicTrack?) = edit { it.setMix(it.mix.copy(music = m)) }

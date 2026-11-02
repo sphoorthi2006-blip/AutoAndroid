@@ -257,7 +257,7 @@ private fun MainBar(st: AutoState) {
     Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp)) {
         Tab("⤒", "Inputs", st.sheet == "inputs") { st.sheet = "inputs" }
         Tab("▦", "Scenes", st.sheet == "scenes") { st.sheet = "scenes" }
-        Tab("▣", "Pictures", st.sheet == "pictures") { st.sheet = "pictures" }
+        Tab("▣", "Media", st.sheet == "pictures") { st.sheet = "pictures" }
         Tab("⚠", "Warnings", st.sheet == "warnings") { st.sheet = "warnings" }
         Tab("Aa", "Text", st.sheet == "text") { st.sheet = "text" }
         Tab("▭", "Captions", st.sheet == "captions") { st.sheet = "captions" }
@@ -320,7 +320,7 @@ private fun BoxScope.SheetHost(st: AutoState) {
             when (shown.value) {
                 "inputs" -> InputsSheet(st)
                 "scenes" -> ScenesSheet(st)
-                "pictures" -> PicturesSheet(st)
+                "pictures" -> MediaSheet(st)
                 "warnings" -> WarningsSheet(st)
                 "export" -> ExportSheet(st)
                 "length" -> LengthSheet(st)

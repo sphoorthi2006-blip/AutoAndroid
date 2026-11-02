@@ -17,6 +17,7 @@ import android.os.Looper
 import android.provider.MediaStore
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -104,6 +105,8 @@ object Exporter {
             val a = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narration))).setRemoveVideo(true).build()
             sequences.add(EditedMediaItemSequence(listOf(a)))
         }
+        // text overlays (with their animations) are drawn over the whole composition, so their times are video times
+        val compositionEffects = if (plan.texts.isEmpty()) Effects.EMPTY else Effects(listOf(), listOf(OverlayEffect(listOf(TextBitmapOverlay(ctx, s.width, s.height, plan.texts)))))
         val out = File(work, "auto_${System.currentTimeMillis()}.mp4")
         val handler = Handler(Looper.getMainLooper())
         val transformer = Transformer.Builder(ctx)
@@ -112,7 +115,7 @@ object Exporter {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) { handler.removeCallbacksAndMessages(null); onDone(publish(ctx, out)) }
                 override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) { handler.removeCallbacksAndMessages(null); onError(exportException.message ?: "Export failed") }
             }).build()
-        transformer.start(Composition.Builder(sequences).build(), out.path)
+        transformer.start(Composition.Builder(sequences).setEffects(compositionEffects).build(), out.path)
         val holder = ProgressHolder()
         val poll = object : Runnable { override fun run() {
             if (transformer.getProgress(holder) != Transformer.PROGRESS_STATE_NOT_STARTED) onProgress(holder.progress)

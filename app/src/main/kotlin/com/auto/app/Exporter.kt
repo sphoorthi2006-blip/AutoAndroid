@@ -19,6 +19,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -28,6 +29,7 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import com.auto.core.ExportPlan
+import com.google.common.collect.ImmutableList
 import com.auto.core.ExportSettings
 import com.auto.core.OverlayStyle
 import com.auto.core.Pipeline
@@ -106,7 +108,7 @@ object Exporter {
             sequences.add(EditedMediaItemSequence(listOf(a)))
         }
         // text overlays (with their animations) are drawn over the whole composition, so their times are video times
-        val compositionEffects = if (plan.texts.isEmpty()) Effects.EMPTY else Effects(listOf(), listOf(OverlayEffect(listOf(TextBitmapOverlay(ctx, s.width, s.height, plan.texts)))))
+        val compositionEffects = if (plan.texts.isEmpty()) Effects.EMPTY else Effects(listOf(), listOf(OverlayEffect(ImmutableList.of<TextureOverlay>(TextBitmapOverlay(ctx, s.width, s.height, plan.texts)))))
         val out = File(work, "auto_${System.currentTimeMillis()}.mp4")
         val handler = Handler(Looper.getMainLooper())
         val transformer = Transformer.Builder(ctx)

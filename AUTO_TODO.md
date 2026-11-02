@@ -1,4 +1,4 @@
-0. (NEXT, owner) Deploy backend/ (see backend/README.md), paste URL+token in the app, re-run the failing project. Send: Audio warnings, scene list, which scenes still start early. Then: compile check of app (GitHub CI), Steps 17-22 only if matching (not timing) is still wrong.
+0. (NEXT, owner) Push this version to GitHub: the Actions run compiles :app (first time since the SRT-first rewrite). Then try your real project: timestamps + numbered pictures + audio. Send: the warnings list and any scene whose picture still starts early.
 # AUTO - TODO in execution order
 Rule: run scripts/run_parity.sh before and after every change; update AUTO_PROGRESS.md.
 

@@ -32,22 +32,21 @@ fun main(args: Array<String>) {
     ok10("live: server-side failure surfaces as a readable error", err10 { c.analyze(audio, "FAIL", "", pollMs = 100) }?.contains("no words") == true)
     ok10("live: server not running -> 'Cannot reach'", err10 { BackendClient(BackendConfig("http://127.0.0.1:1", "t"), connectMs = 1000, retries = 1).analyze(audio) }?.contains("Cannot reach") == true)
 
-    // ---- the timing fix: verified word times place every picture change at its first spoken word
+    // ---- verified word times (AI server) place every picture change at its first spoken word. No timestamps are given, so the script lines are the scenes.
     val scr = File("$dir/script.txt").readText()
-    val items = scopedItems(Details.parseSceneFile(File("$dir/details.txt").readText()), scr, mutableListOf())
     val approx = Captions.parse(File("$dir/caps.srt").readText(), "caps.srt")
-    // pretend the real speaker slows down after word 40 (the evenly-spread caption words cannot know this) and pauses inside later cues
+    // pretend the real speaker slows down after word 40 and pauses inside later cues
     val truth = approx.mapIndexed { i, w -> val d = if (i >= 40) 0.9 else 0.0; TimedWord(w.text, w.start + d, w.end + d) }
     val dur = truth.last().end + 1.0
     // audio whose silences are in the WRONG places (every 2.1 s) - exactly what makes energy-based snapping move cuts
     val x = FloatArray((dur * 16000).toInt()) { k -> if ((k / 16000.0) % 2.1 < 1.7) (0.3 * Math.sin(k * 0.1)).toFloat() else 0.0f }
-    val tv = timeScenes(items, scr, truth, x, dur, verified = true)
+    val tv = Analyser.analyse(scriptText = scr, samples = x, audioSeconds = dur, words = truth)
     val early = tv.scenes.drop(1).count { s -> truth.none { w -> w.start - s.start in -1e-6..0.0601 } }
     ok10("verified: every cut is at a spoken word, at most 0.06 s early (${tv.scenes.size - 1} cuts)", early == 0 && tv.scenes.size > 3)
-    ok10("verified: no pause-snapping/anchoring applied or reported", tv.report?.anchored == false && tv.warnings.any { "exact spoken-word times" in it })
-    val tu = timeScenes(items, scr, truth, x, dur, verified = false)
+    ok10("verified: no pause-snapping applied, and it says so", tv.scenes.none { it.cutCheck } && tv.issues.any { "exact spoken-word times" in it.text })
+    val tu = Analyser.analyse(scriptText = scr, samples = x, audioSeconds = dur)
     val badU = tu.scenes.drop(1).count { s -> truth.none { w -> w.start - s.start in -1e-6..0.0601 } }
-    println("INFO  old energy-snapping path on the same input: $badU of ${tu.scenes.size - 1} cuts NOT at a spoken word")
+    println("INFO  pause-detection path (no server) on the same input: $badU of ${tu.scenes.size - 1} cuts NOT at a spoken word")
     ok10("verified: timeline built from it is valid (no gap/overlap)", Timeline.fromScenes(tv.scenes.onEachIndexed { k, s -> s.image = "/p/$k.png" }, dur).validate().none { it.kind == IssueKind.GAP || it.kind == IssueKind.OVERLAP })
     if (fails10 > 0) { println("$fails10 FAILED"); System.exit(1) }
 }

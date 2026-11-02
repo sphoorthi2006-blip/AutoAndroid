@@ -8,7 +8,6 @@ val STOP: Set<String> = ("a an the and or but so of to in on at for with from by
     "shot visual prompt").split(" ").toSet()
 
 class Scene(val text: String, var start: Double, var end: Double) {
-    var item: SceneItem? = null
     var num = 0
     var cutCheck = false      // the picture change before this scene could not be placed in a clear pause: check it
     var image: String? = null // picture path chosen for this scene (null = missing: blank screen + scene text)
@@ -19,7 +18,7 @@ class Scene(val text: String, var start: Double, var end: Double) {
 
 class AlignReport(val match: Double, val words: Int, var cutsMoved: Int = 0, var cutsUnchecked: Int = 0, var flagged: List<Int> = emptyList(), var anchored: Boolean = false)
 
-/** Ports of segment_words, pull_in_spoken_titles, align, estimate_align from scriptvideo/engine.py. */
+/** Ports of segment_words, align, estimate_align from scriptvideo/engine.py. */
 object Align {
     const val MIN_SCENE_SECONDS = 1.5
     private val NUM_WORDS = mapOf("one" to "1", "two" to "2", "three" to "3", "four" to "4", "five" to "5", "six" to "6", "seven" to "7", "eight" to "8",
@@ -64,46 +63,21 @@ object Align {
         return starts
     }
 
-    /** A section heading with NO picture of its own is still spoken ("Section 3, The Fall"): move the section's first scene back to where the title begins. */
-    fun pullInSpokenTitles(starts0: IntArray, wtoks: List<String>, sceneToks: List<List<String>>, heads: Map<Int, String>): IntArray {
-        val starts = starts0.copyOf()
-        for (i in heads.keys.sorted()) {
-            if (i <= 0 || i >= starts.size) continue
-            val tl = Details.tokens(heads[i]!!).map { tn(it) }
-            val T = tl.toSet(); if (T.isEmpty()) continue
-            val first = sceneToks[i].take(T.size + 1).map { tn(it) }
-            if (first.isNotEmpty() && first.count { it in T } >= max(1, (0.6 * min(first.size, T.size)).toInt()) && sceneToks[i].size <= T.size + 3) continue
-            val s = starts[i]; val room = s - (starts[i - 1] + 1)
-            var bestK = 0; var bestSc = 0.0
-            for (k in 1..min(tl.size + 2, room)) {
-                val win = wtoks.subList(s - k, s).map { tn(it) }
-                val left = tl.toMutableList(); val hits = ArrayList<Boolean>()
-                for (w in win) { if (left.remove(w)) hits.add(true) else hits.add(false) }
-                if (!hits[0]) continue
-                val h = hits.count { it }; val sc = h - 0.6 * (k - h)
-                if (sc > bestSc + 1e-9) { bestK = k; bestSc = sc }
-            }
-            if (bestK > 0 && bestSc >= 1.0 && wtoks.subList(s - bestK, s).any { tn(it) in T && it !in STOP }) starts[i] = s - bestK
-        }
-        return starts
-    }
-
     /** words from the captions file (or speech recognition) + the scene lines -> scenes with start/end. audio = 16 kHz samples for pause snapping (optional). */
-    fun align(words0: List<TimedWord>, sceneLines: List<String>, scriptText: String, audio: FloatArray? = null, heads: Map<Int, String>? = null, lead: Double = 0.12): Pair<List<Scene>, AlignReport> {
+    fun align(words0: List<TimedWord>, sceneLines: List<String>, scriptText: String, audio: FloatArray? = null, lead: Double = 0.12): Pair<List<Scene>, AlignReport> {
         if (words0.isEmpty()) throw PipelineError("No speech was found in the audio file.")
         val words = ArrayList<TimedWord>(); val wtoks = ArrayList<String>()
-        for (w in words0) { val t = Details.tokens(w.text); if (t.isNotEmpty()) { wtoks.add(t.joinToString("")); words.add(w) } }
-        var sceneToks = sceneLines.map { Details.tokens(it) }
-        val scriptLines = if (scriptText.isNotEmpty()) Details.linesOf(scriptText) else emptyList()
-        if (scriptLines.size == sceneLines.size) sceneToks = sceneToks.zip(scriptLines) { a, b -> a + Details.tokens(b) }
+        for (w in words0) { val t = Text.tokens(w.text); if (t.isNotEmpty()) { wtoks.add(t.joinToString("")); words.add(w) } }
+        var sceneToks = sceneLines.map { Text.tokens(it) }
+        val scriptLines = if (scriptText.isNotEmpty()) Text.linesOf(scriptText) else emptyList()
+        if (scriptLines.size == sceneLines.size) sceneToks = sceneToks.zip(scriptLines) { a, b -> a + Text.tokens(b) }
         val allSet = HashSet<String>(); sceneToks.forEach { allSet.addAll(it) }
-        if (scriptText.isNotEmpty()) allSet.addAll(Details.tokens(scriptText))
+        if (scriptText.isNotEmpty()) allSet.addAll(Text.tokens(scriptText))
         val informative = wtoks.filter { it !in STOP }
         val hit = informative.count { it in allSet }.toDouble() / max(informative.size, 1)
         if (hit < 0.45) throw PipelineError("The narration does not seem to match the script/scene text (only ${(hit * 100).roundToInt()}% of spoken words were found). " +
             "Check you picked the right audio and text files.")
-        var starts = segmentWords(wtoks, sceneToks)
-        if (!heads.isNullOrEmpty()) starts = pullInSpokenTitles(starts, wtoks, sceneToks, heads)
+        val starts = segmentWords(wtoks, sceneToks)
         val total = words.last().end
         var cuts: List<Double> = arrayListOf(0.0).also { c ->
             for (i in 1 until starts.size) {
@@ -121,84 +95,15 @@ object Align {
         return Pair(sceneLines.mapIndexed { i, l -> Scene(l, cuts[i], if (i + 1 < cuts.size) cuts[i + 1] else total) }, rep)
     }
 
-    /** One caption cue per scene (same count, same words): the picture changes ARE the cue start times (lead seconds early, never before the previous
-     *  cue's end). Nothing is re-aligned and nothing is snapped to the audio. Null when the cues do not line up with the scenes one-to-one.
-     *  Port of engine.exact_cue_scenes. */
-    fun exactCueScenes(rows0: List<Cue>?, sceneLines: List<String>, total: Double, lead: Double = 0.06): Pair<List<Scene>, AlignReport>? {
-        val rows = (rows0 ?: return null).filter { Details.tokens(it.text).isNotEmpty() }
-        if (rows.isEmpty() || rows.size != sceneLines.size) return null
-        val sims = rows.zip(sceneLines).map { (r, line) ->
-            val a = Details.tokens(r.text).toSet(); val b = Details.tokens(line).toSet()
-            (a intersect b).size.toDouble() / max((a union b).size, 1)
-        }
-        if (sims.average() < 0.85 || sims.min() < 0.4) return null
-        val cuts = arrayListOf(0.0)
-        for (k in 1 until rows.size) {
-            val gap = rows[k].start - rows[k - 1].end
-            cuts.add(max(rows[k].start - min(lead, max(gap, 0.0) / 2), cuts.last() + 0.25))
-        }
-        val endAll = max(total, rows.last().end)
-        val scenes = sceneLines.mapIndexed { i, l -> Scene(l, cuts[i], if (i + 1 < cuts.size) cuts[i + 1] else endAll) }
-        return Pair(scenes, AlignReport(sims.average(), rows.sumOf { Details.tokens(it.text).size }))
-    }
-
     /** No audio and no captions: each scene lasts as long as its own words take to say (2.5 words/s, min 1.5 s). */
     fun estimate(sceneLines: List<String>, scriptText: String = ""): List<Scene> {
-        val sl = if (scriptText.isNotEmpty()) Details.linesOf(scriptText) else emptyList()
+        val sl = if (scriptText.isNotEmpty()) Text.linesOf(scriptText) else emptyList()
         val src = if (sl.size == sceneLines.size) sl else sceneLines
         var t = 0.0; val out = ArrayList<Scene>()
         for ((line, s) in sceneLines.zip(src)) {
-            val d = max(Details.tokens(s).size / Captions.WORDS_PER_SECOND, MIN_SCENE_SECONDS)
+            val d = max(Text.tokens(s).size / Captions.WORDS_PER_SECOND, MIN_SCENE_SECONDS)
             out.add(Scene(line, Math.rint(t * 1000) / 1000, Math.rint((t + d) * 1000) / 1000)); t += d
         }
         return out
     }
-}
-
-class TimingResult(val scenes: List<Scene>, val warnings: List<String>, val report: AlignReport?, val duration: Double)
-
-/** The timing part of analyse(): details items + captions (+ audio) -> scenes. audio = 16 kHz mono samples or null; audioSeconds = its length. */
-fun timeScenes(items: List<SceneItem>, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double, verified: Boolean = false, rows: List<Cue>? = null): TimingResult {
-    val warnings = ArrayList<String>()
-    val lines = items.map { it.spoken }
-    val scenes: List<Scene>; var rep: AlignReport? = null
-    if (words == null) {
-        scenes = Align.estimate(lines, scriptText)
-        warnings.add(if (audio == null) "No narration audio and no captions: picture lengths are ESTIMATED from the number of words in each script line. " +
-            "Add a captions file to get the real timing (the picture matching stays the same)."
-            else "No captions file: picture lengths are ESTIMATED from the number of words in each script line. Add a captions file to get the real timing.")
-    } else {
-        val heads = HashMap<Int, String>()
-        for ((k, it) in items.withIndex()) if (k > 0 && it.section.isNotEmpty() && it.section != items[k - 1].section) heads[k] = it.section
-        // verified = word times come from speech recognition + forced alignment of the real audio (backend). They are exact, so the energy-based
-        // pause snapping (which exists to repair APPROXIMATE caption times, and can move a cut early) is not applied.
-        // The same holds for caption files that keep the real pauses (TurboScribe style) and for one-cue-per-scene files: their times are exact.
-        val exact = if (!verified) Align.exactCueScenes(rows, lines, max(audioSeconds, words.last().end)) else null
-        val keepTimes = verified || exact != null || Captions.pauseAware(rows)
-        if (exact != null) { scenes = exact.first; rep = exact.second
-            warnings.add("Picture changes are the exact start times of the caption lines (one caption per scene) - no re-alignment, no snapping.")
-        } else {
-            val r = Align.align(words, lines, scriptText, if (keepTimes) null else audio, heads, if (keepTimes) 0.06 else 0.12); scenes = r.first; rep = r.second
-            if (verified) warnings.add("Picture changes use the exact spoken-word times from the audio analysis.")
-            else if (keepTimes) warnings.add("The captions keep the real pauses, so their times are used as they are (no pause snapping).")
-        }
-        if (audio != null && !keepTimes) {
-            val res = try { AudioPauses.anchorCuts(audio, scenes.map { it.text }, scenes.map { it.start }) } catch (e: Exception) { null }
-            if (res != null) {
-                val (cuts, odd) = res
-                scenes.forEachIndexed { k, s -> s.start = cuts[k]; s.end = if (k + 1 < scenes.size) cuts[k + 1] else max(scenes.last().end, audioSeconds) }
-                rep.flagged = odd; rep.anchored = true
-                warnings.add("Picture changes were placed in the real pauses of the audio (the captions file is only approximate).")
-            }
-        }
-    }
-    scenes.forEachIndexed { k, s -> s.item = items[k]; s.num = k + 1 }
-    rep?.flagged?.forEach { if (it < scenes.size) scenes[it].cutCheck = true }
-    if (!rep?.flagged.isNullOrEmpty()) warnings.add("Picture change timing is not certain for scene(s) " + rep!!.flagged.take(15).joinToString(", ") { (it + 1).toString() } +
-        (if (rep.flagged.size > 15) " ..." else "") + " (no clear pause between the lines). They are marked with ! on the timeline - check them.")
-    scenes.last().end = max(scenes.last().end, audioSeconds)
-    val dur = max(audioSeconds, scenes.last().end)
-    val short = scenes.filter { it.end - it.start < 0.6 }.map { it.num }
-    if (short.isNotEmpty()) warnings.add("Very short scenes (under 0.6 s): " + short.take(15).joinToString(", "))
-    return TimingResult(scenes, warnings.distinct(), rep, dur)
 }

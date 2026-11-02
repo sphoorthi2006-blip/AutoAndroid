@@ -3,12 +3,11 @@ random.seed(3); rng = np.random.default_rng(7)
 secs = [("INTRO", None, ["The ancient city stood proudly above the sea.","Its great walls protected thousands of families.","Merchants brought silk and spices from distant lands."]),
         ("Section 2: The Siege", "Section two. The Siege.", ["In spring the sultan gathered a massive army.","Enormous cannons pounded the stone defenses daily.","Defenders repaired breaches every single night.","Hunger and fear spread across the crowded streets."]),
         ("Section 3: The Fall", "Section three. The Fall.", ["Finally the final assault began before dawn.","Soldiers poured through the broken gate.","The empire ended and a new age began."])]
-det, script, n = [], [], 0
+script = []
 for h, spoken_h, sents in secs:
-    det.append(h); script.append(h)
-    for s in sents:
-        n += 1; det += [f'Image {n} - Script line: "{s}"', "Subject: something visual"]; script.append(s)
-open("details.txt","w").write("\n".join(det)+"\n"); open("script.txt","w").write("\n".join(script)+"\n")
+    script.append(h)
+    for s in sents: script.append(s)
+open("script.txt","w").write("\n".join(script)+"\n")
 SR=16000; t=0.5; audio=np.full(int(SR*80),0,np.float32); cues=[]; idx=0
 def burst(a,b):
     i,j=int(a*SR),int(b*SR); audio[i:j]=(rng.standard_normal(j-i)*0.2).astype(np.float32)

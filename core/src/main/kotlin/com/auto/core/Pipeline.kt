@@ -3,7 +3,7 @@ package com.auto.core
 import java.io.File
 import java.util.zip.ZipFile
 
-/** ZIP + folder handling and the one-call analyse() that the phone app uses. Pure JVM (java.util.zip) - works on Android too. */
+/** ZIP + folder handling and the one-call analyse() that the phone app uses (the logic itself is in Analyser). Pure JVM (java.util.zip) - works on Android too. */
 object Pipeline {
     val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp", "bmp")
     private fun isImage(name: String) = name.substringAfterLast('.', "").lowercase() in IMAGE_EXT
@@ -45,26 +45,18 @@ object Pipeline {
         return Pair(refs, names)
     }
 
-    class Analysis(val timing: TimingResult, val match: Matching.MatchResult) {
-        val scenes get() = match.scenes
-        val warnings get() = match.warnings
-    }
-
-    /** details + script + (captions) + (audio) + picture folders/ZIPs -> timed scenes, each with its picture. */
-    fun analyse(detailsText: String, scriptText: String, words: List<TimedWord>?, audio: FloatArray?, audioSeconds: Double,
-                pictureSources: List<File>, workDir: File, match: String = "number", verified: Boolean = false, rows: List<Cue>? = null): Analysis {
-        val warn = ArrayList<String>()
-        var items = scopedItems(Details.parseSceneFile(detailsText), scriptText, warn)
-        if (items.isEmpty()) throw PipelineError("No scenes were found in the details file.")
-        val (refs, rootNames) = collectPictures(pictureSources, workDir)
-        if (refs.isEmpty()) throw PipelineError("No pictures (png, jpg, webp) were found in the chosen folders or ZIP files.")
-        val groups = Matching.imageGroups(refs, rootNames)
-        // a section heading the script has and the narrator says (but the details do not list) becomes a scene of its own
-        val spoken = words?.map { Details.tokens(it.text).joinToString("") }?.filter { it.isNotEmpty() }
-        items = Matching.addHeadingItems(items, scriptText, groups, warn, spoken)
-        val timing = timeScenes(items, scriptText, words, audio, audioSeconds, verified, rows)
-        val res = Matching.matchPictures(items, timing.scenes, groups, scriptText, match, warnings0 = warn + timing.warnings,
-            mtime = { File(it).lastModified() })
-        return Analysis(timing, res)
+    /** Everything is optional. pictureSources = ZIPs / folders / loose picture files. Returns the scenes, the timing and the warning list. */
+    fun analyse(timestampsText: String?, timestampsName: String, scriptText: String?, pictureSources: List<File>, workDir: File,
+                samples: FloatArray?, audioSeconds: Double, words: List<TimedWord>? = null, notes: List<String> = emptyList()): Analysis {
+        val start = notes.map { AnalyseIssue(it, null, "info", "input") }.toMutableList()
+        val paths = ArrayList<String>()
+        for ((k, src) in pictureSources.withIndex()) {
+            try {
+                paths += if (src.isDirectory) picturesFromFolder(src).map { it.path }
+                else if (src.extension.equals("zip", true)) picturesFromZip(src, File(workDir, "zip$k")).map { it.path }
+                else if (isImage(src.name)) listOf(src.path) else emptyList()
+            } catch (e: Exception) { start.add(AnalyseIssue("Could not read the pictures in '${src.name}': ${e.message}", null, "warn", "file")) }
+        }
+        return Analyser.analyse(timestampsText, timestampsName, scriptText, paths, samples, audioSeconds, words, start)
     }
 }

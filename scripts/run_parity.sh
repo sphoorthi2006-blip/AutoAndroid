@@ -6,32 +6,20 @@ cd "$(dirname "$0")/.."
 KOTLINC="${KOTLINC:-kotlinc}"
 OUT="$(mktemp -d)"
 # the Check programs read their inputs from these fixed folders
-mkdir -p /tmp/tt2 /tmp/tt3 /tmp/tt7
-cp testdata/timing/details.txt testdata/timing/script.txt testdata/timing/caps.srt /tmp/tt2/
-cp testdata/matching/scen.txt /tmp/tt3/
-"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
+mkdir -p /tmp/tt2 /tmp/tt7
+cp testdata/timing/script.txt testdata/timing/caps.srt /tmp/tt2/
+"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/CheckSrt.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
 CP="$OUT:$(dirname "$(readlink -f "$(command -v "$KOTLINC")")")/../lib/kotlin-stdlib.jar"
-java -cp "$CP" Check4Kt > "$OUT/kt.out"
-sed 's/|None|/|null|/' testdata/matching/ref.out > "$OUT/ref.norm"
-if diff "$OUT/ref.norm" "$OUT/kt.out" > "$OUT/diff.txt"; then echo "PICTURE MATCHING: identical to Python (7 scenarios)"; else echo "PICTURE MATCHING: DIFFERENT"; head -40 "$OUT/diff.txt"; exit 1; fi
-java -cp "$CP" Check5Kt | head -1 | grep -q "scenes=12 full=true evil=false" && echo "ZIP end-to-end: OK" || { echo "ZIP end-to-end: FAILED"; exit 1; }
-java -cp "$CP" Check6Kt testdata/v19 > "$OUT/kt6.out"
-sed 's/|None|/|null|/' testdata/v19/ref.out > "$OUT/ref6.norm"
-if diff "$OUT/ref6.norm" "$OUT/kt6.out" > "$OUT/diff6.txt"; then echo "v19 HEADINGS / PROMPT BLOCKS / BLACK SCREENS: identical to Python (8 scenarios)"; else echo "v19 scenarios: DIFFERENT"; head -40 "$OUT/diff6.txt"; exit 1; fi
+# SRT-first Analyse (timestamps decide scenes and cuts, pictures by number, black screens, warnings, 218-cue ZIP case)
+if java -cp "$CP" CheckSrtKt > "$OUT/kts.out"; then echo "SRT-FIRST ANALYSE: $(grep -c '^PASS' "$OUT/kts.out") checks passed"; else echo "SRT-FIRST ANALYSE: FAILED"; grep FAIL "$OUT/kts.out"; exit 1; fi
 # Timeline model + edit engine (Steps 29-36 core): self-checking, needs a generated test narration
-(cd /tmp/tt7 && cp "$OLDPWD"/testdata/timing/{details.txt,script.txt,gen.py} . && python3 gen.py >/dev/null)
+(cd /tmp/tt7 && cp "$OLDPWD"/testdata/timing/{script.txt,gen.py} . && python3 gen.py >/dev/null)
 if java -cp "$CP" Check7Kt /tmp/tt7 > "$OUT/kt7.out"; then echo "TIMELINE EDIT ENGINE: $(grep -c '^PASS' "$OUT/kt7.out") checks passed"; else echo "TIMELINE EDIT ENGINE: FAILED"; grep FAIL "$OUT/kt7.out"; exit 1; fi
 # DOCX reading, validation report, exact-boundary export plan
 python3 scripts/make_check8_data.py /tmp/tt8
 if java -cp "$CP" Check8Kt /tmp/tt8 > "$OUT/kt8.out"; then echo "DOCX / VALIDATION / EXPORT PLAN: $(grep -c '^PASS' "$OUT/kt8.out") checks passed"; else echo "DOCX / VALIDATION / EXPORT PLAN: FAILED"; grep FAIL "$OUT/kt8.out"; exit 1; fi
 # Confidence scores, pause policy, project store (Steps 7, 26, 27)
 if java -cp "$CP" Check9Kt /tmp/tt9 > "$OUT/kt9.out"; then echo "CONFIDENCE / PAUSE POLICY / PROJECT STORE: $(grep -c '^PASS' "$OUT/kt9.out") checks passed"; else echo "CONFIDENCE / PAUSE POLICY / PROJECT STORE: FAILED"; grep FAIL "$OUT/kt9.out"; exit 1; fi
-# Exact caption timing (one cue per scene / captions with real pauses are NOT re-snapped to audio pauses)
-if java -cp "$CP" Check11Kt testdata/timing > "$OUT/kt11.out"; then echo "EXACT CAPTION TIMING: $(grep -c '^PASS' "$OUT/kt11.out") checks passed"; grep '^INFO' "$OUT/kt11.out" || true; else echo "EXACT CAPTION TIMING: FAILED"; grep FAIL "$OUT/kt11.out"; exit 1; fi
-# Timestamps-first analyse (no Details file): the owner's real captions + generated numbered pictures
-if [ -f testdata/real/ps_clean.srt ]; then
-  if java -cp "$CP" Check12Kt testdata/real > "$OUT/kt12.out"; then echo "TIMESTAMPS-FIRST ANALYSE (no details file): $(grep -c '^PASS' "$OUT/kt12.out") checks passed"; else echo "TIMESTAMPS-FIRST ANALYSE: FAILED"; grep FAIL "$OUT/kt12.out"; exit 1; fi
-else echo "TIMESTAMPS-FIRST ANALYSE: SKIPPED (testdata/real/ps_clean.srt is the owner's private script and is not in the public repo)"; fi
 # Backend client + verified timing (Steps 10-16). Needs python3 with fastapi/uvicorn/numpy + ffmpeg; reported as SKIPPED (not passed) otherwise.
 if python3 -c "import fastapi, uvicorn, numpy" 2>/dev/null && command -v ffmpeg >/dev/null; then
   PORT=$((20000 + RANDOM % 20000)); rm -rf /tmp/tt10 && mkdir -p /tmp/tt10

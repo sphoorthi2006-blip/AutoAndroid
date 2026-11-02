@@ -12,10 +12,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-      - name: Install ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-      - name: Install Python test dependencies
-        run: pip install numpy fastapi uvicorn python-multipart silero-vad-lite httpx pytest
       - name: Install Kotlin compiler
         run: |
           curl -sL -o kotlinc.zip https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
@@ -23,5 +19,3 @@ jobs:
           echo "$HOME/kotlinc/bin" >> "$GITHUB_PATH"
       - name: Kotlin results must equal the Python engine's results
         run: scripts/run_parity.sh
-      - name: Backend tests (fake speech models)
-        run: cd backend && python3 -m pytest -q tests

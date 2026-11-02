@@ -1,5 +1,12 @@
 # AUTO - PROGRESS (update after every step; trust source + tests over this file)
 
+## Session 3: SRT-first rewrite (matches the desktop app)
+- Removed Details.kt, Matching.kt, the Details parts of Bundle.kt and Check, Check2-6 (+ testdata/matching, v19, files). Added Analyse.kt, Pictures.kt, Text.kt, Captions.parseRows, CheckSrt.kt (35 checks).
+- scripts/run_parity.sh: SRT-first 35, timeline 27, docx/validation/plan 21, confidence/store 30, backend+verified timing 15 - all pass (kotlinc 2.0.21).
+- App (MainActivity, Exporter) rewritten for the new core: NOT compiled (no Android SDK / Maven here) - the first GitHub CI run is the compile check.
+- Pictures that were early in the phone test: cuts are now the cue starts minus 0.06 s, never snapped to pauses when timestamps exist.
+- Not ported: 'blank picture' detection (needs bitmap decoding), speech recognition on the phone (the optional AI server replaces it).
+
 Last updated: Session 2 (new account). Core now also has Confidence, PausePolicy, ProjectStore (tested, 30 checks). App still NOT wired to them and NOT compiled in this sandbox (Maven blocked); GitHub CI compiled the app at ecf2f6b per owner report. Previous: Session 1, part 2. Audit done; core now has Timeline engine, DOCX reader, ValidationReport, ExportPlan (all tested). App wiring written but NOT compiled.
 
 ## Master roadmap status (45 steps)
@@ -51,21 +58,3 @@ Fully DONE: 1,2,3,4,5 and 8 (core part; app part uncompiled).  Partial: 7,9,25,2
 - Likely cause: caption times are approximate and AudioPauses.anchorCuts/refineCuts snap cuts to energy pauses, which can land early. Fix: backend gives verified word times; `timeScenes(verified=true)` skips snapping and cuts at first spoken word - 0.06 s (test: 0/9 cuts off-word vs 8/9 on adversarial audio with the old path). NOT confirmed on the owner's real project yet.
 - Added: backend/ (17 pytest), BackendClient.kt, Check10.kt (15 PASS, live server), MainActivity server URL/token fields, INTERNET permission.
 - If pictures still come early after using the server: send the Audio warnings + scene list; next suspect is Align.segmentWords (word->scene assignment), then Gemini fallback (Steps 17-22, not built).
-
-## Session 3 - exact caption timing ported from desktop (TIMING_FIX_README)
-- Captions.parseRows / Captions.pauseAware, Align.exactCueScenes, timeScenes(rows=...), Pipeline.analyse(rows=...), MainActivity passes the caption rows.
-- Rule: one caption cue per scene -> picture changes are the cue starts (0.06 s early, no snapping); captions that keep real pauses -> caption times kept, no pause snapping; Clipchamp-style even captions -> unchanged.
-- Check11.kt: 14 PASS (run_parity.sh). All earlier suites still pass. app/ change is two lines in MainActivity and is NOT compiled here.
-- NOT verified: the old early-cut bug did not reproduce on synthetic audio, so this is a regression guard, not proof the real project is fixed. Test on the real TurboScribe project.
-- Still missing vs desktop: timestamps-first analyse without a Details file, text/click/music tracks, export quality/resolution options, new picture-number patterns (prompt/cue, copy suffix, 0-based).
-
-## Session 3 part 2 - timestamps-first analyse, NO Details file (matches the desktop's new Analyse)
-- core/CaptionPipeline.kt: inputs are captions (timestamps), audio, pictures, script - none mandatory; only "nothing at all" throws. Scenes: cues > script lines > pictures > audio alone. Timing: exact cue starts > verified word times (script only) > estimate > 3 s each. Pictures by number in the file name (image/img/scene/shot/frame/pic/picture/slide/prompt/cue, copy suffix "7 (1)", numbering from 0), else file-name order with a warning; scenes without a picture = black screen + text. Warnings: missing/duplicate/extra/unnumbered/unreadable pictures, scenes >7 s or <0.6 s, overlapping or unsorted captions, audio shorter/longer than captions, script mismatch.
-- MainActivity.analyse() rewritten to use it: no details file needed, no whole-narration decode (only its duration), server only used when there are no captions but a script + audio.
-- Check12.kt: 20 PASS, uses the owner's real ps_clean.srt (testdata/real/). run_parity.sh runs it.
-- NOT done / NOT verified: app/ still not compiled here (CI needed). Blank-picture detection (needs bitmap decode) not ported. Details-based path (Pipeline.analyse) kept for old tests but no longer used by the app.
-
-## Session 3 part 3 - manual AI server inputs removed from the app
-- Owner: a server URL + token typed by hand is not an "AI feature". Removed from MainActivity (fields, saved prefs, BackendClient call) and the INTERNET permission. The app is fully offline now: captions, audio, pictures, script.
-- Script without captions now always uses the ESTIMATED timing (with a warning) - there is no speech recognition in the app.
-- Left in the repo, unused by the app: backend/ (FastAPI) and core/BackendClient.kt + Check10 (their tests still run). A real built-in AI feature (on-device speech timing) would be a separate step: it needs a decision on which on-device model to ship.

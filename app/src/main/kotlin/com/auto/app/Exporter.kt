@@ -26,7 +26,6 @@ import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import com.auto.core.ExportPlan
 import com.auto.core.ExportSettings
-import com.auto.core.Pipeline
 import java.io.File
 import kotlin.math.max
 
@@ -75,44 +74,6 @@ object Exporter {
         if (narration != null) {
             val a = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(narration))).setRemoveVideo(true).build()
             sequences.add(EditedMediaItemSequence(listOf(a)))
-        }
-        val out = File(work, "auto_${System.currentTimeMillis()}.mp4")
-        val handler = Handler(Looper.getMainLooper())
-        val transformer = Transformer.Builder(ctx)
-            .setVideoMimeType(MimeTypes.VIDEO_H264).setAudioMimeType(MimeTypes.AUDIO_AAC)
-            .addListener(object : Transformer.Listener {
-                override fun onCompleted(composition: Composition, exportResult: ExportResult) { handler.removeCallbacksAndMessages(null); onDone(publish(ctx, out)) }
-                override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) { handler.removeCallbacksAndMessages(null); onError(exportException.message ?: "Export failed") }
-            }).build()
-        transformer.start(Composition.Builder(sequences).build(), out.path)
-        val holder = ProgressHolder()
-        val poll = object : Runnable { override fun run() {
-            if (transformer.getProgress(holder) != Transformer.PROGRESS_STATE_NOT_STARTED) onProgress(holder.progress)
-            handler.postDelayed(this, 500) } }
-        handler.post(poll)
-    }
-
-    /** Older per-group export, still used when the pictures do not cover the whole script. Must be called on the main thread. */
-    fun export(ctx: Context, a: Pipeline.Analysis, narration: File?, onProgress: (Int) -> Unit, onDone: (String) -> Unit, onError: (String) -> Unit) {
-        val work = File(ctx.cacheDir, "export").apply { mkdirs() }
-        val blank = blankImage(work)
-        val video = a.scenes.mapIndexed { k, s ->
-            val dur = max(s.end - s.start, 0.04)
-            val img = s.image ?: (if (s.text.isNotBlank()) textScreen(work, k, if (s.item?.heading == true) s.text.uppercase() else s.text).path else blank.path)
-            val mi = MediaItem.Builder().setUri(Uri.fromFile(File(img))).setImageDurationMs((dur * 1000).toLong()).build()
-            EditedMediaItem.Builder(mi).setDurationUs((dur * 1_000_000).toLong()).setFrameRate(30)
-                .setEffects(Effects(listOf(), listOf(Presentation.createForWidthAndHeight(W, H, Presentation.LAYOUT_SCALE_TO_FIT)))).build()
-        }
-        val sequences = ArrayList<EditedMediaItemSequence>()
-        sequences.add(EditedMediaItemSequence(video))
-        if (narration != null) {
-            val audio = a.match.used.filter { it.scenes.isNotEmpty() }.map { g ->
-                val clip = MediaItem.ClippingConfiguration.Builder()
-                    .setStartPositionMs((g.scenes.first().start * 1000).toLong()).setEndPositionMs((g.scenes.last().end * 1000).toLong()).build()
-                val mi = MediaItem.Builder().setUri(Uri.fromFile(narration)).setClippingConfiguration(clip).build()
-                EditedMediaItem.Builder(mi).setRemoveVideo(true).build()
-            }
-            if (audio.isNotEmpty()) sequences.add(EditedMediaItemSequence(audio))
         }
         val out = File(work, "auto_${System.currentTimeMillis()}.mp4")
         val handler = Handler(Looper.getMainLooper())

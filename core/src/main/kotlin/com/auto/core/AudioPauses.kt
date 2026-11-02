@@ -103,7 +103,7 @@ object AudioPauses {
         val first = voiced.indexOfFirst { it }.coerceAtLeast(0); val lastV = voiced.indexOfLast { it }
         val t0 = first / 100.0
         val tend = (n - (n - 1 - (if (lastV < 0) n - 1 else lastV))) / 100.0
-        val W = DoubleArray(K) { max(Details.tokens(sceneTexts[it]).size, 1).toDouble() }
+        val W = DoubleArray(K) { max(Text.tokens(sceneTexts[it]).size, 1).toDouble() }
         val spw = (tend - t0) / W.sum()
         val Eb = DoubleArray(K - 1) { sceneStarts[it + 1] }
         val Kb = K - 1; val INF = 1e18

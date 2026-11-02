@@ -32,8 +32,7 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
             val clips = scenes.mapIndexed { k, s ->
                 val a = if (k == 0) 0L else starts[k]
                 val b = if (k + 1 < scenes.size) starts[k + 1] else max(Math.round(s.end * 1000), audioMs)
-                val hd = s.item?.heading == true
-                ImageClip(k + 1, s.num, s.image, a, max(b, a + 1), s.text, s.conf, hd, Confidence.score(s.conf, s.cutCheck, s.image == null && !hd, max(b, a + 1) - a), s.cutCheck)
+                ImageClip(k + 1, s.num, s.image, a, max(b, a + 1), s.text, s.conf, false, Confidence.score(s.conf, s.cutCheck, s.image == null, max(b, a + 1) - a), s.cutCheck)
             }
             val caps = words?.let { Captions.parseCues(it).mapIndexed { k, c -> CaptionClip(k + 1, Math.round(c.start * 1000), Math.round(c.end * 1000), c.text) } } ?: emptyList()
             return Timeline(audioMs, clips, caps)

@@ -1,7 +1,7 @@
 # AUTO - ARCHITECTURE & DECISIONS
 
 ## Current (audited)
-- `core/` (pure Kotlin/JVM, 1.5 kLOC): Captions (SRT/VTT/Whisper-JSON/timed lines) -> Details (Image N blocks) -> Bundle (file role detection) -> Align (Viterbi-style word->scene segmentation, spoken-title pull-in) -> AudioPauses (energy envelope; refineCuts, anchorCuts DP) -> Matching (number / filename words / folder names, Hungarian assignment, section inference, missing-picture flags) -> Pipeline.analyse().
+- `core/` (pure Kotlin/JVM, 1.5 kLOC): Captions (SRT/VTT/Whisper-JSON/timed lines) -> Bundle (file role detection: timestamps / audio / click / script) -> Analyser.analyse() (SRT-first: cues = scenes and exact cuts; pictures by file-name number; black screen + text when a picture is missing; warnings) with Align (word->scene, only when there are no timestamps) and AudioPauses (pause detection, only when there are no timestamps) as fallbacks -> Pipeline.analyse(). The Details file and Matching (Hungarian, sections) were removed in session 3.
 - `app/` (3 files, plain `Activity`, View-based): AudioDecoder (MediaCodec -> 16 kHz mono floats), MainActivity (4 buttons + text list), Exporter (Media3 Transformer 1.3.1: one image item per scene + narration clips; text/black screens rendered with Canvas).
 - New: `core/Timeline.kt` - immutable ms-precision timeline, edit ops, TimelineEditor (undo/redo), validate(), JSON persistence. Tested by Check7.kt.
 

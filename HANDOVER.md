@@ -1,4 +1,4 @@
-# AUTO ANDROID: HANDOVER (Checkpoint 02: steps 12-21 done and verified in core; next = step 11, then 22+)
+# AUTO ANDROID: HANDOVER (Checkpoint 02 = steps 12-21; since then steps 11 and 22-26 done; next = step 27; app compiles on GitHub, NOT yet run on a phone)
 
 Read this file first. You (a new Claude session or account) have no memory of earlier chats. Everything you need is in this zip.
 
@@ -75,3 +75,17 @@ STEP 11 (owner): git clone https://github.com/sphoorthi2006-blip/AutoAndroid ; c
 
 ## 6c. Session log: step 11 done
 - Pushed `redesign` and dispatched Build APK from the chat with a short-lived token. First-ever compile of app/ passed without edits. Next: step 22 (Exporter work) then device test. Owner must install app-debug.apk from Releases and report crashes/visual problems.
+
+## 6d. Batch 2a: steps 22-26 (small steps, ZIP every 5 steps; JSON checkpoint every 10 = Checkpoint 03 at step 31)
+Each step was pushed to branch `redesign` and the "Build APK" workflow compiled it (status = COMPILES, not seen on a device).
+| Step | What | Status |
+|---|---|---|
+| 22 | Palette swap (Theme.kt object C reads DesignTokens: charcoal + violet) | COMPILES (run 41421134804 and later); look not seen on a phone |
+| 23 | Fonts: Inter, Noto Serif, Nimbus Mono, Z003 (OFL, from desktop fonts/bundled) in app/src/main/res/font; FontResolver.kt (OverlayStyle -> Typeface, weights by API level) | COMPILES |
+| 24 | OverlayRenderer.kt: draws any OverlayStyle text on a Canvas (font, weight, italic, underline, strike, spacing, line spacing, align, case, colour, gradient, opacity, outline, shadow, box, padding, rotation, anim frame). Exporter burns captions with it (plan.captionStyle). RenderCaps: captionStyle WRITTEN. Position rule: (x,y) = box centre; LEFT align -> x is the left edge, RIGHT -> right edge | COMPILES (first attempt failed: parameter `style` shadowed Paint.style; fixed) |
+| 25 | TextBitmapOverlay.kt + Exporter: text overlays with animation drawn as ONE full-frame transparent bitmap per moment, applied with OverlayEffect on the whole Composition. RenderCaps: text, textAnim WRITTEN | COMPILES (OverlayEffect needs Guava ImmutableList). ASSUMPTION: presentationTimeUs = composition time |
+| 26 | ClipEffects.kt: ClipColor (RgbMatrix from ClipFx + fade) and ClipMove (MatrixTransformation: slide/zoom) per picture, after Presentation. RenderCaps: fx, transitions WRITTEN | COMPILES. ASSUMPTION: per-item presentationTimeUs starts at 0 for each picture; RgbMatrix works on letterboxed picture frames |
+Still UNAVAILABLE in RenderCaps: volume, music (step 27 = audio gain + music sequence), blur/sharpen/vignette/dissolve/wipe (library limit).
+No UI can create text clips, fx or transitions yet (Text Studio = step 28+); the exporter code is ready for them and is only exercised when a Timeline contains them.
+Lessons: build with the GitHub token flow in section 6 (push redesign, dispatch workflow 403286994 on branch redesign, read branch buildlog on failure). In the Claude sandbox run bash scripts with `bash`, not `sh` (process substitution).
+Next steps (small): 27 audio gain + music in export; 28 Text Studio sheet (preview with OverlayRenderer); 29 Captions sheet; 30 Effects/Transitions sheet; 31 Media/Audio sheet + Projects page, then Checkpoint 03.

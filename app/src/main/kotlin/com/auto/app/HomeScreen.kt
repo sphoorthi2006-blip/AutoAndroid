@@ -48,9 +48,9 @@ fun HomeScreen(st: AutoState, shell: Shell) {
     )
     Column(Modifier.fillMaxSize().background(C.Bg).verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(C.Glow), contentAlignment = Alignment.Center) { Text("A", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp) }
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.manva_logo), "Manva logo", Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)))
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                Text("AUTO", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("MANVA", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(if (st.hasProject) "Project open · ${st.timeline?.clips?.size ?: 0} scenes" else "No project open", color = C.Muted, fontSize = 12.sp)
             }
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { shell.openSettings() }, contentAlignment = Alignment.Center) { AutoIcon("settings", C.Muted, 24.dp) }

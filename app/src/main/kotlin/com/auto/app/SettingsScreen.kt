@@ -40,7 +40,7 @@ fun SettingsScreen(st: AutoState, shell: Shell) {
         Spacer(Modifier.height(10.dp))
         Column(Modifier.fillMaxWidth().clip(card).background(C.Card).border(1.dp, C.Line, card).padding(16.dp)) {
             Text("About", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text("Auto 0.2", color = C.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+            Text("Manva 0.2", color = C.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
             Text("Export: MP4 (H.264 + AAC), 720p / 1080p / 4K, 16:9 · 9:16 · 1:1 · 4:5, 24 / 30 / 60 fps in the engine (the sheet offers 30 and 60).", color = C.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
         }
     }

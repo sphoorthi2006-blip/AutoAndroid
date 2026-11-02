@@ -218,13 +218,13 @@ private fun TimelineArea(st: AutoState) {
                         Box(Modifier.offset(x = endX).width(2.dp).fillMaxHeight().background(C.Pink))
                         Text(if (total > tl.audioMs) "end of audio · scenes after it are not exported" else "end of audio", color = C.Pink, fontSize = 10.sp, maxLines = 1, softWrap = false, modifier = Modifier.offset(x = endX + 5.dp, y = 210.dp))
                     }
-                    // narration track (decorative wave: only the visible part is drawn)
+                    // narration track (real waveform from the decoded narration; plain decorative wave until it is ready)
                     if (tl.audioMs > 0) Box(Modifier.offset(y = 162.dp).width((tl.audioMs / 1000f * DP_PER_SEC).dp).height(44.dp).clip(RoundedCornerShape(16.dp)).background(C.Wave)) {
                         Canvas(Modifier.fillMaxSize()) {
                             val from = scroll.value.toFloat() - 40f; val to = from + viewPx + 80f
                             var i = max(0, (from / 9f).toInt())
                             while (i * 9f < to && i * 9f < size.width) {
-                                val h = (0.2f + 0.7f * abs(sin(i * 0.7f) * cos(i * 0.23f))) * size.height
+                                val pk = st.peaks; val h = (if (pk != null && pk.isNotEmpty()) 0.08f + 0.9f * pk[((i * 9f) / pxSec * PEAKS_PER_SEC).toInt().coerceIn(0, pk.size - 1)] else 0.2f + 0.7f * abs(sin(i * 0.7f) * cos(i * 0.23f))) * size.height
                                 drawLine(Color(0xFFE0F2FE), Offset(i * 9f + 4f, (size.height - h) / 2), Offset(i * 9f + 4f, (size.height + h) / 2), strokeWidth = 3f)
                                 i++
                             }
@@ -261,6 +261,7 @@ private fun MainBar(st: AutoState) {
         Tab("⚠", "Warnings", st.sheet == "warnings") { st.sheet = "warnings" }
         Tab("Aa", "Text", st.sheet == "text") { st.sheet = "text" }
         Tab("▭", "Captions", st.sheet == "captions") { st.sheet = "captions" }
+        Tab("♪", "Audio", st.sheet == "audio") { st.sheet = "audio" }
         Tab("CC", if (st.captionsOn) "CC on" else "CC off", st.captionsOn) { st.captionsOn = !st.captionsOn }
         Tab("⬆", "Export", st.sheet == "export") { st.sheet = "export" }
     }
@@ -326,6 +327,7 @@ private fun BoxScope.SheetHost(st: AutoState) {
                 "text" -> TextStudioSheet(st)
                 "captions" -> CaptionsSheet(st)
                 "effects" -> EffectsSheet(st)
+                "audio" -> AudioSheet(st)
             }
         }
     }

@@ -42,7 +42,7 @@ fun HomeScreen(st: AutoState, shell: Shell) {
         Shortcut("▭", "Captions", true) { if (st.hasProject) { st.sheet = "captions"; shell.openEditor() } else shell.message("Captions", "Add your files and press Analyse first. Captions belong to a project.") },
         Shortcut("◐", "Effects", true) { if (st.hasProject) { st.sheet = "effects"; shell.openEditor() } else shell.message("Effects", "Add your files and press Analyse first. Effects belong to the pictures of a project.") },
         Shortcut("▣", "Media Library", true) { st.sheet = if (st.hasProject) "pictures" else "inputs"; shell.openEditor() },
-        Shortcut("♪", "Music & Audio", false) { shell.soon("Music & Audio studio") },
+        Shortcut("♪", "Music & Audio", true) { if (st.hasProject) { st.sheet = "audio"; shell.openEditor() } else shell.message("Music & Audio", "Add your files and press Analyse first. Audio belongs to a project.") },
         Shortcut("⬆", "Export", true) { st.sheet = if (st.hasProject) "export" else "inputs"; shell.openEditor() },
     )
     Column(Modifier.fillMaxSize().background(C.Bg).verticalScroll(rememberScrollState()).statusBarsPadding().padding(horizontal = 16.dp)) {

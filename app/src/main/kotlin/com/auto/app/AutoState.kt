@@ -21,6 +21,8 @@ import kotlin.math.max
  * Everything the editor screen shows and does. The picking / analysing / exporting code is the same as the old text screen
  * (moved here from MainActivity); the timeline edits go through core's TimelineEditor, so undo/redo and the rules are the tested ones.
  */
+const val PEAKS_PER_SEC = 20
+
 class AutoState(private val act: ComponentActivity) {
     private val inFiles = ArrayList<File>()      // script, captions, narration
     private val zips = ArrayList<File>()
@@ -31,7 +33,7 @@ class AutoState(private val act: ComponentActivity) {
     private var editor: TimelineEditor? = null
     private var player: MediaPlayer? = null
 
-    var pick: (Int) -> Unit = {}                 // 1 = files/ZIP, 2 = pictures, 3 = replace one picture, 4 = caption file (set by MainActivity)
+    var pick: (Int) -> Unit = {}                 // 1 = files/ZIP, 2 = pictures, 3 = replace one picture, 4 = caption file, 5 = music file (set by MainActivity)
 
     var status by mutableStateOf("Choose your files in Inputs, then press Analyse.")
     var kinds by mutableStateOf(setOf<String>())  // which inputs are present: Timestamps, Audio, Pictures, Script
@@ -89,6 +91,25 @@ class AutoState(private val act: ComponentActivity) {
     }
     fun delete() { val id = selectedId ?: return; edit { it.delete(id, true) }; selectedId = null }
     /** Any length, no magnet: the scenes after this one move later/earlier, the narration stays as it is. */
+    // ---------- audio (step 34) ----------
+    fun setNarrationAudio(a: AudioSettings) = edit { it.setMix(it.mix.copy(narration = a)) }
+    fun setMusic(m: MusicTrack?) = edit { it.setMix(it.mix.copy(music = m)) }
+    /** Real waveform of the narration: PEAKS_PER_SEC peaks per second, computed once per narration file in a background thread. */
+    var peaks by mutableStateOf<FloatArray?>(null)
+    private var peaksFor: String? = null
+    private fun loadPeaks(f: File?) {
+        if (f == null) { peaks = null; peaksFor = null; return }
+        if (peaksFor == f.path && peaks != null) return
+        peaks = null; peaksFor = f.path
+        thread {
+            try {
+                val (samples, _) = AudioDecoder.decode(f)
+                val n = max(1, (samples.size.toDouble() / 1.0).let { _ -> (timeline?.audioMs ?: 0L) / 1000.0 * PEAKS_PER_SEC }.toInt())
+                val p = Waveform.peaks(samples, n)
+                act.runOnUiThread { if (peaksFor == f.path) peaks = p }
+            } catch (_: Throwable) { /* no wave: the timeline keeps its plain bar */ }
+        }
+    }
     fun setFx(id: Int, fx: com.auto.core.ClipFx) = edit { it.setFx(id, fx) }
     fun setTransition(id: Int, t: com.auto.core.TransitionSpec) = edit { it.setTransition(id, t) }
     /** One undo step for the whole loop. */
@@ -182,6 +203,16 @@ class AutoState(private val act: ComponentActivity) {
                     val f = unique(File(act.cacheDir, "replaced").apply { mkdirs() }, name)
                     act.contentResolver.openInputStream(u)!!.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
                     act.runOnUiThread { val id = selectedId; if (id != null) edit { it.replaceImage(id, f.path) }; status = "Picture replaced." }
+                    return@thread
+                }
+                if (mode == 5) {   // music file for the Audio sheet
+                    val u = uris.first(); val name = displayName(u)
+                    try {
+                        val f = unique(File(act.filesDir, "music").apply { mkdirs() }, name)
+                        act.contentResolver.openInputStream(u)!!.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+                        val sec = AudioDecoder.durationSec(f) ?: throw IllegalStateException("not an audio file")
+                        act.runOnUiThread { edit { it.setMix(it.mix.copy(music = MusicTrack(f.path, name, durationMs = (sec * 1000).toLong()))) }; status = "Music added: $name."; toast(status) }
+                    } catch (e: Exception) { act.runOnUiThread { status = "Music not added: ${e.message}"; toast(status) } }
                     return@thread
                 }
                 if (mode == 4) {   // caption file for the Captions sheet
@@ -280,7 +311,7 @@ class AutoState(private val act: ComponentActivity) {
                     release(); player = mp; analysis = a; narration = audioF; editor = ed
                     mp?.setOnCompletionListener { playMs = playEndMs(); playing = false }
                     selectedId = null; playMs = 0L; playing = false; warnings = msgs; busy = false
-                    sync(); jumpKey++
+                    sync(); jumpKey++; loadPeaks(audioF)
                     status = "${a.scenes.size} scenes ready."; sheet = null
                 }
             } catch (e: Exception) { act.runOnUiThread { busy = false; status = "Problem: ${e.message ?: e.toString()}" } }

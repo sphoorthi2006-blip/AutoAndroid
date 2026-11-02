@@ -9,7 +9,7 @@ OUT="$(mktemp -d)"
 mkdir -p /tmp/tt2 /tmp/tt3 /tmp/tt7
 cp testdata/timing/details.txt testdata/timing/script.txt testdata/timing/caps.srt /tmp/tt2/
 cp testdata/matching/scen.txt /tmp/tt3/
-"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt core/src/test/kotlin/Check13.kt core/src/test/kotlin/Check14.kt core/src/test/kotlin/Check15.kt core/src/test/kotlin/Check16.kt core/src/test/kotlin/Check17.kt core/src/test/kotlin/Check18.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
+"$KOTLINC" core/src/main/kotlin/com/auto/core/*.kt core/src/test/kotlin/Check4.kt core/src/test/kotlin/Check5.kt core/src/test/kotlin/Check6.kt core/src/test/kotlin/Check7.kt core/src/test/kotlin/Check8.kt core/src/test/kotlin/Check9.kt core/src/test/kotlin/Check10.kt core/src/test/kotlin/Check11.kt core/src/test/kotlin/Check12.kt core/src/test/kotlin/Check13.kt core/src/test/kotlin/Check14.kt core/src/test/kotlin/Check15.kt core/src/test/kotlin/Check16.kt core/src/test/kotlin/Check17.kt core/src/test/kotlin/Check18.kt core/src/test/kotlin/Check19.kt -d "$OUT" 2>&1 | grep -E "error" && exit 1 || true
 CP="$OUT:$(dirname "$(readlink -f "$(command -v "$KOTLINC")")")/../lib/kotlin-stdlib.jar"
 java -cp "$CP" Check4Kt > "$OUT/kt.out"
 sed 's/|None|/|null|/' testdata/matching/ref.out > "$OUT/ref.norm"

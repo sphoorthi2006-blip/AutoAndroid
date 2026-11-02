@@ -74,6 +74,7 @@ class AutoState(private val act: ComponentActivity) {
         if (id != null && e.current.clips.none { it.id == id }) selectedId = null
         val tid = selectedTextId
         if (tid != null && e.current.texts.none { it.id == tid }) selectedTextId = null
+        scheduleSave()
     }
     private fun edit(f: (Timeline) -> Timeline) {
         val e = editor ?: return
@@ -91,6 +92,74 @@ class AutoState(private val act: ComponentActivity) {
     }
     fun delete() { val id = selectedId ?: return; edit { it.delete(id, true) }; selectedId = null }
     /** Any length, no magnet: the scenes after this one move later/earlier, the narration stays as it is. */
+    // ---------- projects (step 36): saved in filesDir/projects through core ProjectStore ----------
+    private val store by lazy { ProjectStore(File(act.filesDir, "projects")) }
+    var projectId by mutableStateOf<String?>(null)
+    var projectName by mutableStateOf("")
+    var projects by mutableStateOf<List<ProjectSummary>>(emptyList())
+    private var manifest: ProjectManifest? = null
+    private var projectOpen = false                       // true when the timeline was opened from disk (no analysis object exists then)
+    private val copied = HashMap<String, String>()         // source path -> path inside the project (copy each file once)
+    private var saveGen = 0
+    private fun resetProject() { manifest = null; projectId = null; projectName = ""; copied.clear() }
+    fun refreshProjects() { thread { val l = try { store.summaries() } catch (_: Exception) { emptyList() }; act.runOnUiThread { projects = l } } }
+    private fun scheduleSave() {
+        if (timeline == null) return
+        val g = ++saveGen
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (g == saveGen) saveProject() }, 1500)
+    }
+    /** Writes manifest + timeline.json; copies the pictures, music and narration into the project once so it opens later without the temporary cache. */
+    fun saveProject(done: () -> Unit = {}) {
+        val tl = timeline ?: run { done(); return }
+        val prefs = ExportPrefs(resP, fps, aspect, captionsOn); val nar = narration; val nm = projectName
+        thread {
+            try {
+                val m = doSave(tl, prefs, nar, nm)
+                act.runOnUiThread { projectId = m.id; projectName = m.name; done() }
+            } catch (e: Exception) { act.runOnUiThread { status = "Could not save the project: ${e.message}"; done() } }
+        }
+    }
+    @Synchronized private fun doSave(tl: Timeline, prefs: ExportPrefs, nar: File?, nm: String): ProjectManifest {
+        var m = manifest ?: store.create(nm.ifBlank { "Project " + java.text.SimpleDateFormat("d MMM HH:mm", Locale.ROOT).format(java.util.Date()) })
+        val dir = store.dir(m.id).path
+        fun keep(p: String): String = copied.getOrPut(p) { val f = File(p); if (!f.exists() || f.path.startsWith(dir)) p else store.importFile(m.id, f).path }
+        var t2 = tl
+        for (c in tl.clips) c.image?.let { t2 = t2.replaceImage(c.id, keep(it)) }
+        tl.mix.music?.let { mu -> t2 = t2.setMix(t2.mix.copy(music = mu.copy(path = keep(mu.path)))) }
+        val inputs = if (nar != null) mapOf("audio" to listOf(File(keep(nar.path)).name)) else emptyMap()
+        m = store.saveWithPrefs(m.copy(inputs = inputs), t2, prefs); manifest = m
+        return m
+    }
+    fun openProject(id: String, done: () -> Unit) {
+        if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
+        thread {
+            try {
+                val lp = store.load(id)
+                val tl = lp.timeline ?: throw IllegalStateException("this project has no saved timeline: start a new project and press Analyse")
+                val nar = lp.manifest.inputs["audio"]?.firstOrNull()?.let { File(File(store.dir(id), "inputs"), it) }?.takeIf { it.exists() }
+                val mp = nar?.let { try { MediaPlayer().apply { setDataSource(it.path); prepare() } } catch (_: Exception) { null } }
+                val prefs = ExportPrefs.fromMap(lp.manifest.settings)
+                act.runOnUiThread {
+                    stopPlay(); release(); player = mp; narration = nar; analysis = null; projectOpen = true; editor = TimelineEditor(tl)
+                    manifest = lp.manifest; copied.clear(); projectId = id; projectName = lp.manifest.name
+                    resP = prefs.resP; fps = prefs.fps; aspect = prefs.aspect; captionsOn = prefs.captionsOn
+                    mp?.setOnCompletionListener { playMs = playEndMs(); playing = false }
+                    selectedId = null; selectedTextId = null; playMs = 0L; playing = false; warnings = lp.warnings; busy = false
+                    sync(); jumpKey++; loadPeaks(nar); status = "Opened \"${lp.manifest.name}\"."; sheet = null; done()
+                }
+            } catch (e: Exception) { act.runOnUiThread { say("Could not open the project: ${e.message}") } }
+        }
+    }
+    fun renameProject(id: String, name: String) {
+        thread {
+            try { val m = store.rename(id, name); act.runOnUiThread { if (id == projectId) { manifest = m; projectName = m.name }; refreshProjects() } }
+            catch (e: Exception) { act.runOnUiThread { say("Could not rename: ${e.message}") } }
+        }
+    }
+    fun deleteProject(id: String) {
+        val wasOpen = id == projectId
+        thread { try { store.delete(id) } catch (_: Exception) {}; act.runOnUiThread { if (wasOpen) newProject(); refreshProjects() } }
+    }
     // ---------- media library (step 35) ----------
     fun say(msg: String) { status = msg; toast(msg) }
     /** Everything the app has: project assets (pictures on the timeline, the music bed) and imported files (picked pictures, music, replaced pictures). Call off the main thread. */
@@ -337,7 +406,7 @@ class AutoState(private val act: ComponentActivity) {
                 val mp = audioF?.let { try { MediaPlayer().apply { setDataSource(it.path); prepare() } } catch (_: Exception) { null } }
                 val ed = TimelineEditor(Timeline.fromScenes(a.scenes, a.timing.duration))
                 act.runOnUiThread {
-                    release(); player = mp; analysis = a; narration = audioF; editor = ed
+                    release(); resetProject(); projectOpen = false; player = mp; analysis = a; narration = audioF; editor = ed
                     mp?.setOnCompletionListener { playMs = playEndMs(); playing = false }
                     selectedId = null; playMs = 0L; playing = false; warnings = msgs; busy = false
                     sync(); jumpKey++; loadPeaks(audioF)
@@ -355,7 +424,7 @@ class AutoState(private val act: ComponentActivity) {
         if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
         stopPlay(); release()
         inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
-        analysis = null; narration = null; editor = null
+        analysis = null; narration = null; editor = null; projectOpen = false; resetProject(); saveGen++
         timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
         status = "Choose your files in Inputs, then press Analyse."; sheet = "inputs"
         thread { for (d in tempDirs) File(act.cacheDir, d).deleteRecursively() }
@@ -366,7 +435,7 @@ class AutoState(private val act: ComponentActivity) {
         if (busy || exportPct != null) { toast("Wait until the current work has finished."); return }
         stopPlay(); release()
         inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
-        analysis = null; narration = null; editor = null
+        analysis = null; narration = null; editor = null; projectOpen = false; resetProject(); saveGen++
         timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
         status = "Choose your files in Inputs, then press Analyse."
         thread {
@@ -378,7 +447,7 @@ class AutoState(private val act: ComponentActivity) {
 
     // ---------- export (main thread) ----------
     fun export() {
-        if (analysis == null) return; val tl = timeline ?: return
+        if (analysis == null && !projectOpen) return; val tl = timeline ?: return
         if (exportPct != null) return
         val settings = try { ExportOptions.settings(Resolution.of(resP), aspect, fps) } catch (e: Exception) { status = "Export failed: ${e.message}"; return }
         exportPct = 0; status = "Exporting ${resP.let { if (it == 2160) "4K" else "${it}p" }} ${aspect.label} $fps fps..."; stopPlay()

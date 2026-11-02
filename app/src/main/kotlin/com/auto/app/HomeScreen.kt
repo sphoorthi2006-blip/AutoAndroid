@@ -66,7 +66,11 @@ fun HomeScreen(st: AutoState, shell: Shell) {
                 Box(Modifier.weight(1f)) { HomeButton("Import Project", primary = false, enabled = true) { st.sheet = "inputs"; shell.openEditor() } }
                 Box(Modifier.weight(1f)) { HomeButton("Continue Editing", primary = false, enabled = st.hasProject) { st.sheet = null; shell.openEditor() } }
             }
-            if (st.hasProject) Text("Recent project: ${st.timeline?.clips?.size ?: 0} scenes · ${fmt(st.playEndMs())}", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+            if (st.projects.isNotEmpty()) {
+                Text("Recent projects", color = C.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                for (p in st.projects.take(3)) Text("${p.name} · ${p.scenes} scenes · ${com.auto.core.RelativeTime.label(p.updatedMs, System.currentTimeMillis())}", color = if (p.hasTimeline) C.Text else C.Muted, fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = p.hasTimeline) { st.openProject(p.id) { shell.openEditor() } }.padding(vertical = 6.dp))
+            }
         }
         Spacer(Modifier.height(22.dp))
         Text("Quick shortcuts", color = C.Text, fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(bottom = 10.dp))

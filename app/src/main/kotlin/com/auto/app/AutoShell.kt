@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class Page(val glyph: String, val label: String) { Home("⌂", "Home"), Editor("✂", "Editor"), Settings("⚙", "Settings") }
+enum class Page(val glyph: String, val label: String) { Home("⌂", "Home"), Projects("▤", "Projects"), Editor("✂", "Editor"), Media("▣", "Media"), Settings("⚙", "Settings") }
 
 /** Which page is showing + the small "this is not built yet" dialog. The Editor page is full screen (it has its own bottom tabs), so the bar shows on Home and Settings only. */
 @Stable
@@ -42,17 +42,19 @@ class Shell {
 fun AutoShell(st: AutoState) {
     val shell = remember { Shell() }
     st.onHome = { shell.page = Page.Home }
+    androidx.compose.runtime.LaunchedEffect(Unit) { st.refreshProjects() }
     BackHandler(enabled = shell.page != Page.Home) { if (st.sheet != null) st.sheet = null else shell.page = Page.Home }
     Box(Modifier.fillMaxSize().background(C.Bg)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (shell.page) {
                     Page.Home -> HomeScreen(st, shell)
-                    Page.Editor -> EditorScreen(st)
+                    Page.Editor, Page.Media -> EditorScreen(st)
+                    Page.Projects -> ProjectsScreen(st, shell)
                     Page.Settings -> SettingsScreen(st, shell)
                 }
             }
-            if (shell.page != Page.Editor) NavBar(shell)
+            if (shell.page != Page.Editor) NavBar(st, shell)
         }
         shell.notice?.let { n ->
             AlertDialog(onDismissRequest = { shell.notice = null }, containerColor = C.Card, titleContentColor = C.Text, textContentColor = C.Muted,
@@ -63,11 +65,17 @@ fun AutoShell(st: AutoState) {
 }
 
 @Composable
-private fun NavBar(shell: Shell) {
+private fun NavBar(st: AutoState, shell: Shell) {
     Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().padding(vertical = 8.dp)) {
         for (p in Page.values()) {
             val on = shell.page == p
-            Column(Modifier.weight(1f).clickable { shell.page = p }.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.weight(1f).clickable {
+                when (p) {
+                    Page.Editor -> { if (!st.hasProject) st.sheet = "inputs"; shell.openEditor() }
+                    Page.Media -> { st.sheet = "pictures"; shell.openEditor() }
+                    else -> shell.page = p
+                }
+            }.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(p.glyph, color = if (on) C.Cyan else C.Muted, fontSize = 20.sp)
                 Text(p.label, color = if (on) C.Cyan else C.Muted, fontSize = 11.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
             }

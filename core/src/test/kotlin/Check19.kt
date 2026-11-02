@@ -39,5 +39,8 @@ fun main() {
     ok19("StyleLibrary: damaged text gives an empty library, same name replaces", StyleLibrary.parse("{{{").items.isEmpty() && lib.with("Mine", OverlayStyle()).items.size == 2 && lib.without("Mine").items.size == 1)
     ok19("hex colour field", ColorText.parse("#7C3AED") == 0xFF7C3AED.toInt() && ColorText.parse("zz") == null && ColorText.hex(0xFF7C3AED.toInt()) == "#7C3AED")
     ok19("every preset keeps animations legal and sizes in range", (StylePresets.text + StylePresets.caption).all { it.style == it.style.clamped() })
+    ok19("caption line: scene text without cues, cue text with cues", t.captionLineAt(100) == "a" && t.captionLineAt(6000) == "b" && !t.cuesDriveCaptions && c.captionLineAt(100) == "Hello there" && c.captionLineAt(9000) == null && c.cuesDriveCaptions)
+    val fs = t.captionsFromScenes()
+    ok19("captionsFromScenes: one cue per scene text, unchanged if cues exist", fs.captions.map { it.text } == listOf("a", "b") && fs.captions[1].startMs == 5000L && fs.captionsFromScenes() === fs && c.captionsFromScenes() === c)
     if (fails19 > 0) { println("FAILED $fails19"); System.exit(1) } else println("ALL PASS")
 }

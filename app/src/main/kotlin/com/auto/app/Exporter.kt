@@ -103,7 +103,7 @@ object Exporter {
             if (!g.fx.isIdentity || own.kind == TransitionKind.FADE || own.kind == TransitionKind.ZOOM || nextFade) list.add(ClipColor(g.fx, own, g.nextTransition, g.durMs))
             val effects = Effects(listOf(), list)
             val img = when {
-                g.image != null && captions && g.text.isNotBlank() -> captioned(ctx, work, k, g.image!!, g.text, s.width, s.height, plan.captionStyle).path   // captions switch ON
+                g.image != null && captions && g.text.isNotBlank() && plan.captions.isEmpty() -> captioned(ctx, work, k, g.image!!, g.text, s.width, s.height, plan.captionStyle).path   // captions switch ON
                 g.image != null -> g.image!!
                 g.text.isNotBlank() -> textScreen(work, k, if (g.heading) g.text.uppercase() else g.text, s.width, s.height).path    // a scene without a picture shows its text
                 else -> blank.path
@@ -126,7 +126,10 @@ object Exporter {
             sequences.add(EditedMediaItemSequence(listOf(item), m.loop))
         }
         // text overlays (with their animations) are drawn over the whole composition, so their times are video times
-        val compositionEffects = if (plan.texts.isEmpty()) Effects.EMPTY else Effects(listOf(), listOf(OverlayEffect(ImmutableList.of<TextureOverlay>(TextBitmapOverlay(ctx, s.width, s.height, plan.texts)))))
+        // caption CUES (imported / edited in the Captions sheet) are timed overlays with the caption style; without cues the scene text is burned into the pictures (above)
+        val cueTexts = if (captions) plan.captions.map { com.auto.core.TextClip(-it.id, it.startMs, it.endMs, it.text, plan.captionStyle) } else emptyList()
+        val overlayTexts = plan.texts + cueTexts
+        val compositionEffects = if (overlayTexts.isEmpty()) Effects.EMPTY else Effects(listOf(), listOf(OverlayEffect(ImmutableList.of<TextureOverlay>(TextBitmapOverlay(ctx, s.width, s.height, overlayTexts)))))
         val out = File(work, "auto_${System.currentTimeMillis()}.mp4")
         val handler = Handler(Looper.getMainLooper())
         val transformer = Transformer.Builder(ctx)

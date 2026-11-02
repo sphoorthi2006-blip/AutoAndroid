@@ -83,7 +83,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 
-private const val DP_PER_SEC = 60f
+const val DP_PER_SEC = 60f
 
 @Composable
 fun EditorScreen(st: AutoState) {
@@ -95,7 +95,7 @@ fun EditorScreen(st: AutoState) {
             Stage(st, Modifier.weight(1f))
             PlayRow(st)
             TimelineArea(st)
-            if (st.selectedId != null) ContextBar(st) else MainBar(st)
+            if (st.selectedTextId != null) TextBar(st) else if (st.selectedId != null) ContextBar(st) else MainBar(st)
         }
         SheetHost(st)
     }
@@ -140,11 +140,11 @@ private fun Stage(st: AutoState, modifier: Modifier) {
                 Text("Open Inputs to add your files", color = C.Muted, fontSize = 15.sp)
             } else if (b != null) {
                 Image(b, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                if (st.captionsOn && clip != null && clip.text.isNotBlank()) Text(clip.text, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis,
-                    style = TextStyle(shadow = Shadow(Color.Black, Offset(0f, 2f), 6f)), modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 24.dp, vertical = 14.dp))
+                // captions + text clips are drawn in PreviewOverlays (same renderer as the export)
             } else if (clip != null) {   // no picture: black screen with the scene's text (as in the exported video)
                 Text(if (clip.heading) clip.text.uppercase() else clip.text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp))
             }
+            if (tl != null) PreviewOverlays(st, showCaption = st.captionsOn && b != null)
         }
     }
 }
@@ -178,7 +178,7 @@ private fun TimelineArea(st: AutoState) {
     }
     LaunchedEffect(st.jumpKey) { if (!st.playing) scroll.scrollTo((st.playMs / 1000f * pxSec).toInt()) }
 
-    Box(Modifier.fillMaxWidth().height(224.dp).background(C.Bg).border(1.dp, C.Line)) {
+    Box(Modifier.fillMaxWidth().height(256.dp).background(C.Bg).border(1.dp, C.Line)) {
         if (tl == null) { Text("The timeline appears after Analyse", color = C.Muted, modifier = Modifier.align(Alignment.Center)); return@Box }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val half = maxWidth / 2
@@ -209,15 +209,17 @@ private fun TimelineArea(st: AutoState) {
                             Text(c.text, color = Color(0xFF04243A), fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Clip)
                         }
                     }
+                    // free text clips (Text Studio)
+                    for (tc in tl.texts) TextClipBox(tc, st, DP_PER_SEC)
                     // end of the narration: scenes after this line are not exported (the narration is never stretched)
                     if (st.hasNarration()) {
                         val endX = (tl.audioMs / 1000f * DP_PER_SEC).dp
                         if (total > tl.audioMs) Box(Modifier.offset(x = endX).width(((total - tl.audioMs) / 1000f * DP_PER_SEC).dp).fillMaxHeight().background(Color(0xAA060B1E)))
                         Box(Modifier.offset(x = endX).width(2.dp).fillMaxHeight().background(C.Pink))
-                        Text(if (total > tl.audioMs) "end of audio · scenes after it are not exported" else "end of audio", color = C.Pink, fontSize = 10.sp, maxLines = 1, softWrap = false, modifier = Modifier.offset(x = endX + 5.dp, y = 176.dp))
+                        Text(if (total > tl.audioMs) "end of audio · scenes after it are not exported" else "end of audio", color = C.Pink, fontSize = 10.sp, maxLines = 1, softWrap = false, modifier = Modifier.offset(x = endX + 5.dp, y = 210.dp))
                     }
                     // narration track (decorative wave: only the visible part is drawn)
-                    if (tl.audioMs > 0) Box(Modifier.offset(y = 128.dp).width((tl.audioMs / 1000f * DP_PER_SEC).dp).height(44.dp).clip(RoundedCornerShape(16.dp)).background(C.Wave)) {
+                    if (tl.audioMs > 0) Box(Modifier.offset(y = 162.dp).width((tl.audioMs / 1000f * DP_PER_SEC).dp).height(44.dp).clip(RoundedCornerShape(16.dp)).background(C.Wave)) {
                         Canvas(Modifier.fillMaxSize()) {
                             val from = scroll.value.toFloat() - 40f; val to = from + viewPx + 80f
                             var i = max(0, (from / 9f).toInt())
@@ -257,8 +259,22 @@ private fun MainBar(st: AutoState) {
         Tab("▦", "Scenes", st.sheet == "scenes") { st.sheet = "scenes" }
         Tab("▣", "Pictures", st.sheet == "pictures") { st.sheet = "pictures" }
         Tab("⚠", "Warnings", st.sheet == "warnings") { st.sheet = "warnings" }
-        Tab("CC", "Captions", st.captionsOn) { st.captionsOn = !st.captionsOn }
+        Tab("Aa", "Text", st.sheet == "text") { st.sheet = "text" }
+        Tab("▭", "Captions", st.sheet == "captions") { st.sheet = "captions" }
+        Tab("CC", if (st.captionsOn) "CC on" else "CC off", st.captionsOn) { st.captionsOn = !st.captionsOn }
         Tab("⬆", "Export", st.sheet == "export") { st.sheet = "export" }
+    }
+}
+
+@Composable
+private fun TextBar(st: AutoState) {
+    val id = st.selectedTextId ?: return
+    Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp)) {
+        Tab("✕", "Done", false) { st.selectText(null) }
+        Tab("Aa", "Edit", false) { st.sheet = "text" }
+        Tab("✂", "Split", false) { st.splitText(id) }
+        Tab("⧉", "Duplicate", false) { st.duplicateText(id) }
+        Tab("🗑", "Delete", false) { st.deleteText(id) }
     }
 }
 
@@ -306,13 +322,15 @@ private fun BoxScope.SheetHost(st: AutoState) {
                 "warnings" -> WarningsSheet(st)
                 "export" -> ExportSheet(st)
                 "length" -> LengthSheet(st)
+                "text" -> TextStudioSheet(st)
+                "captions" -> CaptionsSheet(st)
             }
         }
     }
 }
 
 @Composable
-private fun GlowButton(text: String, enabled: Boolean = true, outline: Boolean = false, onClick: () -> Unit) {
+fun GlowButton(text: String, enabled: Boolean = true, outline: Boolean = false, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Box(Modifier.fillMaxWidth().padding(bottom = 10.dp).then(if (!outline && enabled) Modifier.glow(C.Violet, 16.dp, shape) else Modifier)
         .clip(shape).then(if (outline) Modifier.border(1.dp, C.Line, shape) else Modifier.background(if (enabled) C.Glow else SolidColor(C.Lane)))
@@ -407,7 +425,7 @@ private fun WarningsSheet(st: AutoState) {
 }
 
 @Composable
-private fun OptionChip(label: String, on: Boolean, onClick: () -> Unit) {
+fun OptionChip(label: String, on: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Box(Modifier.padding(end = 8.dp, bottom = 8.dp).then(if (on) Modifier.glow(C.Cyan, 10.dp, shape) else Modifier).clip(shape).background(if (on) C.Cyan.copy(alpha = 0.15f) else Color.Transparent)
         .border(1.dp, if (on) C.Cyan else C.Line, shape).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -416,7 +434,7 @@ private fun OptionChip(label: String, on: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ToggleRow(label: String, on: Boolean, onToggle: () -> Unit) {
+fun ToggleRow(label: String, on: Boolean, onToggle: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(onClick = onToggle), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = C.Text, fontSize = 16.sp, modifier = Modifier.weight(1f))
         Box(Modifier.width(54.dp).height(30.dp).clip(RoundedCornerShape(50)).background(if (on) C.Glow else SolidColor(C.Lane)).padding(3.dp), contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart) {

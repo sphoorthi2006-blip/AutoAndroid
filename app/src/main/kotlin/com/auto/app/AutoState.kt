@@ -1,5 +1,6 @@
 package com.auto.app
 
+import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -30,7 +31,7 @@ class AutoState(private val act: ComponentActivity) {
     private var editor: TimelineEditor? = null
     private var player: MediaPlayer? = null
 
-    var pick: (Int) -> Unit = {}                 // 1 = files/ZIP, 2 = pictures, 3 = replace one picture (set by MainActivity)
+    var pick: (Int) -> Unit = {}                 // 1 = files/ZIP, 2 = pictures, 3 = replace one picture, 4 = caption file (set by MainActivity)
 
     var status by mutableStateOf("Choose your files in Inputs, then press Analyse.")
     var kinds by mutableStateOf(setOf<String>())  // which inputs are present: Timestamps, Audio, Pictures, Script
@@ -51,6 +52,10 @@ class AutoState(private val act: ComponentActivity) {
     var aspect by mutableStateOf(AspectRatio.R16_9)   // export shape: 16:9, 9:16, 1:1 or 4:5 (pictures are scaled to fit, black bars)
     var onHome: () -> Unit = {}                   // set by the shell: back to the Home page
     val hasProject get() = timeline != null
+    var selectedTextId by mutableStateOf<Int?>(null)   // the selected text clip (Text Studio); never set together with selectedId
+    var styleLib by mutableStateOf(StyleLibrary())     // styles the person saved (filesDir/styles.json)
+    private val styleFile get() = File(act.filesDir, "styles.json")
+    init { styleLib = try { if (styleFile.exists()) StyleLibrary.parse(styleFile.readText()) else StyleLibrary() } catch (e: Exception) { StyleLibrary() } }
 
     /** The whole timeline (scrubbing/editing): can be longer than the narration when a scene was extended. */
     fun totalMs(): Long { val t = timeline ?: return 0L; return max(t.audioMs, t.endMs) }
@@ -65,6 +70,8 @@ class AutoState(private val act: ComponentActivity) {
         timeline = e.current; canUndo = e.canUndo; canRedo = e.canRedo
         val id = selectedId
         if (id != null && e.current.clips.none { it.id == id }) selectedId = null
+        val tid = selectedTextId
+        if (tid != null && e.current.texts.none { it.id == tid }) selectedTextId = null
     }
     private fun edit(f: (Timeline) -> Timeline) {
         val e = editor ?: return
@@ -85,7 +92,7 @@ class AutoState(private val act: ComponentActivity) {
     fun setLength(ms: Long) { val id = selectedId ?: return; edit { it.setLength(id, ms) } }
     fun addLength(deltaMs: Long) { val c = selectedClip() ?: return; setLength(c.durMs + deltaMs) }
     fun selectClip(id: Int?) {
-        selectedId = id
+        selectedId = id; if (id != null) selectedTextId = null
         val c = id?.let { i -> timeline?.clips?.firstOrNull { it.id == i } } ?: return
         seekTo(c.startMs + 1); jumpKey++
     }
@@ -111,6 +118,54 @@ class AutoState(private val act: ComponentActivity) {
     }
     fun release() { try { player?.release() } catch (_: Exception) {}; player = null }
 
+    // ---------- Text Studio (steps 28-30): every change is ONE TimelineEditor edit, so undo/redo works ----------
+    fun selectedText(): TextClip? { val id = selectedTextId ?: return null; return timeline?.texts?.firstOrNull { it.id == id } }
+    fun selectText(id: Int?) {
+        selectedTextId = id; if (id == null) return
+        selectedId = null
+        selectedText()?.let { seekTo(it.startMs + 1); jumpKey++ }
+    }
+    /** New text at the playhead (3 s, Subtitle look), selected so Text Studio edits it right away. */
+    fun addText(style: OverlayStyle = StylePresets.byName("Subtitle") ?: OverlayStyle()) {
+        val t = timeline ?: return; val id = t.nextTextId
+        edit { it.addTextAt(playMs, "Your text", style) }
+        if (timeline?.texts?.any { it.id == id } == true) selectText(id)
+    }
+    fun editText(id: Int, text: String? = null, startMs: Long? = null, endMs: Long? = null, style: OverlayStyle? = null) = edit { it.editText(id, text, startMs, endMs, style) }
+    fun moveText(id: Int, startMs: Long) = edit { it.moveText(id, startMs) }
+    fun deleteText(id: Int) { edit { it.deleteText(id) }; selectedTextId = null }
+    fun duplicateText(id: Int) { val t = timeline ?: return; val n = t.nextTextId; edit { it.duplicateText(id) }; if (timeline?.texts?.any { it.id == n } == true) selectText(n) }
+    fun splitText(id: Int) {
+        val c = timeline?.texts?.firstOrNull { it.id == id } ?: return
+        if (playMs < c.startMs + Timeline.MIN_CLIP_MS || playMs > c.endMs - Timeline.MIN_CLIP_MS) { toast("Move the playhead inside the text first."); return }
+        edit { it.splitText(id, playMs) }
+    }
+    private fun saveLib(l: StyleLibrary) { styleLib = l; try { styleFile.writeText(l.toJson()) } catch (e: Exception) { toast("Could not save the style: ${e.message}") } }
+    fun saveStyle(name: String, s: OverlayStyle) { saveLib(styleLib.with(name, s)); toast("Style saved.") }
+    fun deleteSavedStyle(name: String) = saveLib(styleLib.without(name))
+
+    // ---------- Captions sheet (step 31) ----------
+    fun setCaptionStyle(s: OverlayStyle) = edit { it.setCaptionStyle(s) }
+    fun editCaption(id: Int, text: String? = null, startMs: Long? = null, endMs: Long? = null) = edit { it.editCaption(id, text, startMs, endMs) }
+    fun addCaption() = edit { it.addCaptionAt(playMs) }
+    fun deleteCaption(id: Int) = edit { it.deleteCaption(id) }
+    fun mergeCaption(id: Int) = edit { it.mergeCaptionWithNext(id) }
+    fun shiftCaptions(deltaMs: Long) = edit { it.shiftCaptions(deltaMs) }
+    fun clearCaptions() = edit { it.withCaptions(emptyList()) }
+    fun captionsFromScenes() = edit { it.captionsFromScenes() }
+    fun splitCaption(id: Int) {
+        val c = timeline?.captions?.firstOrNull { it.id == id } ?: return
+        if (playMs < c.startMs + Timeline.MIN_CLIP_MS || playMs > c.endMs - Timeline.MIN_CLIP_MS) { toast("Move the playhead inside the caption first."); return }
+        edit { it.splitCaption(id, playMs) }
+    }
+    /** Sends the cues as text (SRT or VTT) to any app the person picks (mail, notes, files...). */
+    fun shareCaptions(vtt: Boolean) {
+        val caps = timeline?.captions.orEmpty()
+        if (caps.isEmpty()) { toast("There are no caption cues yet. Tap From scenes or import a file."); return }
+        val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_SUBJECT, if (vtt) "captions.vtt" else "captions.srt"); putExtra(Intent.EXTRA_TEXT, if (vtt) CaptionTools.toVtt(caps) else CaptionTools.toSrt(caps)) }
+        try { act.startActivity(Intent.createChooser(i, "Share captions")) } catch (e: Exception) { toast("Could not share: ${e.message}") }
+    }
+
     // ---------- picking files ----------
     fun onPicked(mode: Int, uris: List<Uri>) {
         if (uris.isEmpty()) return
@@ -123,6 +178,15 @@ class AutoState(private val act: ComponentActivity) {
                     val f = unique(File(act.cacheDir, "replaced").apply { mkdirs() }, name)
                     act.contentResolver.openInputStream(u)!!.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
                     act.runOnUiThread { val id = selectedId; if (id != null) edit { it.replaceImage(id, f.path) }; status = "Picture replaced." }
+                    return@thread
+                }
+                if (mode == 4) {   // caption file for the Captions sheet
+                    val u = uris.first(); val name = displayName(u)
+                    try {
+                        val text = act.contentResolver.openInputStream(u)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+                        val caps = CaptionTools.parse(text, name)
+                        act.runOnUiThread { edit { it.withCaptions(caps) }; status = "${caps.size} captions imported from $name."; toast(status) }
+                    } catch (e: Exception) { act.runOnUiThread { status = "Captions not imported: ${e.message}"; toast(status) } }
                     return@thread
                 }
                 if (mode == 1) { inFiles.clear(); bundleZips.clear(); File(act.cacheDir, "in").deleteRecursively(); File(act.cacheDir, "bundle").deleteRecursively() }

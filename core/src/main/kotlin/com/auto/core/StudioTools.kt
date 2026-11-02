@@ -31,3 +31,15 @@ fun Timeline.captionAt(ms: Long): CaptionClip? = captions.firstOrNull { ms >= it
 /** Id of the text to select when the person taps at ms: the topmost (last started) one, or null. */
 fun Timeline.textIdAt(ms: Long): Int? = textsAt(ms).maxByOrNull { it.startMs }?.id
 fun Timeline.addCaptionAt(playMs: Long, durMs: Long = 2000L): Timeline { val s = playMs.coerceIn(0L, max(0L, spanMs - 500L)); return addCaption(s, min(s + durMs, max(s + Timeline.MIN_CLIP_MS, spanMs)), "New caption") }
+
+/** The caption line shown at ms: the timed caption cues when the project has any (imported / edited in the Captions sheet), otherwise the scene text of the picture on screen.
+ *  Preview and export use this one rule, so what is edited is what is burned in. */
+fun Timeline.captionLineAt(ms: Long): String? = if (captions.isNotEmpty()) captionAt(ms)?.text?.takeIf { it.isNotBlank() } else clips.firstOrNull { ms >= it.startMs && ms < it.endMs }?.text?.takeIf { it.isNotBlank() }
+val Timeline.cuesDriveCaptions get() = captions.isNotEmpty()
+
+/** One caption cue per scene that has text (start/end = the scene's), so the scene text can be edited/split/exported as captions. Does nothing to a project that already has cues. */
+fun Timeline.captionsFromScenes(): Timeline {
+    if (captions.isNotEmpty()) return this
+    val c = clips.filter { it.text.isNotBlank() && it.endMs > it.startMs }.sortedBy { it.startMs }.mapIndexed { k, s -> CaptionClip(k + 1, s.startMs, s.endMs, s.text.trim()) }
+    return withCaptions(c)
+}

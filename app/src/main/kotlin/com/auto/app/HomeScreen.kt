@@ -38,8 +38,8 @@ fun HomeScreen(st: AutoState, shell: Shell) {
     val shortcuts = listOf(
         Shortcut("＋", "New Project", true) { st.newProject(); shell.openEditor() },
         Shortcut("◎", "Auto Analyse", true) { st.sheet = "inputs"; shell.openEditor() },
-        Shortcut("Aa", "Text Studio", false) { shell.soon("Text Studio") },
-        Shortcut("▭", "Captions", false) { shell.soon("Captions editor") },
+        Shortcut("Aa", "Text Studio", true) { if (st.hasProject) { st.sheet = "text"; shell.openEditor() } else shell.message("Text Studio", "Add your files and press Analyse first. Text Studio edits the text of a project.") },
+        Shortcut("▭", "Captions", true) { if (st.hasProject) { st.sheet = "captions"; shell.openEditor() } else shell.message("Captions", "Add your files and press Analyse first. Captions belong to a project.") },
         Shortcut("▣", "Media Library", true) { st.sheet = if (st.hasProject) "pictures" else "inputs"; shell.openEditor() },
         Shortcut("♪", "Music & Audio", false) { shell.soon("Music & Audio studio") },
         Shortcut("✦", "Effects", false) { shell.soon("Effects and transitions") },

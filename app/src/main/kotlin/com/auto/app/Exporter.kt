@@ -693,13 +693,16 @@ object Exporter {
                 if (!g.fx.isIdentity || own.kind == TransitionKind.FADE || own.kind == TransitionKind.ZOOM || nextFade) list.add(ClipColor(g.fx, own, g.nextTransition, g.durMs))
                 val effects = Effects(listOf(), list)
                 val burnSceneCaption = captions && g.text.isNotBlank() && plan.captions.isEmpty()
+                // Local copies: `g` comes from another module, so Kotlin cannot smart-cast its properties.
+                val repl: Int? = g.replacementColor
+                val gImg: String? = g.image
                 val img = when {
-                    g.replacementColor != null -> {
-                        val capKey = "solid_${g.replacementColor}_${s.width}x${s.height}_${if (burnSceneCaption) g.text else ""}"
+                    repl != null -> {
+                        val capKey = "solid_${repl}_${s.width}x${s.height}_${if (burnSceneCaption) g.text else ""}"
                         preparedFrameCache.getOrPut(capKey) {
                             val sf = solidScreen(
                                 dir = work,
-                                argbColor = g.replacementColor,
+                                argbColor = repl,
                                 k = k,
                                 w = s.width,
                                 h = s.height,
@@ -711,15 +714,15 @@ object Exporter {
                             sf.path
                         }
                     }
-                    g.image != null && burnSceneCaption -> {
-                        val capKey = "cap_${g.image}_${s.width}x${s.height}_${usePngCaptions}_${g.text}"
+                    gImg != null && burnSceneCaption -> {
+                        val capKey = "cap_${gImg}_${s.width}x${s.height}_${usePngCaptions}_${g.text}"
                         preparedFrameCache.getOrPut(capKey) {
-                            val cf = captioned(ctx, work, k, g.image, g.text, s.width, s.height, plan.captionStyle, png = usePngCaptions)
-                            if (cf.path != g.image) currentTempFiles.add(cf)
+                            val cf = captioned(ctx, work, k, gImg, g.text, s.width, s.height, plan.captionStyle, png = usePngCaptions)
+                            if (cf.path != gImg) currentTempFiles.add(cf)
                             cf.path
                         }
                     }
-                    g.image != null -> g.image
+                    gImg != null -> gImg
                     g.text.isNotBlank() -> {
                         val dispText = if (g.heading) g.text.uppercase() else g.text
                         val capKey = "text_${s.width}x${s.height}_$dispText"

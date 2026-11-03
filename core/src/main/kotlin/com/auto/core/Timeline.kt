@@ -4,8 +4,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 /** One picture on the image track. All times are integer milliseconds (no floating-point drift while editing). */
-data class ImageClip(val id: Int, val sceneNum: Int, val image: String?, val startMs: Long, val endMs: Long, val text: String = "", val conf: String = "", val heading: Boolean = false, val score: Int = 100, val cutCheck: Boolean = false, val fx: ClipFx = ClipFx(), val transition: TransitionSpec = TransitionSpec()) {
+data class ImageClip(val id: Int, val sceneNum: Int, val image: String?, val startMs: Long, val endMs: Long, val text: String = "", val conf: String = "", val heading: Boolean = false, val score: Int = 100, val cutCheck: Boolean = false, val fx: ClipFx = ClipFx(), val transition: TransitionSpec = TransitionSpec(), val originalImage: String? = null, val replacementImage: String? = null) {
     val durMs get() = endMs - startMs
+    val hasReplacement get() = replacementImage != null
 }
 
 /** A free text on the text track (Text Studio). Its look is a full OverlayStyle; its position is part of the style (x, y as frame fractions). */
@@ -98,7 +99,20 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
         return withClips(clips.filter { it.id != id }.map { if (closeGap && it.startMs >= c.endMs) it.copy(startMs = it.startMs - c.durMs, endMs = it.endMs - c.durMs) else it })
     }
 
-    fun replaceImage(id: Int, path: String?) = replace(clip(id).copy(image = path))
+    fun replaceImage(id: Int, path: String?): Timeline {
+        val c = clip(id)
+        val orig = c.originalImage ?: c.image
+        return replace(c.copy(image = path, originalImage = orig, replacementImage = path))
+    }
+    fun deleteReplacement(id: Int): Timeline {
+        val c = clip(id)
+        val orig = c.originalImage ?: c.image
+        return replace(c.copy(image = orig, originalImage = null, replacementImage = null))
+    }
+    fun replaceClipImages(id: Int, image: String?, originalImage: String?, replacementImage: String?): Timeline {
+        val c = clip(id)
+        return replace(c.copy(image = image, originalImage = originalImage, replacementImage = replacementImage))
+    }
     fun editCaption(id: Int, text: String? = null, startMs: Long? = null, endMs: Long? = null): Timeline {
         val c = captions.firstOrNull { it.id == id } ?: throw IllegalArgumentException("No caption with id $id")
         val s = startMs ?: c.startMs; val e = max(endMs ?: c.endMs, s + 1)
@@ -167,7 +181,7 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
     private fun q(s: String) = buildString { append('"'); for (ch in s) when { ch == '"' -> append("\\\""); ch == '\\' -> append("\\\\"); ch == '\n' -> append("\\n"); ch == '\r' -> append("\\r"); ch == '\t' -> append("\\t"); ch < ' ' -> append(String.format("\\u%04x", ch.code)); else -> append(ch) }; append('"') }
     fun toJson(): String = buildString {
         append("{\"version\":1,\"audioMs\":$audioMs,\"nextId\":$nextId,\"clips\":[")
-        append(clips.joinToString(",") { "{\"id\":${it.id},\"scene\":${it.sceneNum},\"image\":${it.image?.let(::q) ?: "null"},\"start\":${it.startMs},\"end\":${it.endMs},\"text\":${q(it.text)},\"conf\":${q(it.conf)},\"heading\":${it.heading},\"score\":${it.score},\"cutCheck\":${it.cutCheck}${if (it.fx.isIdentity) "" else ",\"fx\":" + it.fx.toJson()}${if (it.transition.active) ",\"transition\":" + it.transition.toJson() else ""}}" })
+        append(clips.joinToString(",") { "{\"id\":${it.id},\"scene\":${it.sceneNum},\"image\":${it.image?.let(::q) ?: "null"},\"start\":${it.startMs},\"end\":${it.endMs},\"text\":${q(it.text)},\"conf\":${q(it.conf)},\"heading\":${it.heading},\"score\":${it.score},\"cutCheck\":${it.cutCheck}${if (it.fx.isIdentity) "" else ",\"fx\":" + it.fx.toJson()}${if (it.transition.active) ",\"transition\":" + it.transition.toJson() else ""}${if (it.originalImage != null) ",\"originalImage\":" + q(it.originalImage) else ""}${if (it.replacementImage != null) ",\"replacementImage\":" + q(it.replacementImage) else ""}}" })
         append("],\"captions\":[")
         append(captions.joinToString(",") { "{\"id\":${it.id},\"start\":${it.startMs},\"end\":${it.endMs},\"text\":${q(it.text)}}" })
         append("],\"texts\":[")
@@ -181,7 +195,7 @@ data class Timeline(val audioMs: Long, val clips: List<ImageClip>, val captions:
             val root = try { MiniJson(text).parse() as? Map<*, *> } catch (e: Exception) { null } ?: throw PipelineError("The project file is damaged (not valid JSON).")
             if (n(root, "version") != 1L) throw PipelineError("Unsupported project file version ${n(root, "version")}.")
             val clips = (root["clips"] as? List<*> ?: throw PipelineError("Project file has no clips.")).map { c ->
-                c as Map<*, *>; ImageClip(n(c, "id").toInt(), n(c, "scene").toInt(), c["image"] as? String, n(c, "start"), n(c, "end"), c["text"] as? String ?: "", c["conf"] as? String ?: "", c["heading"] as? Boolean ?: false, (c["score"] as? Double)?.toInt() ?: 100, c["cutCheck"] as? Boolean ?: false, ClipFx.fromMap(c["fx"] as? Map<*, *>), TransitionSpec.fromMap(c["transition"] as? Map<*, *>))
+                c as Map<*, *>; ImageClip(n(c, "id").toInt(), n(c, "scene").toInt(), c["image"] as? String, n(c, "start"), n(c, "end"), c["text"] as? String ?: "", c["conf"] as? String ?: "", c["heading"] as? Boolean ?: false, (c["score"] as? Double)?.toInt() ?: 100, c["cutCheck"] as? Boolean ?: false, ClipFx.fromMap(c["fx"] as? Map<*, *>), TransitionSpec.fromMap(c["transition"] as? Map<*, *>), c["originalImage"] as? String, c["replacementImage"] as? String)
             }
             val caps = (root["captions"] as? List<*> ?: emptyList<Any>()).map { c -> c as Map<*, *>; CaptionClip(n(c, "id").toInt(), n(c, "start"), n(c, "end"), c["text"] as? String ?: "") }
             val texts = (root["texts"] as? List<*> ?: emptyList<Any>()).mapNotNull { c -> (c as? Map<*, *>)?.let { TextClip(n(it, "id").toInt(), n(it, "start"), n(it, "end"), it["text"] as? String ?: "", OverlayStyle.fromMap(it["style"] as? Map<*, *> ?: emptyMap<String, Any>())) } }

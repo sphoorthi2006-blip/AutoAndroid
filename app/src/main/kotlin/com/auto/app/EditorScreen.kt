@@ -78,7 +78,10 @@ import com.auto.core.IntermediateFormat
 import com.auto.core.RenderCaps
 import com.auto.core.Resolution
 import com.auto.core.ImageClip
+import com.auto.core.MediaAsset
+import com.auto.core.MediaKind
 import com.auto.core.TimeText
+import java.util.Locale
 import com.auto.core.UpscaleFactor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -219,6 +222,11 @@ private fun TimelineArea(st: AutoState) {
                             .clickable { st.selectClip(c.id) }) {
                             Thumb(c.image, Modifier.fillMaxSize())
                             Text("${c.sceneNum}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.padding(6.dp))
+                            if (c.hasReplacement) {
+                                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(C.Violet.copy(alpha = 0.9f)).padding(horizontal = 4.dp, vertical = 2.dp)) {
+                                    Text("REPL", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                     // text track
@@ -299,6 +307,7 @@ private fun TextBar(st: AutoState) {
 
 @Composable
 private fun ContextBar(st: AutoState) {
+    val clip = st.selectedClip()
     Row(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 6.dp)) {
         Tab("close", "Done", false) { st.selectedId = null }
         Tab("split", "Split", false) { st.split() }
@@ -306,7 +315,10 @@ private fun ContextBar(st: AutoState) {
         Tab("plus", "+1 s", false) { st.addLength(1000) }
         Tab("length", "Length", false) { st.sheet = "length" }
         Tab("effects", "Effects", st.sheet == "effects") { st.sheet = "effects" }
-        Tab("replace", "Replace", false) { st.pick(3) }
+        Tab("replace", "Replace", st.sheet == "replace") { st.openReplace() }
+        if (clip?.hasReplacement == true) {
+            Tab("delete", "Delete Replacement", false) { st.deleteReplacement() }
+        }
         Tab("delete", "Delete", false) { st.delete() }
     }
 }
@@ -346,6 +358,7 @@ private fun BoxScope.SheetHost(st: AutoState, wide: Boolean) {
                 "captions" -> CaptionsSheet(st)
                 "effects" -> EffectsSheet(st)
                 "audio" -> AudioSheet(st)
+                "replace" -> ReplaceSheet(st)
             }
         }
     }
@@ -552,4 +565,212 @@ private fun InputsSheet(st: AutoState) {
 @Composable
 private fun WarningsSheet(st: AutoState) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { StageChip(st); AnalysisCards(st); WarningsSheetBody(st) }
+}
+
+@Composable
+private fun ReplaceSheet(st: AutoState) {
+    val clip = st.selectedClip()
+    if (clip == null) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("No scene selected", color = C.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Select a scene on the timeline to replace its image.", color = C.Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
+            GlowButton("Close") { st.sheet = null }
+        }
+        return
+    }
+
+    val origPath = clip.originalImage ?: clip.image
+    val pendingPath = st.pendingReplacementPath
+    val activeReplacementPath = clip.replacementImage
+    val displayedOverlayPath = pendingPath ?: activeReplacementPath
+
+    val origBmp by produceState<ImageBitmap?>(null, origPath) {
+        value = origPath?.let { p -> withContext(Dispatchers.IO) { Pics.load(p, 900) } }
+    }
+    val replBmp by produceState<ImageBitmap?>(null, displayedOverlayPath) {
+        value = displayedOverlayPath?.let { p -> withContext(Dispatchers.IO) { Pics.load(p, 900) } }
+    }
+
+    var query by remember { mutableStateOf("") }
+    var mediaList by remember { mutableStateOf<List<MediaAsset>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        val all = withContext(Dispatchers.IO) { st.scanMedia().filter { it.kind == MediaKind.IMAGE } }
+        mediaList = all
+    }
+
+    val shownMedia = remember(mediaList, query) {
+        if (query.isBlank()) mediaList
+        else mediaList.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        // Title & scene info header
+        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Replace Scene ${clip.sceneNum}", color = C.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    if (clip.hasReplacement) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.clip(RoundedCornerShape(4.dp)).background(C.Violet).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                            Text("Replaced", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                val durSec = String.format(Locale.ROOT, "%.2f", clip.durMs / 1000f)
+                Text("${fmt(clip.startMs)} – ${fmt(clip.endMs)} (${durSec}s) · Duration preserved", color = C.Cyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Box(Modifier.size(36.dp).clip(CircleShape).background(C.Lane).clickable { st.cancelReplace() }, contentAlignment = Alignment.Center) {
+                AutoIcon("close", C.Muted, 18.dp)
+            }
+        }
+
+        // Preview Area with Non-Destructive Overlay
+        val previewShape = RoundedCornerShape(16.dp)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 140.dp, max = 210.dp)
+                .aspectRatio(st.aspect.ratio.coerceIn(0.5f, 2.2f))
+                .align(Alignment.CenterHorizontally)
+                .glow(C.Violet, 12.dp, previewShape)
+                .clip(previewShape)
+                .background(C.Screen)
+                .border(1.dp, C.Cyan.copy(alpha = 0.4f), previewShape),
+            contentAlignment = Alignment.Center
+        ) {
+            // Base layer: Original scene image
+            val ob = origBmp
+            if (ob != null) {
+                Image(ob, contentDescription = "Original scene image", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            } else if (clip.text.isNotBlank()) {
+                Text(if (clip.heading) clip.text.uppercase() else clip.text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(16.dp))
+            } else {
+                Text("No original image", color = C.Muted, fontSize = 14.sp)
+            }
+
+            // Overlay layer: Replacement image
+            val rb = replBmp
+            if (rb != null) {
+                Image(rb, contentDescription = "Replacement image overlay", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (pendingPath != null) C.Cyan.copy(alpha = 0.9f) else C.Violet.copy(alpha = 0.9f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        if (pendingPath != null) "New Replacement Overlay" else "Current Replacement Overlay",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.65f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("Original Image", color = Color.White, fontSize = 11.sp)
+                }
+            }
+        }
+
+        // Action controls
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(Modifier.weight(1f)) {
+                GlowButton("Cancel", outline = true) { st.cancelReplace() }
+            }
+            if (clip.hasReplacement) {
+                Box(Modifier.weight(1.2f)) {
+                    GlowButton("Delete Replacement", outline = true) {
+                        st.deleteReplacement(clip.id)
+                    }
+                }
+            }
+            Box(Modifier.weight(1f)) {
+                GlowButton("Confirm", enabled = pendingPath != null) {
+                    if (pendingPath != null) st.confirmReplacement(clip.id, pendingPath)
+                }
+            }
+        }
+
+        // In-app media library selection
+        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Select from Media Library", color = C.Text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text("${shownMedia.size} images", color = C.Muted, fontSize = 12.sp)
+        }
+        SearchBox(query, "Search images by name") { query = it }
+
+        if (shownMedia.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f).padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    if (mediaList.isEmpty()) "No images in the media library.\nAdd pictures via Inputs tab to use them for replacement."
+                    else if (query.isNotBlank()) "No images match \"$query\"."
+                    else "No images available.", 
+                    color = C.Muted,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                GridCells.Fixed(3),
+                Modifier.weight(1f).padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(shownMedia, key = { it.path }) { asset ->
+                    val isSelected = asset.path == (pendingPath ?: if (pendingPath == null && clip.replacementImage == asset.path) clip.replacementImage else null)
+                    val cardShape = RoundedCornerShape(12.dp)
+                    Box(
+                        Modifier
+                            .aspectRatio(1f)
+                            .clip(cardShape)
+                            .background(C.Lane)
+                            .border(if (isSelected) 2.dp else 1.dp, if (isSelected) C.Cyan else C.Line, cardShape)
+                            .clickable {
+                                st.pendingReplacementPath = asset.path
+                            }
+                    ) {
+                        Thumb(asset.path, Modifier.fillMaxSize())
+                        if (isSelected) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(C.Cyan),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AutoIcon("check", Color.White, 14.dp)
+                            }
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .background(Color(0xCC000000))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(asset.name, color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

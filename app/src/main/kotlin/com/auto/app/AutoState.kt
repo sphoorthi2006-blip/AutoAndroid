@@ -47,6 +47,7 @@ class AutoState(private val act: ComponentActivity) {
     var playing by mutableStateOf(false)
     var selectedId by mutableStateOf<Int?>(null)
     var sheet by mutableStateOf<String?>("inputs")
+    var pendingReplacementPath by mutableStateOf<String?>(null)
     var exportPct by mutableStateOf<Int?>(null)
     var jumpKey by mutableIntStateOf(0)           // bumped when the timeline must scroll to playMs
     var captionsOn by mutableStateOf(true)        // captions switch: shown over the pictures in the preview AND burned into the exported video
@@ -99,6 +100,29 @@ class AutoState(private val act: ComponentActivity) {
     /** Where playing and the exported video stop: the end of the narration (picture edits never change it); without narration, the last picture. */
     fun playEndMs(): Long { val t = timeline ?: return 0L; return if (narration != null) t.audioMs else max(t.audioMs, t.endMs) }
     fun selectedClip(): ImageClip? { val id = selectedId ?: return null; return timeline?.clips?.firstOrNull { it.id == id } }
+    fun openReplace() {
+        val clip = selectedClip() ?: return
+        pendingReplacementPath = null
+        sheet = "replace"
+    }
+    fun cancelReplace() {
+        pendingReplacementPath = null
+        sheet = null
+    }
+    fun confirmReplacement(id: Int, path: String) {
+        edit { it.replaceImage(id, path) }
+        pendingReplacementPath = null
+        sheet = null
+        status = "Picture replaced non-destructively."
+        toast(status)
+    }
+    fun deleteReplacement(id: Int? = selectedId) {
+        if (id == null) return
+        edit { it.deleteReplacement(id) }
+        pendingReplacementPath = null
+        status = "Replacement removed. Original restored."
+        toast(status)
+    }
 
     // ---------- timeline edits ----------
     private fun sync() {
@@ -175,7 +199,14 @@ class AutoState(private val act: ComponentActivity) {
         val dir = store.dir(m.id).path
         fun keep(p: String): String = copied.getOrPut(p) { val f = File(p); if (!f.exists() || f.path.startsWith(dir)) p else store.importFile(m.id, f).path }
         var t2 = tl
-        for (c in tl.clips) c.image?.let { t2 = t2.replaceImage(c.id, keep(it)) }
+        for (c in tl.clips) {
+            val img = c.image?.let { keep(it) }
+            val orig = c.originalImage?.let { keep(it) }
+            val repl = c.replacementImage?.let { keep(it) }
+            if (img != c.image || orig != c.originalImage || repl != c.replacementImage) {
+                t2 = t2.replaceClipImages(c.id, img, orig, repl)
+            }
+        }
         tl.mix.music?.let { mu -> t2 = t2.setMix(t2.mix.copy(music = mu.copy(path = keep(mu.path)))) }
         val inputs = if (nar != null) mapOf("audio" to listOf(File(keep(nar.path)).name)) else emptyMap()
         m = store.saveWithPrefs(m.copy(inputs = inputs), t2, prefs); manifest = m
@@ -222,11 +253,19 @@ class AutoState(private val act: ComponentActivity) {
             if (!f.isFile) return
             out[f.path] = MediaAsset(f.path, f.name, MediaLibrary.classify(f.name), f.length(), f.lastModified(), origin)
         }
-        for (d in listOf(File(act.cacheDir, "Pictures"), File(act.cacheDir, "replaced"), File(act.cacheDir, "in"), File(act.filesDir, "music")))
+        for (d in listOf(File(act.cacheDir, "Pictures"), File(act.cacheDir, "replaced"), File(act.cacheDir, "in"), File(act.cacheDir, "work"), File(act.filesDir, "music")))
             d.listFiles()?.forEach { add(it, MediaOrigin.IMPORTED) }
+        manifest?.let { m ->
+            File(store.dir(m.id), "inputs").listFiles()?.forEach { add(it, MediaOrigin.PROJECT) }
+        }
         val tl = timeline
-        tl?.clips?.mapNotNull { it.image }?.distinct()?.forEach { add(File(it), MediaOrigin.PROJECT) }
+        tl?.clips?.forEach { c ->
+            c.image?.let { add(File(it), MediaOrigin.PROJECT) }
+            c.originalImage?.let { add(File(it), MediaOrigin.PROJECT) }
+            c.replacementImage?.let { add(File(it), MediaOrigin.PROJECT) }
+        }
         tl?.mix?.music?.let { add(File(it.path), MediaOrigin.PROJECT) }
+        pics.forEach { add(it, MediaOrigin.IMPORTED) }
         return out.values.toList()
     }
     /** Pictures replace the picture of the selected scene (one at a time); audio becomes the music bed. */
@@ -512,7 +551,7 @@ class AutoState(private val act: ComponentActivity) {
         stopPlay(); release()
         inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
         analysis = null; narration = null; editor = null; projectOpen = false; resetProject(); saveGen++
-        timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
+        timeline = null; canUndo = false; canRedo = false; selectedId = null; pendingReplacementPath = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
         status = "Choose your files in Inputs, then press Analyse."; sheet = "inputs"
         thread { for (d in tempDirs) File(act.cacheDir, d).deleteRecursively() }
     }
@@ -523,7 +562,7 @@ class AutoState(private val act: ComponentActivity) {
         stopPlay(); release()
         inFiles.clear(); zips.clear(); bundleZips.clear(); pics.clear()
         analysis = null; narration = null; editor = null; projectOpen = false; resetProject(); saveGen++
-        timeline = null; canUndo = false; canRedo = false; selectedId = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
+        timeline = null; canUndo = false; canRedo = false; selectedId = null; pendingReplacementPath = null; playMs = 0L; warnings = emptyList(); kinds = emptySet()
         status = "Choose your files in Inputs, then press Analyse."
         thread {
             val n = tempDirs.sumOf { d -> File(act.cacheDir, d).walkTopDown().filter { it.isFile }.sumOf { it.length() } }

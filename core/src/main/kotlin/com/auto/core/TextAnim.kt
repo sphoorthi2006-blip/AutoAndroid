@@ -1,12 +1,10 @@
 package com.auto.core
 
-import kotlin.math.PI
+import java.text.BreakIterator
+import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sin
 
 /** Animations a text can have when it appears (in) or leaves (out). Only kinds with allowedIn/allowedOut = true are offered for that slot. */
 enum class AnimKind(val label: String, val allowedIn: Boolean, val allowedOut: Boolean) {
@@ -56,12 +54,65 @@ object AnimMath {
         if (inMs > 0 && tMs < inMs) return entering(s.animIn, tMs.toFloat() / inMs)
         return AnimFrame.REST
     }
-    /** Letters visible for a typewriter frame (never cuts a surrogate pair in half). */
+
+    /** True if codePoint is an Indic Virama / Halant (Devanagari U+094D, Telugu U+0C4D, Malayalam U+0D4D) or ZWJ/ZWNJ. */
+    private fun isConjoiningLinker(cp: Int): Boolean =
+        cp == 0x094D || cp == 0x0C4D || cp == 0x0D4D || cp == 0x200D || cp == 0x200C
+
+    /** True if codePoint is an Indic dependent vowel sign (matra), anusvara, visarga, nukta, or Unicode combining mark. */
+    private fun isDependentMark(cp: Int): Boolean {
+        val type = Character.getType(cp)
+        if (type == Character.NON_SPACING_MARK.toInt() ||
+            type == Character.COMBINING_SPACING_MARK.toInt() ||
+            type == Character.ENCLOSING_MARK.toInt()
+        ) return true
+        return cp in 0x0900..0x0903 || cp in 0x093A..0x094F || cp in 0x0951..0x0957 || cp in 0x0962..0x0963 ||
+            cp in 0x0C00..0x0C04 || cp in 0x0C3E..0x0C56 || cp in 0x0C62..0x0C63 ||
+            cp in 0x0D00..0x0D03 || cp in 0x0D3B..0x0D4E || cp in 0x0D57..0x0D57 || cp in 0x0D62..0x0D63
+    }
+
+    /**
+     * Computes grapheme-cluster / Indic-akshara end offsets in `text`.
+     * Never splits surrogate pairs, combining marks, or Indic conjunct syllables (C + Virama + C + Matra).
+     */
+    fun graphemeEnds(text: String): IntArray {
+        if (text.isEmpty()) return IntArray(0)
+        val raw = ArrayList<Int>()
+        val bi = BreakIterator.getCharacterInstance(Locale.ROOT)
+        bi.setText(text)
+        var b = bi.next()
+        while (b != BreakIterator.DONE) {
+            raw.add(b)
+            b = bi.next()
+        }
+        // Merge boundaries where the previous cluster ends with a Virama/ZWJ or the next starts with a dependent mark
+        val merged = ArrayList<Int>(raw.size)
+        for (endIdx in raw) {
+            if (endIdx < text.length) {
+                val prevCp = Character.codePointBefore(text, endIdx)
+                val nextCp = Character.codePointAt(text, endIdx)
+                if (isConjoiningLinker(prevCp) || isConjoiningLinker(nextCp) || isDependentMark(nextCp)) {
+                    continue
+                }
+            }
+            merged.add(endIdx)
+        }
+        if (merged.isEmpty() || merged.last() != text.length) merged.add(text.length)
+        return merged.toIntArray()
+    }
+
+    /**
+     * Phase 2 (Section 11): Grapheme-safe typewriter animation.
+     * Steps by whole grapheme clusters / Indic aksharas so surrogate pairs, combining marks,
+     * and Devanagari/Telugu/Malayalam conjuncts are never cut mid-cluster.
+     */
     fun visibleText(text: String, f: AnimFrame): String {
         if (f.visibleChars >= 1f) return text
-        var n = (text.length * f.visibleChars).toInt().coerceIn(0, text.length)
-        if (n in 1 until text.length && Character.isHighSurrogate(text[n - 1])) n--
-        return text.substring(0, n)
+        if (f.visibleChars <= 0f || text.isEmpty()) return ""
+        val ends = graphemeEnds(text)
+        if (ends.isEmpty()) return ""
+        val k = (ends.size * f.visibleChars).toInt().coerceIn(0, ends.size)
+        return if (k == 0) "" else text.substring(0, ends[k - 1])
     }
 }
 

@@ -5,11 +5,33 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
+/** Project origin/type (Section 9): Auto Create generated project vs Manual Editor / Blank project. */
+enum class ProjectType(val label: String) {
+    AUTO_CREATE("Auto Create"),
+    MANUAL("Manual Editor");
+
+    companion object {
+        fun fromString(raw: String?): ProjectType =
+            values().firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: AUTO_CREATE
+    }
+}
+
 /** One project on disk. inputs: role ("audio","script","captions","details","pictures"...) -> file name inside <project>/inputs. */
-data class ProjectManifest(val id: String, val name: String, val createdMs: Long, val updatedMs: Long, val inputs: Map<String, List<String>> = emptyMap(), val settings: Map<String, String> = emptyMap()) {
+data class ProjectManifest(
+    val id: String,
+    val name: String,
+    val createdMs: Long,
+    val updatedMs: Long,
+    val inputs: Map<String, List<String>> = emptyMap(),
+    val settings: Map<String, String> = emptyMap()
+) {
+    val projectType: ProjectType get() = ProjectType.fromString(settings["project.type"])
+    val parentProjectId: String? get() = settings["project.parentId"]
+
     fun toJson() = "{\"version\":1,\"id\":${jsonQuote(id)},\"name\":${jsonQuote(name)},\"created\":$createdMs,\"updated\":$updatedMs,\"inputs\":{" +
         inputs.entries.joinToString(",") { (k, v) -> "${jsonQuote(k)}:[${v.joinToString(",") { jsonQuote(it) }}]" } + "},\"settings\":{" +
         settings.entries.joinToString(",") { (k, v) -> "${jsonQuote(k)}:${jsonQuote(v)}" } + "}}"
+
     companion object {
         fun parse(text: String): ProjectManifest {
             val m = try { MiniJson(text).parse() as? Map<*, *> } catch (e: Exception) { null } ?: throw PipelineError("Project manifest is damaged.")
@@ -24,20 +46,24 @@ data class ProjectManifest(val id: String, val name: String, val createdMs: Long
 class LoadedProject(val manifest: ProjectManifest, val timeline: Timeline?, val warnings: List<String>)
 
 /**
- * Step 7. Folder per project below `root`:  <id>/manifest.json, <id>/timeline.json (+ .bak of the previous good copy), <id>/inputs/, <id>/work/ (temp, safe to delete).
+ * Step 7 & Phase 6 (Sections 9, 17). Folder per project below `root`:
+ * <id>/manifest.json, <id>/timeline.json (+ .bak of the previous good copy), <id>/inputs/, <id>/work/ (temp, safe to delete).
  * Writes are atomic (temp file, flush to disk, rename), so a crash or killed process leaves either the old or the new file, never half of one.
- * If the current file is unreadable, load() falls back to the .bak copy and says so in `warnings` instead of silently losing the project.
+ * Supports non-destructive `duplicate()` (Save As / Edit a Copy) which clones manifest, timeline, settings, and input references without mutating the original project.
  */
 class ProjectStore(val root: File, private val clock: () -> Long = System::currentTimeMillis) {
     init { root.mkdirs() }
     fun dir(id: String) = File(root, safeId(id))
     private fun safeId(id: String): String { require(id.isNotEmpty() && id.all { it.isLetterOrDigit() || it == '-' || it == '_' }) { "Bad project id" }; return id }
 
-    fun create(name: String): ProjectManifest {
+    fun create(name: String, type: ProjectType = ProjectType.AUTO_CREATE): ProjectManifest {
         val now = clock(); var id = "p$now"; var k = 1
         while (File(root, id).exists()) id = "p$now-${k++}"
         File(dir(id), "inputs").mkdirs(); File(dir(id), "work").mkdirs()
-        return ProjectManifest(id, name.ifBlank { "Untitled" }, now, now).also { writeAtomic(File(dir(id), "manifest.json"), it.toJson()) }
+        val settings = if (type == ProjectType.AUTO_CREATE) emptyMap() else mapOf("project.type" to type.name)
+        return ProjectManifest(id, name.ifBlank { "Untitled" }, now, now, emptyMap(), settings).also {
+            writeAtomic(File(dir(id), "manifest.json"), it.toJson())
+        }
     }
 
     /** Copy a user file into the project (once), so later steps never depend on a temporary URI/cache path. Returns the stored file. */
@@ -52,6 +78,71 @@ class ProjectStore(val root: File, private val clock: () -> Long = System::curre
         val m = manifest.copy(updatedMs = clock())
         if (timeline != null) writeAtomic(File(dir(m.id), "timeline.json"), timeline.toJson()) { Timeline.Json.parse(it) }
         writeAtomic(File(dir(m.id), "manifest.json"), m.toJson()) { ProjectManifest.parse(it) }; return m
+    }
+
+    /**
+     * Phase 6 (Sections 8, 9, 17): Save As / Edit a Copy.
+     * Creates a new project duplicating the source project's timeline, settings, and media references without mutating the original project folder or files.
+     */
+    fun duplicate(sourceId: String, newName: String = "", asManualCopy: Boolean = true): LoadedProject {
+        val src = load(sourceId)
+        val copyTitle = newName.trim().ifBlank { "${src.manifest.name} (Copy)" }
+        val newType = if (asManualCopy) ProjectType.MANUAL else src.manifest.projectType
+        val created = create(copyTitle, newType)
+        val srcInputsDir = File(dir(sourceId), "inputs")
+        val dstInputsDir = File(dir(created.id), "inputs").also { it.mkdirs() }
+        // Copy files in <sourceId>/inputs/ into <newId>/inputs/ so deleting or editing the copy never touches the original
+        val pathMap = HashMap<String, String>()
+        if (srcInputsDir.exists()) {
+            srcInputsDir.listFiles()?.filter { it.isFile }?.forEach { f ->
+                val dstFile = File(dstInputsDir, f.name)
+                Files.copy(f.toPath(), dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                pathMap[f.path] = dstFile.path
+            }
+        }
+        val remappedTimeline = src.timeline?.let { tl ->
+            var t2 = tl
+            for (c in tl.clips) {
+                val img = c.image?.let { pathMap[it] ?: it }
+                val orig = c.originalImage?.let { pathMap[it] ?: it }
+                val repl = c.replacementImage?.let { pathMap[it] ?: it }
+                if (img != c.image || orig != c.originalImage || repl != c.replacementImage) {
+                    t2 = t2.replaceClipImages(c.id, img, orig, repl)
+                }
+            }
+            tl.mix.music?.let { mu ->
+                val mp = pathMap[mu.path] ?: mu.path
+                if (mp != mu.path) t2 = t2.setMix(t2.mix.copy(music = mu.copy(path = mp)))
+            }
+            t2
+        }
+        val mergedSettings = LinkedHashMap(src.manifest.settings).apply {
+            put("project.type", newType.name)
+            put("project.parentId", sourceId)
+        }
+        val savedManifest = save(
+            created.copy(inputs = src.manifest.inputs, settings = mergedSettings),
+            remappedTimeline
+        )
+        return LoadedProject(savedManifest, remappedTimeline, src.warnings)
+    }
+
+    /** Inspects all media file paths referenced by a project (clips, replacements, music, narration) and reports whether each exists on disk. */
+    fun inspectMediaReferences(id: String): Map<String, Boolean> {
+        val lp = load(id)
+        val result = LinkedHashMap<String, Boolean>()
+        val inputsDir = File(dir(id), "inputs")
+        lp.manifest.inputs.values.flatten().forEach { name ->
+            val f = File(inputsDir, name)
+            result[f.path] = f.exists() && f.isFile
+        }
+        lp.timeline?.clips?.forEach { c ->
+            c.image?.let { result[it] = File(it).isFile }
+            c.originalImage?.let { result[it] = File(it).isFile }
+            c.replacementImage?.let { result[it] = File(it).isFile }
+        }
+        lp.timeline?.mix?.music?.path?.let { result[it] = File(it).isFile }
+        return result
     }
 
     fun load(id: String): LoadedProject {

@@ -1,31 +1,19 @@
 package com.auto.core
 
 import java.io.File
-import java.util.zip.ZipFile
 
 /** ZIP + folder handling and the one-call analyse() that the phone app uses. Pure JVM (java.util.zip) - works on Android too. */
 object Pipeline {
     val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp", "bmp")
     private fun isImage(name: String) = name.substringAfterLast('.', "").lowercase() in IMAGE_EXT
-    private fun skip(parts: List<String>) = parts.any { it.startsWith(".") || it == "__MACOSX" } 
+    private fun skip(parts: List<String>) = parts.any { it.startsWith(".") || it == "__MACOSX" }
 
-    /** Pictures inside a ZIP, extracted below outDir (kept in sub-folders). root = the ZIP path, name = the ZIP's name without .zip. */
-    fun picturesFromZip(zip: File, outDir: File): List<PicRef> {
-        val out = ArrayList<PicRef>(); val root = outDir.canonicalFile
-        ZipFile(zip).use { z ->
-            for (e in z.entries()) {
-                if (e.isDirectory) continue
-                val parts = e.name.replace('\\', '/').split('/').filter { it.isNotEmpty() }
-                if (parts.isEmpty() || skip(parts) || !isImage(parts.last())) continue
-                val dest = File(root, parts.joinToString("/")).canonicalFile
-                if (!dest.path.startsWith(root.path + File.separator)) continue   // zip-slip guard
-                dest.parentFile.mkdirs()
-                z.getInputStream(e).use { i -> dest.outputStream().use { o -> i.copyTo(o) } }
-                out.add(PicRef(zip.path, parts, dest.path))
-            }
-        }
-        return out
-    }
+    /**
+     * Pictures inside a ZIP, extracted below outDir (kept in sub-folders).
+     * Enforces zip-slip protection plus named entry-count, single-entry-size, and total-expanded-size limits (ZipSafety).
+     */
+    fun picturesFromZip(zip: File, outDir: File, limits: ZipLimits = ZipSafety.DEFAULT_LIMITS): List<PicRef> =
+        ZipSafety.extractPicturesFromZip(zip, outDir, IMAGE_EXT, limits)
 
     /** Pictures in a folder tree. root = the folder, rel = path parts below it. */
     fun picturesFromFolder(dir: File): List<PicRef> =

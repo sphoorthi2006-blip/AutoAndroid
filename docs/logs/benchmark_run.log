@@ -1,0 +1,11 @@
+[photographic] static224=1951.3ms -> dyn=1004.2ms (1.94x), png_L3=43.8ms -> png_L1=36.4ms (1.20x), PSNR=27.05dB (bicubic 53.26dB)
+[textures] static224=1935.8ms -> dyn=1075.1ms (1.80x), png_L3=37.2ms -> png_L1=33.6ms (1.11x), PSNR=15.15dB (bicubic 17.52dB)
+[faces] static224=1869.1ms -> dyn=957.7ms (1.95x), png_L3=14.3ms -> png_L1=8.9ms (1.60x), PSNR=35.98dB (bicubic 38.37dB)
+[text_edges] static224=1861.7ms -> dyn=959.8ms (1.94x), png_L3=20.9ms -> png_L1=11.2ms (1.87x), PSNR=26.90dB (bicubic 23.66dB)
+[noisy_jpeg] static224=1923.1ms -> dyn=1023.4ms (1.88x), png_L3=46.1ms -> png_L1=37.2ms (1.24x), PSNR=29.42dB (bicubic 35.12dB)
+[flat_illustration] static224=1895.6ms -> dyn=953.3ms (1.99x), png_L3=20.3ms -> png_L1=13.8ms (1.47x), PSNR=32.54dB (bicubic 30.81dB)
+[animation] static224=1890.0ms -> dyn=940.4ms (2.01x), png_L3=46.6ms -> png_L1=15.3ms (3.05x), PSNR=30.21dB (bicubic 26.69dB)
+[Workload 10 scenes] Legacy: 161.41s (82 tiles) -> Optimized Cold: 28.78s (12 tiles, 5.61x faster, -82.2% time) -> Optimized Warm: 0.02s (8070.5x faster)
+[Workload 25 scenes] Legacy: 413.65s (210 tiles) -> Optimized Cold: 57.56s (24 tiles, 7.19x faster, -86.1% time) -> Optimized Warm: 0.04s (10341.25x faster)
+[Workload 200 scenes] Legacy: 3228.26s (1640 tiles) -> Optimized Cold: 575.53s (240 tiles, 5.61x faster, -82.2% time) -> Optimized Warm: 0.35s (9223.6x faster)
+Saved benchmark results to /working_dir/c_9a6e8112713ad51b/work/AutoAndroid/docs/logs/benchmark_run.json

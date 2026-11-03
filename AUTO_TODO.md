@@ -1,16 +1,21 @@
-0. (NEXT, owner) Deploy backend/ (see backend/README.md), paste URL+token in the app, re-run the failing project. Send: Audio warnings, scene list, which scenes still start early. Then: compile check of app (GitHub CI), Steps 17-22 only if matching (not timing) is still wrong.
-# AUTO - TODO in execution order
-Rule: run scripts/run_parity.sh before and after every change; update AUTO_PROGRESS.md.
+# AutoAndroid — Remaining Host & Device Verification Tasks (`AUTO_TODO.md`)
 
-1. (S6) Add Gradle wrapper (8.7) + `libs.versions.toml`; keep :core pure JVM. Make CI run `gradle :core:test` style check + assembleDebug. First real compile of :app - fix whatever breaks.
-2. (S38-40) DONE in code, uncompiled: exact-boundary durations, one narration item, ExportSettings, MediaStore error message. REMAINING: compile + run on device and measure A/V length; settings screen; foreground service; captions burn-in (OverlayEffect/TextOverlay); handle partial-coverage case via Timeline too.
-3. (S9) DONE in core: DOCX, ValidationReport. REMAINING: review screen with the 3 outcomes (accept / pick other image / adjust timing); numeric confidence.
-4. (S7) CORE DONE (ProjectStore.kt, tested). REMAINING: use it from MainActivity + projects list screen. Original plan: Project store: app-private folder per project, `project.json` = inputs manifest + Timeline.toJson, atomic writes, recovery on start. Stop copying all pictures into cache; copy once into project folder.
-5. (S37) Preview: ExoPlayer for narration + image drawn from `Timeline.clipAt(playerPositionMs)`; captions drawn from CaptionClip. Exact by construction.
-6. (S29-36) Compose timeline UI on top of TimelineEditor: ruler, 4 tracks, pinch zoom, playhead drag, clip handles, waveform (precompute peaks from decoded samples), undo/redo buttons.
-7. (S25-27) CORE DONE (PausePolicy, Confidence). REMAINING: settings UI, show scores in review screen, feed into export warnings. Original: Pause policy setting (keep image / switch at pause / flag long pause > N s); numeric confidence per scene (from Matching + cut quality).
-8. (S10-16) Optional backend `/analyze` (FastAPI): faster-whisper -> verified transcript; WhisperX alignment -> words. OUTPUT FORMAT = Whisper-JSON `{"segments":[{"words":[{"word","start","end","score"}]}]}` which Captions.parse() already reads - no core change needed. Add transcript-vs-caption diff (missing/extra words).
-9. (S17-22) Only if step 8 shows ambiguity remains: LLM fallback for scenes the deterministic matcher flags "?"; vision check as an explicit "Verify pictures" button, results are WARNINGS only, never silent re-assignment.
-10. (S41-45) Real-project tests, 300+ images, 1 h narration memory test (stream peaks/VAD instead of one FloatArray), handover docs.
+## 1. Completed in Repository (`Phases 0–10` & `Phases C0–C6`)
+- [x] **Phase C0**: Rewrote `scripts/run_parity.sh` and `scripts/dev_check.sh` to fail closed without `|| true`, verify all 38 core files and 28 test suites (`Check4`–`Check31`), and capture raw logs (`docs/logs/parity_broken_compile.log` and `docs/logs/parity_normal_run.log`) in `PARITY_REPORT.md`.
+- [x] **Phase C1**: Implemented `StreamingPngWriter` + `PngFormatVerifier` (`StreamingImageWriter.kt`), `BitmapRegionDecoder` source-strip decoding (`Upscaler.upscaleToPngFile`), `UpscaleMemoryGuard` (`Math.multiplyExact` overflow protection + preflight check with explicit user choices and no silent `4× -> 2×` reduction), pixel-complete `cacheKey` (quality + EXIF rotation), and `ucache_` ownership verification in `UpscaleCache`. Documented in `UPSCALE_MEMORY_REPORT.md`.
+- [x] **Phase C2**: Removed `android:largeHeap="true"` from `AndroidManifest.xml`, implemented `ExportForegroundService` (`foregroundServiceType="mediaProcessing"`, ongoing progress notification with `Cancel` button, Android 14 `onTimeout` handler), added `AutoAppHolder` (`MainActivity.kt`), and hardened post-cancellation write prevention and idempotent `pendingMediaStoreUri` cleanup in `Exporter.kt` and `ExportTracker.kt`. Documented in `BACKGROUND_JOB_REPORT.md`.
+- [x] **Phase C3**: Implemented `WorkspaceSessionSimulator` (`10 × 10 = 100` ordered workspace transitions + contextual text/audio selection transitions) in `WorkspaceMode.kt` and documented all 10 workspaces and all 22 Section 7 control groups in `WORKSPACE_VERIFICATION.md`.
+- [x] **Phase C4–C6**: Verified SHA-256 invariance of all 8 protected Auto Create core files (`Captions.kt`, `Details.kt`, `Bundle.kt`, `Align.kt`, `AudioPauses.kt`, `Matching.kt`, `CaptionPipeline.kt`, `ClickTrack.kt`) and updated `CORRECTION_REPORT.md`, `CHANGES.md`, `HANDOVER.md`, and `RESULTS.md`.
 
-Needs from the owner: a real sample project (audio + script + SRT + details + images zip); a physical device or emulator log of first run; (for step 8) hosting choice + Gemini API key held server-side only.
+---
+
+## 2. Host & Physical Device Tasks (`NOT RUN` / `BLOCKED` in Offline VM)
+Run these steps on a developer workstation with Kotlin `2.0.21`, Android SDK `34`, and an attached physical Android device:
+- [ ] **Host Kotlin Parity & Unit Suite Execution (`NOT RUN` in VM)**:
+  - Run `bash scripts/run_parity.sh` with `kotlinc` `2.0.21` on `PATH` and verify all suites (`Check4` through `Check31`) pass.
+- [ ] **Host Gradle Build & Lint (`NOT RUN` in VM)**:
+  - Run `./gradlew test :app:assembleDebug :app:lintDebug` and archive build logs.
+- [ ] **Physical Device Memory & Lifecycle Verification (`NOT RUN` in VM)**:
+  - Install `app-debug.apk` on a physical Android device, run a `4000 × 3000` image upscale at `2×` and `4×` (`Streaming PNG`), capture `adb shell dumpsys meminfo com.auto.app`, and populate the `NOT RUN` cells in `RESULTS.md`.
+  - Verify background navigation (`Editor -> Home -> Projects -> Settings -> Editor`), notification `Cancel`, and `adb shell am kill com.auto.app` process-death recovery on device.
+  - Capture portrait, landscape, and tablet screenshots of all 10 workspaces into `docs/screenshots/`.

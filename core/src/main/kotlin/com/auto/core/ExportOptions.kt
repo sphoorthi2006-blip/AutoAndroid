@@ -30,6 +30,19 @@ enum class UpscaleFactor(val label: String, val scale: Int) {
     }
 }
 
+/** Phase 5 (Section 15): AI Upscaling profiles (Fast, Balanced/Smart, Maximum) plus Manual. */
+enum class UpscaleProfile(val label: String, val description: String) {
+    MANUAL("Manual", "Use the selected manual scale factor (Off, 2×, or 4×)."),
+    FAST("Fast", "Upscales only pictures smaller than the output frame at 2× (JPEG)."),
+    BALANCED("Balanced (Recommended)", "Smart factor per image (skips adequate pictures, uses 2× when enough, 4× for small images)."),
+    MAXIMUM("Maximum", "4× super-resolution with lossless PNG intermediates where memory allows.");
+
+    companion object {
+        fun fromString(raw: String?): UpscaleProfile =
+            values().firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: MANUAL
+    }
+}
+
 /** Intermediate file format for upscaled images stored in the temporary export workspace. */
 enum class IntermediateFormat(val label: String, val shortLabel: String, val ext: String, val mime: String, val png: Boolean) {
     JPEG("JPEG", "JPEG", "jpg", "image/jpeg", false),
@@ -66,11 +79,15 @@ object ExportOptions {
         path
     }
 
-    /** Unique non-blank source image paths referenced by the finalized export plan, in first-encounter order. */
+    /**
+     * Unique non-blank source image paths referenced by the finalized export plan, in first-encounter order.
+     * Phase 3 & 5 (Sections 12 & 15): Solid-colour scenes (`replacementColor != null`) and clips without image assets are skipped.
+     */
     fun uniqueSourceImages(plan: ExportPlan.Plan, normalize: (String) -> String = ::canonicalKey): List<String> {
         val seen = HashSet<String>()
         val result = ArrayList<String>()
         for (seg in plan.segments) {
+            if (seg.replacementColor != null) continue
             val img = seg.image?.takeIf { it.isNotBlank() } ?: continue
             val key = normalize(img)
             if (seen.add(key)) result.add(img)
@@ -78,7 +95,7 @@ object ExportOptions {
         return result
     }
 
-    /** Replaces source image paths in the finalized export plan with their processed temporary image paths, preserving all edits. */
+    /** Replaces source image paths in the finalized export plan with their processed temporary image paths, preserving all edits and solid-colour scenes. */
     fun withProcessedImages(
         plan: ExportPlan.Plan,
         processedByKey: Map<String, String>,
@@ -86,10 +103,11 @@ object ExportOptions {
     ): ExportPlan.Plan {
         if (processedByKey.isEmpty()) return plan
         val remapped = plan.segments.map { g ->
+            if (g.replacementColor != null) return@map g
             val img = g.image
             val newImg = if (img != null) processedByKey[normalize(img)] ?: processedByKey[img] ?: img else null
             if (newImg == img) g
-            else ExportPlan.Segment(newImg, g.text, g.heading, g.startMs, g.endMs, g.sceneNum, g.fx, g.transition, g.nextTransition)
+            else ExportPlan.Segment(newImg, g.text, g.heading, g.startMs, g.endMs, g.sceneNum, g.fx, g.transition, g.nextTransition, g.replacementColor)
         }
         return ExportPlan.Plan(remapped, plan.totalMs, plan.captions, plan.texts, plan.captionStyle, plan.mix)
     }

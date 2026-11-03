@@ -1,0 +1,4 @@
+=== AutoAndroid Fail-Closed Parity Runner ===
+Date (UTC): 2026-11-03T08:28:59Z
+ERROR: Kotlin compiler ('kotlinc') not found on PATH. Install Kotlin 2.0.21 or set KOTLINC=/path/to/kotlinc.
+EXIT_CODE=127

@@ -26,16 +26,13 @@ import com.auto.core.Guides
 import com.auto.core.OverlayStyle
 import com.auto.core.TextClip
 import com.auto.core.captionLineAt
-import com.auto.core.textsAt
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sin
 
-/** Approximate box of a text in frame fractions: centre (cx, cy) and half sizes. Used only for hit tests and the dashed selection frame (the real text is drawn by OverlayRenderer). */
 private class Box4(val cx: Float, val cy: Float, val hw: Float, val hh: Float)
 private fun boxOf(s: OverlayStyle): Box4 {
     val hw = s.widthFrac / 2f
@@ -44,9 +41,9 @@ private fun boxOf(s: OverlayStyle): Box4 {
 }
 
 /**
- * Step 29: captions and text clips drawn over the picture with the export's own OverlayRenderer and AnimMath, so the preview animates like the export.
- * A selected text that is on screen can be moved by dragging it (snaps to centre lines/thirds, stays inside the safe area) and resized + rotated with the round handle at its corner.
- * While dragging only a local copy changes; ONE edit (one undo step) is made when the finger lifts.
+ * Step 29 & Phase 7: Captions and visible text clips drawn over the picture/solid screen in zIndex order
+ * using the export's own OverlayRenderer and AnimMath.
+ * Honors `sel.locked` (locked text layers cannot be dragged or rotated) and `st.snappingEnabled`.
  */
 @Composable
 fun PreviewOverlays(st: AutoState, showCaption: Boolean) {
@@ -57,20 +54,21 @@ fun PreviewOverlays(st: AutoState, showCaption: Boolean) {
     var guideY by remember { mutableStateOf<Float?>(null) }
     val sel = st.selectedText()
     val selNow by rememberUpdatedState(sel)
-    val selVisible = sel != null && st.playMs >= sel.startMs && st.playMs < sel.endMs
+    val selVisible = sel != null && sel.visible && !sel.locked && st.playMs >= sel.startMs && st.playMs < sel.endMs
 
-    Box(Modifier.fillMaxSize().pointerInput(sel?.id, selVisible) {
+    Box(Modifier.fillMaxSize().pointerInput(sel?.id, selVisible, st.snappingEnabled) {
         if (!selVisible) return@pointerInput
         var mode = 0; var ax = 0f; var ay = 0f
         var base: OverlayStyle = OverlayStyle(); var startPos = Offset.Zero; var d0 = 1f; var a0 = 0f
         detectDragGestures(
             onDragStart = { pos ->
                 val s = selNow ?: return@detectDragGestures
+                if (s.locked || !s.visible) return@detectDragGestures
                 base = s.style; ax = 0f; ay = 0f; startPos = pos
                 val w = size.width.toFloat(); val h = size.height.toFloat(); val b = boxOf(base)
                 val r = Math.toRadians(base.rotationDeg.toDouble()); val c = cos(r).toFloat(); val sn = sin(r).toFloat()
                 val dx = b.hw * w; val dy = b.hh * h
-                val hx = b.cx * w + dx * c - dy * sn; val hy = b.cy * h + dx * sn + dy * c      // corner handle, rotated with the text
+                val hx = b.cx * w + dx * c - dy * sn; val hy = b.cy * h + dx * sn + dy * c
                 val cxp = b.cx * w; val cyp = b.cy * h
                 mode = when {
                     hypot(pos.x - hx, pos.y - hy) < 56f -> 2
@@ -85,19 +83,26 @@ fun PreviewOverlays(st: AutoState, showCaption: Boolean) {
                 val w = size.width.toFloat(); val h = size.height.toFloat()
                 if (mode == 1) {
                     ax += amt.x; ay += amt.y
-                    val sx = Guides.snap((base.x + ax / w).coerceIn(0f, 1f)); val sy = Guides.snap((base.y + ay / h).coerceIn(0f, 1f))
+                    val rawX = (base.x + ax / w).coerceIn(0f, 1f)
+                    val rawY = (base.y + ay / h).coerceIn(0f, 1f)
+                    val sx = if (st.snappingEnabled) Guides.snap(rawX) else Guides.Snap(rawX, null)
+                    val sy = if (st.snappingEnabled) Guides.snap(rawY) else Guides.Snap(rawY, null)
                     val (kx, ky) = Guides.keepInside(sx.value, sy.value, 0.06f, base.sizeFrac * 0.6f)
-                    live = s.id to base.copy(x = kx, y = ky); guideX = sx.guide?.takeIf { it == kx }; guideY = sy.guide?.takeIf { it == ky }
+                    live = s.id to base.copy(x = kx, y = ky)
+                    guideX = sx.guide?.takeIf { it == kx }
+                    guideY = sy.guide?.takeIf { it == ky }
                 } else if (mode == 2) {
                     ax += amt.x; ay += amt.y
                     val b = boxOf(base); val cxp = b.cx * w; val cyp = b.cy * h; val p = startPos + Offset(ax, ay)
                     val d = hypot(p.x - cxp, p.y - cyp); val a = atan2(p.y - cyp, p.x - cxp)
-                    var rot = base.rotationDeg + Math.toDegrees((a - a0).toDouble()).toFloat(); if (abs(rot) < 3f) rot = 0f
+                    var rot = base.rotationDeg + Math.toDegrees((a - a0).toDouble()).toFloat()
+                    if (st.snappingEnabled && abs(rot) < 3f) rot = 0f
                     live = s.id to base.copy(sizeFrac = (base.sizeFrac * d / d0).coerceIn(0.015f, 0.2f), rotationDeg = rot).clamped()
                 }
             },
             onDragEnd = { val l = live; live = null; guideX = null; guideY = null; if (l != null && mode != 0) st.editText(l.first, style = l.second.clamped()); mode = 0 },
-            onDragCancel = { live = null; guideX = null; guideY = null; mode = 0 })
+            onDragCancel = { live = null; guideX = null; guideY = null; mode = 0 }
+        )
     }) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width.toInt(); val h = size.height.toInt()
@@ -105,18 +110,19 @@ fun PreviewOverlays(st: AutoState, showCaption: Boolean) {
             drawIntoCanvas { cv ->
                 val n = cv.nativeCanvas
                 if (showCaption) tl.captionLineAt(t)?.let { OverlayRenderer.draw(ctx, n, w, h, it, tl.captionStyle) }
+                // Timeline.textsAt(t) filters by visible == true and sorts by zIndex then startMs
                 for (c in tl.textsAt(t)) drawText(ctx, n, w, h, c, live?.takeIf { it.first == c.id }?.second, t)
             }
             if (selVisible && sel != null) {
                 val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))
                 val m = Guides.SAFE_ACTION
-                drawRect(Color.White.copy(alpha = 0.3f), Offset(w * m, h * m), Size(w * (1 - 2 * m), h * (1 - 2 * m)), style = Stroke(2f, pathEffect = dash))   // safe area
+                drawRect(Color.White.copy(alpha = 0.3f), Offset(w * m, h * m), Size(w * (1 - 2 * m), h * (1 - 2 * m)), style = Stroke(2f, pathEffect = dash))
                 guideX?.let { drawLine(C.Cyan, Offset(it * w, 0f), Offset(it * w, h.toFloat()), 2f, pathEffect = dash) }
                 guideY?.let { drawLine(C.Cyan, Offset(0f, it * h), Offset(w.toFloat(), it * h), 2f, pathEffect = dash) }
                 val s = (live?.second ?: sel.style); val b = boxOf(s)
                 rotate(s.rotationDeg, Offset(b.cx * w, b.cy * h)) {
-                    drawRect(C.Cyan, Offset((b.cx - b.hw) * w, (b.cy - b.hh) * h), Size(b.hw * 2 * w, b.hh * 2 * h), style = Stroke(3f, pathEffect = dash))
-                    drawCircle(C.Cyan, 18f, Offset((b.cx + b.hw) * w, (b.cy + b.hh) * h))
+                    drawRect(C.VioletLight, Offset((b.cx - b.hw) * w, (b.cy - b.hh) * h), Size(b.hw * 2 * w, b.hh * 2 * h), style = Stroke(3f, pathEffect = dash))
+                    drawCircle(C.Violet, 18f, Offset((b.cx + b.hw) * w, (b.cy + b.hh) * h))
                     drawCircle(Color.White, 8f, Offset((b.cx + b.hw) * w, (b.cy + b.hh) * h))
                 }
             }

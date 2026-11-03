@@ -1,0 +1,12 @@
+=== AutoAndroid Fail-Closed Parity Runner ===
+Date (UTC): 2026-11-03T08:28:59Z
+Kotlin compiler: /tmp/mock_broken_kotlinc.sh
+info: kotlinc-jvm 2.0.21 (JRE 17.0.18+8-LTS) [mock compile-error verifier]
+Java runtime: /usr/bin/java
+openjdk version "17.0.20.1" 2026-08-18
+OpenJDK Runtime Environment (build 17.0.20.1+1-1-deb12u1-Debian)
+Verified 38 core files and 29 test suites exist.
+Compiling 38 core files and 29 test files...
+COMPILE FAILED with exit code 1. Compiler output:
+core/src/test/kotlin/Check32.kt:15:5: error: unresolved reference: intentionalCompileErrorForPhase6Test
+EXIT_CODE=1

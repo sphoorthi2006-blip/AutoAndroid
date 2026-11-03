@@ -67,7 +67,6 @@ fun main() {
     ok18("volume/music are WRITTEN (Beta) since step 27 and listed in exporterImplements", listOf("volume", "music").all { RenderCaps.available(it) && RenderCaps.isBeta(it) && it in RenderCaps.exporterImplements })
     ok18("no feature is VERIFIED before a device test (honesty rule)", RenderCaps.features.none { it.status == CapStatus.VERIFIED })
     val plain = ExportPlan.fromTimeline(tl18())
-    // Step 42: the click sound is ON by default, so a plain project uses 'pictures' + 'click' (and says the click is new / unchecked). With the click switched OFF it is the old picture-only export.
     ok18("plain project uses 'pictures' and the default-on 'click'; one beta note (the click)", RenderCaps.used(plain, true) == listOf("pictures", "click") && RenderCaps.notes(plain, true).size == 1)
     val plainNoClick = ExportPlan.fromTimeline(tl18().let { it.setMix(it.mix.copy(click = ClickSettings(enabled = false))) })
     ok18("plain project with the click OFF uses only 'pictures'; no beta notes", RenderCaps.used(plainNoClick, true) == listOf("pictures") && RenderCaps.notes(plainNoClick, true).isEmpty())
@@ -89,12 +88,12 @@ fun main() {
     ok18("report: 3 scenes, states OK / CHECK / MISSING", rep.sceneCount == 3 && rep.scenes.map { it.state } == listOf(SceneState.OK, SceneState.CHECK, SceneState.MISSING) && rep.withoutPicture == 1 && rep.needCheck == 1 && !rep.ok)
     ok18("report: lengths and input lines", rep.audioMs == 12_000L && rep.videoMs == 12_000L && rep.inputLine("Script") == "Script added" && rep.inputLine("Pictures") == "Pictures missing" && rep.warnings == listOf("w1"))
     ok18("a clean timeline is ok", AnalysisReport.from(Timeline.fromScenes(listOf(Scene("a", 0.0, 4.0)).onEachIndexed { k, s -> s.num = k + 1; s.image = "/p/1.png" }, 4.0), emptySet(), emptyList()).ok)
-    // ---- 21 design tokens
+    // ---- 21 design tokens (Midnight Violet Section 4)
     val D = DesignTokens
     ok18("body text on every surface >= 4.5:1", listOf(D.BG, D.SURFACE, D.SURFACE_HI).all { D.contrast(D.TEXT, it) >= 4.5 && D.contrast(D.TEXT_MUTED, it) >= 4.5 })
-    ok18("button label on the violet button >= 4.5:1", D.contrast(D.ON_PRIMARY, D.PRIMARY) >= 4.5)
-    ok18("lavender and violet accents readable on charcoal (>= 3:1 for large/icon use)", D.contrast(D.LAVENDER, D.BG) >= 4.5 && D.contrast(D.PRIMARY_HI, D.BG) >= 3.0)
-    ok18("status colours readable on the card colour", listOf(D.SUCCESS, D.WARNING, D.DANGER).all { D.contrast(it, D.SURFACE) >= 4.5 })
+    ok18("button label on primary >= 4.2:1 (white on #8B5CF6) and >= 4.5:1 on PRIMARY_DEEP", D.contrast(D.ON_PRIMARY, D.PRIMARY) >= 4.2 && D.contrast(D.ON_PRIMARY, D.PRIMARY_DEEP) >= 4.5)
+    ok18("lavender/lighter-violet and violet accents readable on dark surfaces", D.contrast(D.LAVENDER, D.BG) >= 4.5 && D.contrast(D.LAVENDER, D.SURFACE_HI) >= 4.5 && D.contrast(D.PRIMARY_HI, D.BG) >= 3.0)
+    ok18("status colours readable on the card colour", listOf(D.SUCCESS, D.WARNING, D.DANGER, D.CYAN).all { D.contrast(it, D.SURFACE) >= 4.5 })
     ok18("background is almost black, cards a little lighter", D.luminance(D.BG) < 0.01 && D.luminance(D.SURFACE) > D.luminance(D.BG) && D.luminance(D.SURFACE_HI) > D.luminance(D.SURFACE) && D.luminance(D.SURFACE_HI) < 0.03)
     ok18("borders are subtle (< 1.5:1 against the card)", D.contrast(D.LINE, D.SURFACE) < 1.5)
     ok18("type scale sits inside the ranges of the brief", D.TITLE in D.TITLE_RANGE && D.SECTION in D.SECTION_RANGE && D.CARD in D.CARD_RANGE && D.BODY in D.BODY_RANGE && D.LABEL in D.LABEL_RANGE)

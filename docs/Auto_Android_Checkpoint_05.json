@@ -1,0 +1,78 @@
+{
+ "project_name": "AutoAndroid (Manva) - Master Specification Phases 0-5",
+ "project_version": "1.0-phase5",
+ "checkpoint_number": "05",
+ "completed_step_range": "43-52",
+ "supersedes": "Auto_Android_Checkpoint_04.json",
+ "base": {
+  "repo": "https://github.com/sphoorthi2006-blip/AutoAndroid",
+  "base_branch": "redesign",
+  "note": "Phases 0 to 5 implemented; Kotlin/Android code is WRITTEN ONLY in offline VM and ready for GitHub Actions Check core and Build APK verification."
+ },
+ "completed_steps": [
+  {
+   "step": 43,
+   "title": "Phase 0: Privacy-safe Diagnostics model, DiagnosticsLog local JSON store, BASELINE.md, and Check21",
+   "verified_by": "WRITTEN ONLY (kotlinc unavailable in offline VM)",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 44,
+   "title": "Phase 1a: Bounded PagedSampleBuffer and PeakStreamer (20 peaks/sec streaming waveform) + AudioDecoder finally cleanup",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 45,
+   "title": "Phase 1b: AutosaveCoordinator out-of-order race guard and TaskToken cancellation state safety",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 46,
+   "title": "Phase 1c: ZipSafety entry-count, single-entry-size, and total-expanded-size limits + MediaStore IS_PENDING cleanup",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 47,
+   "title": "Phase 1d: Midnight Violet DesignTokens (#0B1020, #121A2B, #192338, #8B5CF6, #38BDF8, #34D399, #F87171, #FBBF24), no orange, restrained glow, Check22",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 48,
+   "title": "Phase 2a: Bundled 59 TTFs from FONTS.zip + OFL.txt into app/src/main/res/font (63 total font files) and docs/FONT_LICENCES.md",
+   "verified_by": "VERIFIED (file copy and fc-query Unicode inspection)",
+   "status": "VERIFIED assets / WRITTEN ONLY code"
+  },
+  {
+   "step": 49,
+   "title": "Phase 2b: Extended FontCatalog/FontFace with weightFiles, variableAxes, categories, ScriptTags, ScriptDetector, and grapheme-safe typewriter in TextAnim.kt + Check23",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 50,
+   "title": "Phase 3: Solid-colour scene replacement (Black, White, Custom ARGB) on ImageClip, ExportPlan, RenderCaps (solidColor WRITTEN), Upscaler skip, ReplaceSheet UI + Check24",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 51,
+   "title": "Phase 4: ExportTracker stages, ETA >= 5 items & CV <= 0.45 stability rule, atomic ExportJobStore, process-death resume, StatFs storage guard, output verification + Check25",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  },
+  {
+   "step": 52,
+   "title": "Phase 5: Bounded strip-streaming Upscaler, smartFactor, profiles (Fast/Balanced/Maximum), persistent SHA-256 UpscaleCache with LRU eviction, thermal adaptation, docs/ONNX_BENCHMARK.md + Check26",
+   "verified_by": "WRITTEN ONLY",
+   "status": "WRITTEN ONLY"
+  }
+ ],
+ "pending_steps": [
+  "Steps 53-62 (Phases 6-10: Manual Editor, Design Studio, 10 Workspaces, Polish/Settings, Scale Generator)"
+ ],
+ "failed_steps": []
+}

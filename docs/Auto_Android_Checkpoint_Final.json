@@ -1,208 +1,56 @@
 {
- "project_name": "Auto Android - premium redesign shell on the phone editor",
- "project_version": "1.0 (steps 1-41 done; steps 28-41 compile on GitHub Actions and are NOT seen on a phone)",
- "checkpoint_number": "final",
- "completed_step_range": "1-41",
- "supersedes": "Auto_Android_Checkpoint_04.json (and earlier; steps 1-31 were done before)",
- "base": {
-  "repo": "https://github.com/sphoorthi2006-blip/AutoAndroid",
-  "base_branch": "mobile-editor-ui",
-  "new_branch": "redesign",
-  "note": "work is on branch redesign; the GitHub 'Build APK' workflow compiled every app step"
- },
- "project_summary": "Auto turns narration, captions (SRT/VTT/JSON), script and pictures into a timed picture video and exports MP4 on Android (Media3 Transformer). :core is pure Kotlin tested against Python reference outputs; :app is Compose. The Android app is being redesigned as a premium video-editing app. Desktop project Auto_Desktop_srt_driven is reference only and must not be modified.",
- "completed_steps": [
-  {
-   "step": 22,
-   "title": "Palette swap in Theme.kt (charcoal + violet from DesignTokens)",
-   "verified_by": "Build APK compiled",
-   "status": "COMPILES, not seen on a phone"
+  "checkpoint": "Final_Performance_And_RealESRGAN_Directive",
+  "applicationId": "com.auto.app",
+  "brandName": "Manva",
+  "designSystem": "Midnight Violet",
+  "protectedCoreFilesUnchanged": true,
+  "protectedCoreSha256": {
+    "Captions.kt": "ab0f0d9154de3d6c5458e6711774c0dc3d9bed0375c60e4769ce29217982878e",
+    "Details.kt": "135c86b50051b19a141fb2ddfc448d87f15dcb4818d6c6c8e9898a19d08b3090",
+    "Bundle.kt": "2ca8a2555a10306bf0d2482daa8fce50a432da58cee614d2c0fecb37a46856f7",
+    "Align.kt": "aecf5e875d17b290e18ce1e0809aed67038f0b092d9df207916d95c30b993eaa",
+    "AudioPauses.kt": "b724291a5730337da51472f48076aaa748f913163511a8638da2023605e88768",
+    "Matching.kt": "61386ef7aba360cf3f5db04b7fcb05b061c4a95a8d1970ed719c8339acee0470",
+    "CaptionPipeline.kt": "1801a709e9689ff51fcb8cf89a595a45434115359dd92970faa8e1acc6255ab5",
+    "ClickTrack.kt": "c0659d22c0cfb80e5f11a743c41229f3f8fb56fc152f88446f276ade51ec5f32"
   },
-  {
-   "step": 23,
-   "title": "Bundled fonts (Inter, Noto Serif, Nimbus Mono, Z003) + FontResolver + OverlayRenderer caption burn-in with OverlayStyle",
-   "verified_by": "Build APK compiled",
-   "status": "COMPILES, not seen on a phone"
+  "shippedOnnxModel": {
+    "path": "app/src/main/assets/model.onnx",
+    "sha256": "d3b45e236c1cdc43c14b6aca839d59d6ac009f3791f998a16404252f6f65600e",
+    "sizeBytes": 4866341,
+    "architecture": "SRVGGNetCompact (num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type=prelu)",
+    "variant": "realesr-general-x4v3",
+    "parameters": 1213296,
+    "license": "BSD-3-Clause (xinntao/Real-ESRGAN)",
+    "status": "VERIFIED"
   },
-  {
-   "step": 24,
-   "title": "Caption burn-in uses plan.captionStyle (RenderCaps captionStyle WRITTEN)",
-   "verified_by": "Build APK compiled",
-   "status": "COMPILES, not seen on a phone"
+  "vmBenchmarkResults": {
+    "status": "VERIFIED",
+    "script": "scripts/benchmark_export_upscale.py",
+    "logJson": "docs/logs/benchmark_run.json",
+    "singleImageDynamicSpeedupX": 1.92,
+    "workload10ScenesColdSpeedupX": 5.61,
+    "workload25ScenesColdSpeedupX": 7.19,
+    "workload200ScenesColdSpeedupX": 5.61,
+    "workload200ScenesTimeSavedPct": 82.2
   },
-  {
-   "step": 25,
-   "title": "Text overlays + animation on the Composition (TextBitmapOverlay + OverlayEffect)",
-   "verified_by": "Build APK compiled",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 26,
-   "title": "Per-picture colour/opacity (ClipColor RgbMatrix) and fade/slide/zoom transitions (ClipMove) in the export",
-   "verified_by": "Build APK compiled",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 27,
-   "title": "Audio in the export: AudioGainProcessor (volume, fades, mute) on narration; looping music sequence with its own gain",
-   "verified_by": "Check18 + Build APK compiled (0f9222e)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 28,
-   "title": "Text Studio sheet: StyleEditor, presets, saved styles, + Text, StylePreview; core StudioTools + Check19",
-   "verified_by": "Check19 + Build APK compiled (347f3c3)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 29,
-   "title": "Live preview of captions and texts in the editor stage; drag/snap/safe area; resize+rotate handle",
-   "verified_by": "Build APK compiled (347f3c3)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 30,
-   "title": "Text lane on the timeline: select, open Text Studio, move, trim, split, duplicate, delete",
-   "verified_by": "Build APK compiled (347f3c3)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 31,
-   "title": "Captions sheet: cues import/edit/split/merge/shift/add/delete/share, reading-speed warnings, caption style; cues drive export captions",
-   "verified_by": "Check19 + Build APK compiled (347f3c3)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 32,
-   "title": "Effects sheet + live colour preview",
-   "verified_by": "Build APK compiled (7016d44)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 33,
-   "title": "Transitions tab + Apply to all",
-   "verified_by": "Build APK compiled (7016d44)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 34,
-   "title": "Audio sheet, music import (pick 5), real waveform",
-   "verified_by": "Build APK compiled (2ecc2f4)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 35,
-   "title": "Media Library sheet",
-   "verified_by": "Build APK compiled (4def5d3)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 36,
-   "title": "Projects page, 5-tab nav, save/open/rename/delete, autosave",
-   "verified_by": "Build APK compiled (88452ba); run_parity all PASS",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 37,
-   "title": "Status chip + analysis cards",
-   "verified_by": "Build APK compiled (6fdfec5)",
-   "status": "COMPILES, not seen on a phone"
-  },
-  {
-   "step": 38,
-   "title": "Export notes, Cancel, Share",
-   "verified_by": "Build APK compiled (6fdfec5)",
-   "status": "COMPILES, not seen on a phone; Cancel untested"
-  },
-  {
-   "step": 39,
-   "title": "Layout fixes (Inputs chips, Text Studio section cards, Export status/disabled reason/violet pill, Home tile height, scrollable Inputs/Warnings), landscape/tablet layout, 48dp touch targets, AutoIcons.kt vector icons",
-   "verified_by": "Build APK compiled (commit 854148e); not seen on a phone"
-  },
-  {
-   "step": 40,
-   "title": "Stability pass: no phone notes or answers were provided, so no fixes and nothing flipped to VERIFIED",
-   "verified_by": "no code change"
-  },
-  {
-   "step": 41,
-   "title": "Final: parity tests all pass, final zip + checkpoint",
-   "verified_by": "run_parity.sh all pass; Build APK OK on final commit"
-  }
- ],
- "pending_steps": [],
- "failed_steps": [],
- "features_implemented": [
-  "Everything from steps 1-41 is implemented. Core logic is tested (run_parity.sh, all suites pass).",
-  "All render features stay Beta (WRITTEN) in RenderCaps: nothing was reported as watched in an exported video.",
-  "App UI from step 28 on (Home, Projects, 5-tab bar, Effects, Audio, Media Library, status chip, export notes, Cancel, Share, landscape layout, vector icons) compiles; never seen on a phone."
- ],
- "features_still_under_development": [],
- "files_created": [
-  "app: AudioGainProcessor.kt TextStudio.kt PreviewOverlay.kt TextLane.kt CaptionsSheet.kt (earlier: FontResolver.kt OverlayRenderer.kt TextBitmapOverlay.kt ClipEffects.kt)",
-  "core: StudioTools.kt",
-  "tests: Check19.kt",
-  "scripts: ci.sh is NOT in the repo (kept outside); run_parity.sh now runs Check19"
- ],
- "files_modified": [
-  "app: AutoState.kt (text/caption ops, style library, pick mode 4), EditorScreen.kt (text lane, overlays, TextBar, sheets, 256 dp timeline), HomeScreen.kt (Text Studio + Captions tiles live), Exporter.kt (audio processors, music sequence, caption cues as overlays)",
-  "core: RenderCaps.kt (volume, music WRITTEN)",
-  "tests: Check18.kt"
- ],
- "important_source_code_changes": [
-  "Timeline JSON stays version 1; new keys optional",
-  "If the project has caption cues they drive preview AND export captions (timed overlays with captionStyle); no cues = scene text burned into pictures as before (Timeline.captionLineAt)",
-  "Overlay sizes are fractions of frame height",
-  "Caption animations are not offered (burn-in has none)",
-  "Core name clash: core TextAlign vs Compose TextAlign (use fully qualified)"
- ],
- "gradle_and_dependency_changes": "None in this checkpoint.",
- "current_architecture": "AutoShell -> HomeScreen / EditorScreen / SettingsScreen. EditorScreen: Stage (+PreviewOverlays), PlayRow, TimelineArea (pictures, scene text, text lane TextClipBox, narration), bars (MainBar/ContextBar/TextBar), SheetHost (inputs, scenes, pictures, warnings, export, length, text, captions). All state in AutoState (edit{} -> TimelineEditor -> core). Exporter (Media3 1.3.1): captions, text overlays, ClipColor/ClipMove, AudioGainProcessor, music sequence.",
- "build_status": "Branch redesign, final commit built OK by Build APK. run_parity all pass (backend python suites skipped in the sandbox).",
- "testing_results": {
-  "run_parity.sh": "all suites pass; style/fonts/animation/guides 52; effects/transitions/text/plan 44; audio/caption tools 36; media/prefs/caps/workflow/tokens 50; studio tools/caption cues/style library 24",
-  "skipped": "timestamps-first analyse (private data), backend client (fastapi/ffmpeg missing)",
-  "device": "nothing run on a device"
- },
- "known_bugs": [
-  "Nothing from step 28 on has been seen on a phone",
-  "Export Cancel (Transformer.cancel) untested on a device",
-  "Script and caption inputs are not stored in saved projects",
-  "Re-analysing creates a new project",
-  "Waveform peaks are kept in memory only",
-  "Text/caption overlay time = video time and per-picture effect time = time since the picture started are ASSUMED, not confirmed",
-  "Preview drag/resize hit boxes are approximations",
-  "Landscape layout: the right column scrolls on short phones"
- ],
- "important_technical_decisions": [
-  "Base is mobile-editor-ui; its editor is kept, not replaced",
-  "No control that does nothing: unavailable tools are tagged Soon and explain themselves",
-  "Shell uses the existing palette C so the app looks consistent; the original brief asked charcoal + violet, so that is an open decision (step 18)",
-  "Export options come only from core ExportOptions (tested); every new logic goes in :core with a CheckNN test",
-  "Editor page is full screen with its own tabs; the bottom bar shows on Home and Settings only",
-  "Effects limited to what Media3 1.3.1 renders (brightness, contrast, saturation, opacity); blur/sharpen/vignette/dissolve/wipe are UNAVAILABLE",
-  "Transitions are entrances at the start of a picture; FADE also fades the previous picture out",
-  "Narration is never trimmed or offset; music starts at 0 and loops or stops; no video clips, no narration split",
-  "Font weights other than Regular/Bold need Android 9+ (FontCatalog.offeredWeights)",
-  "Palette: change VALUES of object C in Theme.kt to DesignTokens, keep names"
- ],
- "next_exact_development_step": "Install the LATEST APK, test on a phone, report crashes/visual problems and which exported features were watched (then flip those ids to VERIFIED and update Check18).",
- "continuation_instructions": "Unzip Auto_Android_Source_Final.zip (or clone branch redesign). Read HANDOVER.md section 6f. Start from the owner phone-test notes.",
- "required_source_files_and_context": [
-  "Auto_Android_Source_02.zip",
-  "HANDOVER.md",
-  "Auto_Android_Checkpoint_01.json (older history)",
-  "Auto_Desktop_srt_driven.zip (reference only, for fonts and features)"
- ],
- "source_zip": "Auto_Android_Source_Final.zip",
- "unavailable_in_media3_1_3_1": [
-  "blur",
-  "sharpen",
-  "vignette",
-  "dissolve",
-  "wipe",
-  "video clips on the timeline",
-  "splitting the narration",
-  "starting music later"
- ]
+  "requiredDeliverables": [
+    "START_HERE.md",
+    "PERFORMANCE_REPORT.md",
+    "REAL_ESRGAN_EVALUATION.md",
+    "UPSCALE_MEMORY_REPORT.md",
+    "BACKGROUND_JOB_REPORT.md",
+    "PARITY_REPORT.md",
+    "WORKSPACE_VERIFICATION.md",
+    "CORRECTION_REPORT.md",
+    "CHANGES.md",
+    "HANDOVER.md",
+    "RESULTS.md",
+    "BASELINE.md"
+  ],
+  "blockedInVm": [
+    "Executing kotlinc on Check4..Check32 (kotlinc binary not installed in offline VM)",
+    "Executing ./gradlew test :app:assembleDebug :app:lintDebug (gradle/Android SDK and internet access not available in offline VM)",
+    "Physical Android device end-to-end export timing, dumpsys meminfo, and ADB screenshots (no physical device attached to VM)"
+  ]
 }

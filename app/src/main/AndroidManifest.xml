@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Priority 2 (Section 3): Permissions for user-initiated media export foreground service on Android 13/14 (targetSdk 34) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Priority 7 (Section 8): android:largeHeap="true" removed; bounded memory is enforced via StreamingPngWriter, BitmapRegionDecoder, and PagedSampleBuffer -->
@@ -25,6 +25,6 @@
         <service
             android:name=".ExportForegroundService"
             android:exported="false"
-            android:foregroundServiceType="mediaProcessing" />
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

@@ -51,7 +51,7 @@ class ExportForegroundService : Service() {
         }
     }
 
-    /** Android 14+ (API 34) mediaProcessing foreground service timeout callback. */
+    /** Android 14+ (API 34) foreground service timeout callback. */
     override fun onTimeout(startId: Int) {
         val msg = "Android system background time limit reached — Resume export when ready."
         DiagnosticsLog.recordWarning(msg)
@@ -62,8 +62,9 @@ class ExportForegroundService : Service() {
 
     private fun startForegroundSafe(notification: Notification) {
         try {
-            if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+            if (Build.VERSION.SDK_INT >= 29) {
+                // dataSync is valid on API 29..34+. (mediaProcessing is Android 15 / API 35 only and fails on Android 14.)
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }

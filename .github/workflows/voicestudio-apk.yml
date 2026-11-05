@@ -21,6 +21,13 @@ jobs:
         working-directory: vs/VoiceStudioAndroid
         run: gradle :app:assembleDebug --stacktrace --console=plain 2>&1 | tee ../../vs-build.log; test ${PIPESTATUS[0]} -eq 0
         shell: bash
+      - name: Push build log to a branch
+        if: failure()
+        run: |
+          mkdir -p /tmp/lg && cp vs-build.log /tmp/lg/
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout --orphan voicestudio-buildlog && git rm -rf -q . && cp /tmp/lg/vs-build.log . && git add vs-build.log
+          git commit -q -m "build log" && git push -f origin voicestudio-buildlog
       - uses: actions/upload-artifact@v4
         if: always()
         with:

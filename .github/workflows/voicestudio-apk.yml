@@ -1,0 +1,38 @@
+name: Build VoiceStudio APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project
+        run: unzip -q VoiceStudio_Android_Studio_Project.zip -d vs
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Build debug APK
+        working-directory: vs/VoiceStudioAndroid
+        run: gradle :app:assembleDebug --stacktrace --console=plain 2>&1 | tee ../../vs-build.log; test ${PIPESTATUS[0]} -eq 0
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VoiceStudio-debug-apk
+          path: |
+            vs/VoiceStudioAndroid/app/build/outputs/apk/debug/app-debug.apk
+            vs-build.log
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp vs/VoiceStudioAndroid/app/build/outputs/apk/debug/app-debug.apk VoiceStudio-debug.apk
+          gh release delete voicestudio-latest -y --cleanup-tag || true
+          gh release create voicestudio-latest VoiceStudio-debug.apk --title "VoiceStudio (debug APK)" --notes "Built from commit ${{ github.sha }}"

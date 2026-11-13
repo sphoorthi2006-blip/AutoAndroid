@@ -1,0 +1,9 @@
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+.cxx/
+# fetched by the build workflow (not committed)
+app/src/main/cpp/ncnn/
+app/src/main/assets/models/

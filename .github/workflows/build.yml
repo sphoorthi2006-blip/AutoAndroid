@@ -1,0 +1,99 @@
+name: Build Sukko APK
+
+on:
+  push:
+    branches: [ sukko ]
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+      - name: Install CMake for the native build
+        run: (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1" > /dev/null) || true
+      - name: Pick a recent NDK (the current ncnn build needs NDK r28 or newer)
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          ls "$SDK/ndk" || true
+          best=$(ls "$SDK/ndk" | sort -V | tail -1)
+          if [ "${best%%.*}" -lt 28 ]; then
+            (yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null) || true
+            best=$(ls "$SDK/ndk" | sort -V | tail -1)
+          fi
+          echo "Using NDK $best"
+          echo "NDK_VER=$best" >> "$GITHUB_ENV"
+      - name: Fetch ncnn (prebuilt, Vulkan) and the Real-ESRGAN models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ncnn app/src/main/cpp/ncnn app/src/main/assets/models
+          gh release download -R Tencent/ncnn -p '*-android-vulkan.zip' -D /tmp/ncnn
+          unzip -q /tmp/ncnn/*-android-vulkan.zip -d app/src/main/cpp/ncnn
+          ls app/src/main/cpp/ncnn
+          # Real-ESRGAN animevideov3 ncnn models (the same files Upscayl ships)
+          base=https://raw.githubusercontent.com/upscayl/upscayl/main/models
+          for s in 2 3 4; do
+            for e in param bin; do
+              curl -fsSL --retry 3 -o "app/src/main/assets/models/realesr-animevideov3-x$s.$e" "$base/realesr-animevideov3-x$s.$e"
+            done
+            test "$(stat -c%s app/src/main/assets/models/realesr-animevideov3-x$s.bin)" -gt 1000000
+          done
+          ls -la app/src/main/assets/models
+      - name: Build release APK
+        run: |
+          set +e
+          gradle :app:assembleRelease --no-daemon -PndkVer=$NDK_VER 2>&1 | tee /tmp/build.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            msg=$(grep -E '^e: |error:|What went wrong' -A2 /tmp/build.log | head -40 | cut -c1-300)
+            echo "::error title=Build errors::${msg//$'\n'/%0A}"
+            exit "$code"
+          fi
+      - name: Check the native library is self-contained
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/apkcheck
+          unzip -q -o app/build/outputs/apk/release/*.apk 'lib/*' -d /tmp/apkcheck
+          for so in /tmp/apkcheck/lib/*/libupscaler.so; do
+            echo "== $so"
+            readelf -d "$so" | grep NEEDED
+            if readelf -d "$so" | grep -q 'libomp.so'; then echo "libomp.so is a runtime dependency - APK would crash"; exit 1; fi
+          done
+          ls /tmp/apkcheck/lib/*/libupscaler.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upscaler-apk
+          path: app/build/outputs/apk/release/*.apk
+      - name: Package browser extension
+        run: |
+          cd extension
+          zip -r ../UpscalerExtension.zip . -x '.*'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upscaler-extension
+          path: UpscalerExtension.zip
+      - name: Publish Sukko.apk as a release (best effort)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/*.apk Sukko.apk
+          if gh release view sukko-latest >/dev/null 2>&1; then
+            gh release upload sukko-latest Sukko.apk --clobber
+          else
+            gh release create sukko-latest Sukko.apk --title "Sukko APK (latest)" --notes "Sukko: one-button AI image upscaler" --target "${{ github.sha }}"
+          fi

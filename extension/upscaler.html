@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Upscaler</title>
+  <link rel="stylesheet" href="upscaler.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Image Upscaler</h1>
+    <p>Automatically removes the corner sparkle mark, then upscales 2x. Everything runs in your browser; nothing is uploaded.</p>
+  </header>
+
+  <main>
+    <section class="card options">
+      <label><input type="checkbox" id="optMark" checked> Remove corner mark</label>
+      <label><input type="checkbox" id="optCrop"> Crop black strip at the top (changes height)</label>
+    </section>
+
+    <section id="drop" class="card drop">
+      <div class="drop-title">Drop images, ZIPs or a folder here</div>
+      <div class="buttons">
+        <button id="pickFiles" class="primary">Pick images and/or ZIPs</button>
+        <button id="pickFolder">Pick a folder</button>
+      </div>
+      <input id="fileInput" type="file" multiple accept="image/*,.zip,application/zip,application/x-zip-compressed" hidden>
+      <input id="folderInput" type="file" webkitdirectory multiple hidden>
+      <div class="hint">Any number of files, mixed. Folders are read with their subfolders, and ZIPs inside them too.</div>
+    </section>
+
+    <section id="progressCard" class="card" hidden>
+      <progress id="bar" value="0" max="1"></progress>
+      <div id="status" role="status"></div>
+    </section>
+
+    <section id="resultsCard" class="card" hidden>
+      <div class="results-head">
+        <h2 id="resultsTitle">Results</h2>
+        <div class="buttons">
+          <button id="compareAll" class="primary">Before / After slider</button>
+          <button id="zipAll">Download all (ZIP)</button>
+          <button id="saveFolder" hidden>Save to folder...</button>
+        </div>
+      </div>
+      <div id="grid" class="grid"></div>
+    </section>
+  </main>
+
+  <div id="overlay" class="overlay" hidden>
+    <div class="overlay-bar">
+      <button id="closeCompare">Close</button>
+      <div id="compareTitle" class="compare-title"></div>
+      <button id="prev" title="Previous (Left arrow)">&#8249;</button>
+      <button id="next" title="Next (Right arrow)">&#8250;</button>
+    </div>
+    <canvas id="compareCanvas"></canvas>
+    <div class="overlay-hint">Drag the slider &nbsp;|&nbsp; scroll, pinch or double-click to zoom and check the detail &nbsp;|&nbsp; arrow keys: previous / next &nbsp;|&nbsp; Esc: close</div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

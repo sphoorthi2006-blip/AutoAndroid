@@ -2,7 +2,7 @@ name: Build Sukko APK
 
 on:
   push:
-    branches: [ sukko ]
+    branches: [ main ]
     paths-ignore:
       - '**/*.md'
   workflow_dispatch:

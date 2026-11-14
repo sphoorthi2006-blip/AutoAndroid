@@ -7,7 +7,11 @@ object NativeUpscaler {
     // All native calls run on ONE permanent thread. The OpenMP / Vulkan runtimes inside ncnn keep
     // per-thread state and can crash when each batch calls them from a brand-new thread.
     private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(null, r, "upscaler-native", 16L * 1024 * 1024).apply { isDaemon = true }
+        Thread(null, Runnable {
+            // favourable priority so the AI step is not starved when another app is on screen
+            try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_DISPLAY) } catch (_: Throwable) { }
+            r.run()
+        }, "upscaler-native", 16L * 1024 * 1024).apply { isDaemon = true }
     }
 
     private fun <T> onWorker(block: () -> T): T {

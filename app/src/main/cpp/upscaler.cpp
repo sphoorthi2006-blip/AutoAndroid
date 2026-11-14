@@ -146,6 +146,7 @@ Java_com_example_upscaler_NativeUpscaler_nativeRun(JNIEnv* env, jobject, jintArr
     std::vector<unsigned char> rgb((size_t)n * 3);
     jint* p = env->GetIntArrayElements(pixels, nullptr);
     if (!p) return nullptr;
+    #pragma omp parallel for num_threads(4)
     for (int i = 0; i < n; i++) {
         jint c = p[i];
         rgb[(size_t)i * 3] = (c >> 16) & 255;
@@ -177,6 +178,7 @@ Java_com_example_upscaler_NativeUpscaler_nativeRun(JNIEnv* env, jobject, jintArr
     const float* r = out.channel(0);
     const float* g = out.channel(1);
     const float* b = out.channel(2);
+    #pragma omp parallel for num_threads(4)
     for (int i = 0; i < ow * oh; i++) {
         int rr = (int)(r[i] * 255.f + 0.5f);
         int gg = (int)(g[i] * 255.f + 0.5f);

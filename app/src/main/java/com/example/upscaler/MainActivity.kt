@@ -318,7 +318,25 @@ class MainActivity : Activity() {
             isFillViewport = true
             addView(root)
         }
+        // Wide windows (unfolded phone, dual screen, tablet, split-screen resize): keep the content
+        // in a centred column instead of stretching it across the whole width.
+        mainView.addOnLayoutChangeListener { v, l, _, r, _, _, _, _, _ ->
+            val width = r - l
+            val maxCol = dp(560)
+            val side = if (width > maxCol + dp(44)) (width - maxCol) / 2 else dp(22)
+            if (root.paddingLeft != side) root.setPadding(side, dp(44), side, dp(28))
+        }
         setContentView(mainView)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 77)
+        }
+    }
+
+    /** The layout adapts by itself (see above); declared so Android does not restart the app mid-run. */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
     }
 
     /** Shows the card: small label, big line, progress (0..1) and details. */
@@ -733,6 +751,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("upscaler", MODE_PRIVATE)
         prefs.edit().putBoolean("run_in_progress", true).commit()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        KeepAliveService.start(this)
         readProblems.clear()
         // if the app dies inside the GPU driver, this flag is still set next time and that run uses the CPU
         val useGpu = !prefs.getBoolean("gpu_crashed", false)
@@ -743,6 +762,7 @@ class MainActivity : Activity() {
         noticeView.visibility = View.GONE
         showState("READING", "Looking for pictures\u2026", "", 0f)
         thread {
+            try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_MORE_FAVORABLE) } catch (_: Throwable) { }
             val inputs = try {
                 collect()
             } catch (e: Throwable) {
@@ -779,6 +799,7 @@ class MainActivity : Activity() {
 
             fun progressText(done: Int, name: String, extra: String = "") {
                 val detail = if (extra.isEmpty()) name else "$name  \u00B7  $extra"
+                KeepAliveService.progress(applicationContext, done, total, name)
                 runOnUiThread {
                     showState("UPSCALING", "$done / $total", detail, done.toFloat() / total)
                 }
@@ -922,6 +943,7 @@ class MainActivity : Activity() {
     private fun finishUi() {
         getSharedPreferences("upscaler", MODE_PRIVATE).edit().putBoolean("run_in_progress", false).apply()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        KeepAliveService.stop(this)
         running = false
         setBusy(false)
     }

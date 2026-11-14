@@ -84,3 +84,8 @@ Next: read the timing line from the user, then optimise the stage that dominates
 
 ## Licences
 ncnn (BSD-3-Clause), Real-ESRGAN and its models (BSD-3-Clause), Real-ESRGAN-ncnn-vulkan (MIT). Models are taken from the Upscayl repository's `models` folder. Keep the README licence note when changing this.
+
+## v3.1 (background + dual screen)
+- `KeepAliveService.kt`: foreground service (dataSync) + partial wake lock + progress notification, started in `runJob`, stopped in `finishUi`. The batch still runs in MainActivity's thread; the service keeps the process alive when the app is in the background / screen off.
+- Manifest: `resizeableActivity`, `configChanges` (no restart on fold/unfold/split-screen resize), `singleTask`, notification + foreground-service permissions. Main screen centres in a 560dp column on wide windows.
+- Native worker thread priority raised; pixel conversion in `nativeRun` parallelised with OpenMP. Not compiled/tested on device (CI is the compiler).

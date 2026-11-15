@@ -89,3 +89,12 @@ ncnn (BSD-3-Clause), Real-ESRGAN and its models (BSD-3-Clause), Real-ESRGAN-ncnn
 - `KeepAliveService.kt`: foreground service (dataSync) + partial wake lock + progress notification, started in `runJob`, stopped in `finishUi`. The batch still runs in MainActivity's thread; the service keeps the process alive when the app is in the background / screen off.
 - Manifest: `resizeableActivity`, `configChanges` (no restart on fold/unfold/split-screen resize), `singleTask`, notification + foreground-service permissions. Main screen centres in a 560dp column on wide windows.
 - Native worker thread priority raised; pixel conversion in `nativeRun` parallelised with OpenMP. Not compiled/tested on device (CI is the compiler).
+
+## v3.2 (2026-11-15) - GPU stability and speed
+- Bug fixed: `gpu_crashed` was set at run start and only cleared on a normal finish, so swiping the app away / background kill / early stop left it set and the NEXT run used the CPU (about 5x slower, more tiles). Now it is cleared in `finishUi()` and, on API 30+, kept only when the last exit was `REASON_CRASH_NATIVE`.
+- `NativeUpscaler.ensureLoaded` retries the GPU on the next picture if native dropped to CPU after a failed GPU step.
+- `ImageProcessor.tuneForDevice()` sets tile sizes and output cap from RAM (table in README). 8 GB phone: GPU tile 384.
+- Mark removal now runs inside `decodeImage` (decoder thread, one picture ahead) and `process()` is called with removeMark=false. Still CPU on purpose (owner confirmed).
+- Status line shows `GPU`/`CPU n threads`; finished screen shows seconds per picture and total time.
+- Owner phone: Motorola with 8 GB / 128 GB, probably Edge 50 Fusion (Snapdragon 7s Gen 2, Adreno 710), unconfirmed. Not yet measured on device.
+- Owner rule: do not change app behaviour that was not asked for (an automatic GPU-vs-CPU speed test was added by mistake and removed).

@@ -184,6 +184,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ImageProcessor.tuneForDevice(this)
         window.statusBarColor = BG
         window.navigationBarColor = BG
         val crashPrefs = getSharedPreferences("upscaler", MODE_PRIVATE)
@@ -732,10 +733,13 @@ class MainActivity : Activity() {
     private fun decodeImage(input: ImageInput): Decoded? {
         val t0 = System.nanoTime()
         val bmp = input.open()?.use { BitmapFactory.decodeStream(it) } ?: return null
-        val px = IntArray(bmp.width * bmp.height)
-        bmp.getPixels(px, 0, bmp.width, 0, 0, bmp.width, bmp.height)
-        val img = ImageProcessor.Img(bmp.width, bmp.height, px)
+        val bw = bmp.width
+        val bh = bmp.height
+        val px = IntArray(bw * bh)
+        bmp.getPixels(px, 0, bw, 0, 0, bw, bh)
         bmp.recycle()
+        // Mark removal runs here, on the decoder thread, while the GPU upscales the previous picture.
+        val img = ImageProcessor.removeMark(ImageProcessor.Img(bw, bh, px))
         return Decoded(img, (System.nanoTime() - t0) / 1_000_000L)
     }
 
@@ -786,6 +790,8 @@ class MainActivity : Activity() {
                 ZipSink(SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()), total > PER_ZIP)
             } else null
             var ok = 0
+            val runStart = System.nanoTime()
+            var aiMs = 0L
             val aiNotes = mutableListOf<String>()
             val finished = mutableListOf<Result>()
             // The next picture is read while the current one is processed, and the previous one is
@@ -837,10 +843,11 @@ class MainActivity : Activity() {
                         val src = dec.img
                         // always: remove the mark, no crop, AI 2x (falls back to classic by itself if AI fails)
                         val out = ImageProcessor.process(
-                            src, true, false, 2, assets, useGpu
+                            src, false, false, 2, assets, useGpu
                         ) { done, steps ->
-                            progressText(idx, input.name, "AI step $done/$steps")
+                            progressText(idx, input.name, "AI step $done/$steps \u00B7 " + NativeUpscaler.info())
                         }
+                        aiMs += ImageProcessor.lastScaleMs
                         ImageProcessor.aiNote?.let { aiNotes.add("${input.name}: $it") }
                         // at most one save in flight: wait for the previous one before starting another
                         pending?.let { finishPending(it) }
@@ -893,6 +900,11 @@ class MainActivity : Activity() {
                 "Saved as PNG \u2192 Pictures/Upscaled"
             }
             val extra = StringBuilder(where)
+            if (ok > 0) {
+                val totalSec = (System.nanoTime() - runStart) / 1_000_000_000.0
+                extra.append(String.format(Locale.US, "\nAI: %s \u00B7 %.1f s per picture \u00B7 total %.1f min",
+                    NativeUpscaler.info(), aiMs / 1000.0 / ok, totalSec / 60.0))
+            }
             if (aiNotes.isNotEmpty()) extra.append("\nNote: ").append(aiNotes.take(2).joinToString("; "))
             val skipped = readProblems + saveErrors
             if (skipped.isNotEmpty()) extra.append("\nSkipped: ").append(skipped.take(5).joinToString("; "))
@@ -923,6 +935,9 @@ class MainActivity : Activity() {
                 val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
                 val info = am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()
                 if (info != null) {
+                    if (info.reason != android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) {
+                        prefs.edit().putBoolean("gpu_crashed", false).apply()
+                    }
                     val name = when (info.reason) {
                         android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "crash inside the native AI library / GPU driver"
                         android.app.ApplicationExitInfo.REASON_CRASH -> "app error"
@@ -941,7 +956,9 @@ class MainActivity : Activity() {
     }
 
     private fun finishUi() {
-        getSharedPreferences("upscaler", MODE_PRIVATE).edit().putBoolean("run_in_progress", false).apply()
+        // the process is still alive here, so the GPU driver did not crash: never leave the flag set
+        getSharedPreferences("upscaler", MODE_PRIVATE).edit()
+            .putBoolean("run_in_progress", false).putBoolean("gpu_crashed", false).apply()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         KeepAliveService.stop(this)
         running = false

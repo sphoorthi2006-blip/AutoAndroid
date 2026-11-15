@@ -43,7 +43,8 @@ object NativeUpscaler {
     @Synchronized
     fun ensureLoaded(am: AssetManager, scale: Int, useGpu: Boolean): Boolean {
         if (!available()) return false
-        if (loadedScale == scale && loadedGpu == useGpu) return true
+        // if the native side dropped to CPU after a failed GPU step, try the GPU again for the next picture
+        if (loadedScale == scale && loadedGpu == useGpu && (!useGpu || onWorker { nativeUsingGpu() })) return true
         val ok = try {
             onWorker { nativeLoad(am, scale, useGpu) }
         } catch (t: Throwable) {

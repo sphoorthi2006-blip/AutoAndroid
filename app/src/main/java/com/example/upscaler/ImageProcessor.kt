@@ -358,10 +358,24 @@ object ImageProcessor {
     }
 
     // ---------- AI upscale (Real-ESRGAN via ncnn), done in overlapping tiles ----------
-    private const val TILE_CPU = 192      // source pixels per tile on the CPU
-    private const val TILE_GPU = 256      // bigger tiles on the GPU: less overhead and less thrown-away overlap
+    // Sized from the phone's RAM by tuneForDevice(): small phones get small tiles and a lower output cap,
+    // big phones get big tiles (less overhead, less thrown-away overlap).
+    private var TILE_CPU = 192            // source pixels per tile on the CPU
+    private var TILE_GPU = 256            // source pixels per tile on the GPU
+    private var AI_MAX_OUTPUT_PIXELS = 30_000_000L
+
+    fun tuneForDevice(ctx: android.content.Context) {
+        val am = ctx.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val mi = android.app.ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+        val gb = mi.totalMem / (1024.0 * 1024.0 * 1024.0)
+        when {
+            am.isLowRamDevice || gb < 3.0 -> { TILE_CPU = 128; TILE_GPU = 128; AI_MAX_OUTPUT_PIXELS = 12_000_000L }
+            gb < 6.0 -> { TILE_CPU = 192; TILE_GPU = 256; AI_MAX_OUTPUT_PIXELS = 20_000_000L }
+            else -> { TILE_CPU = 192; TILE_GPU = 384; AI_MAX_OUTPUT_PIXELS = 30_000_000L }
+        }
+    }
     private const val TILE_PAD = 10       // extra context around each tile, cut off again afterwards (same as Real-ESRGAN-ncnn)
-    private const val AI_MAX_OUTPUT_PIXELS = 30_000_000L
 
     /** Set by process(): why the AI path was skipped (null when it worked or was not asked for). */
     @Volatile var aiNote: String? = null

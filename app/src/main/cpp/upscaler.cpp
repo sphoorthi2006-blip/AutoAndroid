@@ -68,7 +68,9 @@ static bool build_net(JNIEnv* env, int scale, bool wantVk) {
     if (vk) {
         net->opt.use_fp16_packed = true;
         net->opt.use_fp16_storage = true;
-        net->opt.use_fp16_arithmetic = false;
+        // fp16 maths: Adreno GPUs run it at ~2x the speed of fp32. ncnn switches it off by itself if the GPU lacks support.
+        net->opt.use_fp16_arithmetic = true;
+        net->opt.use_shader_pack8 = false;
         net->opt.use_int8_packed = false;
         net->opt.use_int8_storage = false;
         net->opt.use_int8_arithmetic = false;

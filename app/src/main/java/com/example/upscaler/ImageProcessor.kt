@@ -372,7 +372,7 @@ object ImageProcessor {
         when {
             am.isLowRamDevice || gb < 3.0 -> { TILE_CPU = 128; TILE_GPU = 128; AI_MAX_OUTPUT_PIXELS = 12_000_000L }
             gb < 6.0 -> { TILE_CPU = 192; TILE_GPU = 256; AI_MAX_OUTPUT_PIXELS = 20_000_000L }
-            else -> { TILE_CPU = 192; TILE_GPU = 384; AI_MAX_OUTPUT_PIXELS = 30_000_000L }
+            else -> { TILE_CPU = 192; TILE_GPU = 256; AI_MAX_OUTPUT_PIXELS = 30_000_000L }   // 384 measured ~15.9 s/picture, 256 measured ~9 s
         }
     }
     private const val TILE_PAD = 10       // extra context around each tile, cut off again afterwards (same as Real-ESRGAN-ncnn)

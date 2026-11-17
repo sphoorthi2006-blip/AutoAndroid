@@ -53,6 +53,7 @@ data class ExportSummary(
     val unusedImages: List<String>,
     val lufs: Double,
     val clicks: Int,
+    val breakdown: String = "",
 )
 
 data class ExportUi(
@@ -291,7 +292,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _export.value = ExportUi(
                     result = ExportSummary(
                         vname, rf.name ?: "report.csv", out.frames, out.frames.toDouble() / s.fps, out.seconds,
-                        used, s.images.size, unused, out.audio.lufs, out.audio.clicks,
+                        used, s.images.size, unused, out.audio.lufs, out.audio.clicks, out.breakdown,
                     ),
                 )
             } catch (e: OutOfMemoryError) {

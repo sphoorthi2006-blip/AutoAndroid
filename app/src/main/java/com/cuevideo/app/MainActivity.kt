@@ -361,6 +361,7 @@ fun MainScreen(vm: AppViewModel) {
                 Text("Done: ${r.videoName}", color = Green, fontWeight = FontWeight.Bold)
                 Text("Report: ${r.reportName}", fontSize = 13.sp, color = Muted)
                 Text("${r.frames} frames, ${"%.1f".format(r.seconds)} s of video, made in ${"%.0f".format(r.took)} s. ${r.clicks} clicks, voice-over ${"%.1f".format(r.lufs)} LUFS.", fontSize = 13.sp, color = Muted)
+                if (r.breakdown.isNotEmpty()) Text(r.breakdown, fontSize = 11.sp, color = Muted)
                 Text("Pictures used: ${r.usedImages} of ${r.givenImages}.", fontSize = 13.sp, color = Muted)
                 if (r.unusedImages.isNotEmpty())
                     Text("Not used: " + r.unusedImages.take(30).joinToString(", ") + if (r.unusedImages.size > 30) ", ..." else "", fontSize = 12.sp, color = Amber)

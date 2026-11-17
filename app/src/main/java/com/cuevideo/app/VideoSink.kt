@@ -13,7 +13,14 @@ import java.nio.ByteBuffer
  * H.264 encoder fed through an input Surface, plus the MP4 muxer. The finished audio (an .m4a made by
  * AudioJob) is copied into the same muxer in step with the video, so no second pass is needed.
  */
-class VideoSink(file: File, private val W: Int, private val H: Int, private val fps: Int, audio: File?) {
+class VideoSink(
+    file: File,
+    private val W: Int,
+    private val H: Int,
+    private val fps: Int,
+    audio: File?,
+    private val sparse: Boolean = false,
+) {
     private val codec: MediaCodec
     val inputSurface: Surface
     private val muxer = MediaMuxer(file.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
@@ -32,7 +39,9 @@ class VideoSink(file: File, private val W: Int, private val H: Int, private val 
     private fun create(withProfile: Boolean): MediaCodec {
         val f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, W, H)
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-        f.setInteger(MediaFormat.KEY_BIT_RATE, if (fps > 30) 16_000_000 else 12_000_000)
+        // Sparse mode sends far fewer frames, so each one gets a bigger share (the file stays small anyway).
+        val rate = if (sparse) (if (fps > 30) 20_000_000 else 16_000_000) else (if (fps > 30) 16_000_000 else 12_000_000)
+        f.setInteger(MediaFormat.KEY_BIT_RATE, rate)
         f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
         if (withProfile) {
@@ -89,6 +98,15 @@ class VideoSink(file: File, private val W: Int, private val H: Int, private val 
             muxer.writeSampleData(audioTrack, abuf, ainfo)
             ex.advance()
         }
+    }
+
+    /** Asks the encoder to make the next frame a full (key) frame. Harmless if the encoder ignores it. */
+    fun requestSync() {
+        try {
+            val b = android.os.Bundle()
+            b.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0)
+            codec.setParameters(b)
+        } catch (e: Exception) { }
     }
 
     /** Takes finished video from the encoder. [untilEnd] waits for the end of the stream. */

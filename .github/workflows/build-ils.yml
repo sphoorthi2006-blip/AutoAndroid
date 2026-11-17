@@ -1,0 +1,43 @@
+name: Build ILS APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'ils-android/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ils-android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Make wrapper executable
+        run: chmod +x gradlew
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/*.apk ils-android-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ils-android-debug-apk
+          path: ils-android/ils-android-debug.apk
+      - name: Publish to a GitHub Release (direct download link)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ils-android-latest --yes --cleanup-tag -R "$GITHUB_REPOSITORY" || true
+          gh release create ils-android-latest ils-android-debug.apk -R "$GITHUB_REPOSITORY" \
+            --title "ILS Android (latest debug build)" \
+            --notes "Debug APK built from commit $GITHUB_SHA. Install on your phone (allow unknown sources)."

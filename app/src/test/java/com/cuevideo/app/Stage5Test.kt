@@ -58,7 +58,7 @@ class Stage5Test {
         val lines = csv.trim().split("\r\n")
         assertEquals("cue,start,end,source,replaced_image,text", lines[0])
         assertEquals("1,0.00,2.00,1.jpg,,Welcome to the show", lines[1])
-        assertEquals("2,2.00,4.00,TEXT SLIDE (heading, fade-in + zoom),2.jpg,1. The first thing", lines[2])
+        assertEquals("2,2.00,4.00,\"TEXT SLIDE (heading, fade-in + zoom)\",2.jpg,1. The first thing", lines[2])
         assertEquals("5,8.00,10.00,TEXT SLIDE (subscribe),5.jpg,Please subscribe now", lines[5])
         val (used, unused) = ReportCsv.usage(plan, imgs(1, 2, 3, 4, 5, 6, 7))
         assertEquals(4, used)
@@ -125,7 +125,7 @@ class Stage5Test {
 
     @Test fun faststartMovesMoovAndFixesOffsets() {
         val src = makeMp4(listOf(32L, 48L))                        // ftyp 24 + mdat header 8 -> payload at 32
-        val f = File.createTempFile("fs", ".mp4")
+        val f = File.createTempFile("faststart1", ".mp4")
         try {
             f.writeBytes(src)
             val out = ByteArrayOutputStream()
@@ -150,7 +150,7 @@ class Stage5Test {
         val moov = box("moov", box("trak", ByteArray(4)))
         val mdat = box("mdat", ByteArray(10))
         val src = ftyp + moov + mdat
-        val f = File.createTempFile("fs2", ".mp4")
+        val f = File.createTempFile("faststart2", ".mp4")
         try {
             f.writeBytes(src)
             val out = ByteArrayOutputStream()

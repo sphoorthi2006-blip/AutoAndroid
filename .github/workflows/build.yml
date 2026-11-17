@@ -1,7 +1,11 @@
 name: Build APK
 on:
   push:
+    branches-ignore: [ buildlog ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -16,10 +20,25 @@ jobs:
         with:
           gradle-version: 8.9
       - name: Run logic tests
-        run: gradle :app:testDebugUnitTest --no-daemon
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
       - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon 2>&1 | tee -a /tmp/build.log
       - uses: actions/upload-artifact@v4
         with:
           name: CueVideo-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Save error log to the buildlog branch
+        if: failure()
+        run: |
+          mkdir /tmp/out
+          { grep -E "^e: |^w: .*(Stage|Main|Video|Clip|Gl|Export)|FAILED|Exception|Error|What went wrong|expected|but was" /tmp/build.log | head -150; echo ----; tail -60 /tmp/build.log; } > /tmp/out/log.txt
+          cd /tmp/out
+          git init -q
+          git checkout -q -b buildlog
+          git add log.txt
+          git -c user.name=ci -c user.email=ci@example.com commit -q -m "log"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" buildlog

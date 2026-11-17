@@ -1,0 +1,15 @@
+{
+  "slides": [
+    {
+      "image": 6,
+      "elements": [
+        { "label": "skin",            "type": "icon", "sentence": 0, "trigger": "skin",       "row": 1, "col": 1 },
+        { "label": "itching",         "type": "icon", "sentence": 0, "trigger": "itching",    "row": 1, "col": 2 },
+        { "label": "insect bite",     "type": "icon", "sentence": 1, "trigger": "insect",     "row": 2, "col": 1 },
+        { "label": "baking soda paste","type": "icon", "sentence": 1, "trigger": "paste",     "row": 2, "col": 2 },
+        { "label": "3 : 1",           "type": "text", "sentence": 2, "trigger": "three parts","row": 3, "col": 1 },
+        { "label": "lukewarm bath",   "type": "icon", "sentence": 3, "trigger": "lukewarm",   "row": 3, "col": 2 }
+      ]
+    }
+  ]
+}

@@ -31,6 +31,14 @@ jobs:
         with:
           name: CueVideo-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as a release (download link)
+        if: github.ref == 'refs/heads/cuevideo'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk CueVideo.apk
+          gh release delete cuevideo-latest -y --cleanup-tag || true
+          gh release create cuevideo-latest CueVideo.apk --title "Cue Video (latest build)" --notes "Latest Cue Video debug APK from branch cuevideo." --target "${{ github.sha }}"
       - name: Save error log to the buildlog branch
         if: failure()
         run: |

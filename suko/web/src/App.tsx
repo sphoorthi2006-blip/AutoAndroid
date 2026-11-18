@@ -8,6 +8,7 @@ import { FontPicker } from "./FontPicker";
 import { ResolutionPicker } from "./ResolutionPicker";
 import { buildTextSvg, DEFAULT_TEXT, SHAPES, type TextSettings } from "./textanim";
 import VideoMode from "./VideoMode";
+import TextEditor from "./TextEditor";
 
 /** The video ends this long after the last element is finished, so the final artwork is on screen in the last frames. */
 const HOLD = 0.1;
@@ -42,7 +43,14 @@ function thumbOf(l: Layer): string {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
+/** Inside the Suko app the Text Editor card opens this page as ...index.html?app=text: the Text Editor screen (TextEditor.tsx), no Image/Video tabs. */
+const isTextApp = (): boolean => { try { return new URLSearchParams(window.location.search).get("app") === "text"; } catch { return false; } };
+
 export default function App() {
+  return isTextApp() ? <TextEditor /> : <Studio />;
+}
+
+function Studio() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [project, setProject] = useState<Project | null>(null);

@@ -16,6 +16,8 @@ class SukoBridge(
     /** Runs a piece of JavaScript in the page (the activity posts it to the UI thread). */
     private val runJs: (String) -> Unit,
     private val onSaved: (where: String) -> Unit,
+    /** The page's own back arrow: closes this screen (the activity posts finish() to the UI thread). */
+    private val onBack: () -> Unit = {},
 ) {
     private val pool = Executors.newSingleThreadExecutor()
 
@@ -57,6 +59,8 @@ class SukoBridge(
 
     @JavascriptInterface
     fun info(): String = """{"host":"suko","engine":"${WebConfig.ENGINE}","blocked":${blockedCount()}}"""
+
+    @JavascriptInterface fun back() = onBack()
 
     fun close() {
         pool.shutdownNow()

@@ -66,6 +66,7 @@ class WebHostActivity : ComponentActivity() {
             core, saves, inputs, { blocked.get() },
             { js -> runOnUiThread { if (!isDestroyed) web.evaluateJavascript(js, null) } },
             { where -> runOnUiThread { Toast.makeText(this, "Saved: $where", Toast.LENGTH_LONG).show() } },
+            { runOnUiThread { if (web.canGoBack()) web.goBack() else finish() } },
         )
         val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (debuggable) WebView.setWebContentsDebuggingEnabled(true)

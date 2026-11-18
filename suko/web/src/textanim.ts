@@ -54,7 +54,7 @@ export const SHAPES: { id: string; label: string; w: number; h: number }[] = [
 ];
 /** write = handwritten: the pen follows the centre line of every letter (no outline). trace = the older look: outline drawn, then filled. */
 export type WriteStyle = "write" | "trace";
-export interface TextSettings { text: string; fontId: string; color: string; align: Align; size: number /* % of the biggest size that fits */; shape: string; style: WriteStyle; posX?: number /* 0 = far left, 100 = far right of the safe area; undefined = automatic */; posY?: number /* 0 = top, 100 = bottom; undefined = centred */ }
+export interface TextSettings { text: string; fontId: string; color: string; align: Align; size: number /* % of the biggest size that fits */; shape: string; style: WriteStyle; posX?: number /* 0 = far left, 100 = far right of the safe area; undefined = automatic */; posY?: number /* 0 = top, 100 = bottom; undefined = centred */; px?: number /* exact size in canvas pixels (Text Editor screen); when set it replaces the size % */ }
 export const DEFAULT_TEXT: TextSettings = { text: "The Lord is my shepherd;\nI shall not want.\n— Psalm 23:1", fontId: "patrick", color: "#1b2a41", align: "center", size: 100, shape: "wide", style: "write" };
 
 /** One character to draw: its font, size scale (1 = normal, smaller = superscript / subscript) and vertical shift (in em). */
@@ -81,8 +81,10 @@ export function parseMarkup(line: string): Ch[] {
   return out;
 }
 
-interface Placed { d: string; len: number; ch: string; font: opentype.Font; x: number; y: number; sz: number }
-interface Laid { glyphs: Placed[]; width: number; height: number; size: number }
+export interface Placed { d: string; len: number; ch: string; font: opentype.Font; x: number; y: number; sz: number }
+/** ink = box around the letters, area = the safe area they can move in (both in canvas pixels; set by layoutCore). */
+export interface Box { x: number; y: number; w: number; h: number }
+export interface Laid { glyphs: Placed[]; width: number; height: number; size: number; fit?: number /* biggest size that fits, canvas px */; ink?: Box; area?: Box }
 
 /** Approximate pen length of an outline (control polygon), used to give detailed letters more time than simple ones. */
 function pathLen(cmds: opentype.PathCommand[]): number {
@@ -102,7 +104,7 @@ function pathLen(cmds: opentype.PathCommand[]): number {
  *  The block is centred by the ink itself (top of the tallest letter to the bottom of the lowest), so it sits in the middle of the picture. */
 export function layoutText(main: opentype.Font, mathFont: opentype.Font, s: TextSettings, cv: Canvas): Laid {
   const marginX = cv.w * 0.08, marginY = cv.h * 0.1;
-  return layoutCore(main, mathFont, s.text, s.align, s.size, { x: marginX, y: marginY, w: cv.w - 2 * marginX, h: cv.h - 2 * marginY }, cv, false, 300, { x: s.posX, y: s.posY });
+  return layoutCore(main, mathFont, s.text, s.align, s.size, { x: marginX, y: marginY, w: cv.w - 2 * marginX, h: cv.h - 2 * marginY }, cv, false, 300, { x: s.posX, y: s.posY }, s.px);
 }
 
 /** Writes `text` into a box of the picture (a detected heading or caption): biggest size that fits, centred in the box. Used by the Video tab to replace the AI's lettering. */
@@ -114,7 +116,7 @@ export function layoutInBox(main: opentype.Font, mathFont: opentype.Font, text: 
 
 /** Shared layout: word wrap inside `area`, biggest size that fits (times size%), centred or left, then the ink is centred up/down inside the area.
  *  tight = true measures the height by the letters (one line needs about 0.85 x size) instead of the roomy line spacing of the Text tab. */
-function layoutCore(main: opentype.Font, mathFont: opentype.Font, text: string, align: Align, sizePct: number, area: { x: number; y: number; w: number; h: number }, cv: Canvas, tight: boolean, maxSize = 300, pos?: { x?: number; y?: number }): Laid {
+function layoutCore(main: opentype.Font, mathFont: opentype.Font, text: string, align: Align, sizePct: number, area: { x: number; y: number; w: number; h: number }, cv: Canvas, tight: boolean, maxSize = 300, pos?: { x?: number; y?: number }, fixedPx?: number): Laid {
   const maxW = area.w, maxH = area.h, marginX = area.x;
   const lineGap = 1.28;
   const fontFor = (ch: string) => (main.charToGlyphIndex(ch) > 0 || mathFont.charToGlyphIndex(ch) <= 0 ? main : mathFont);
@@ -154,7 +156,8 @@ function layoutCore(main: opentype.Font, mathFont: opentype.Font, text: string, 
   const fits = (size: number) => { const L = wrap(size); return needH(L.length, size) <= maxH && L.every(ln => lineWidth(ln, size) <= maxW + 0.5); };
   let lo = tight ? 6 : 16, hi = maxSize;   // binary search: the biggest size that fits
   for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
-  const size = Math.max(tight ? 5 : 10, lo * (Math.min(100, Math.max(20, sizePct)) / 100));
+  const size = fixedPx !== undefined && Number.isFinite(fixedPx) ? Math.max(10, Math.min(lo, fixedPx)) : Math.max(tight ? 5 : 10, lo * (Math.min(100, Math.max(20, sizePct)) / 100));
+  const fit = lo;
   const lines = wrap(size);
 
   // First place every letter on a baseline, then move the whole block so its ink is centred up/down.
@@ -185,7 +188,8 @@ function layoutCore(main: opentype.Font, mathFont: opentype.Font, text: string, 
     const p = r.font.charToGlyph(r.ch).getPath(r.x + shiftX, r.y + shift, r.sz);
     if (p.commands.length) glyphs.push({ d: p.toPathData(2), len: pathLen(p.commands), ch: r.ch, font: r.font, x: r.x + shiftX, y: r.y + shift, sz: r.sz });
   }
-  return { glyphs, width: cv.w, height: cv.h, size };
+  const ink = raw.length ? { x: left + shiftX, y: top + shift, w: right - left, h: bot - top } : undefined;
+  return { glyphs, width: cv.w, height: cv.h, size, fit, ink, area };
 }
 
 const f3 = (x: number) => +x.toFixed(3);
@@ -283,10 +287,11 @@ export function textParts(laid: Laid, s: { color: string; style: WriteStyle }, T
   }).join("");
 }
 
-export async function buildTextSvg(s: TextSettings, bgMarkupFor: (w: number, h: number) => string, seconds: number): Promise<{ svg: string; width: number; height: number }> {
+export interface TextScene { svg: string; width: number; height: number; size: number; fit?: number; ink?: Box; area?: Box }
+export async function buildTextSvg(s: TextSettings, bgMarkupFor: (w: number, h: number) => string, seconds: number): Promise<TextScene> {
   const shape = SHAPES.find(x => x.id === s.shape) ?? SHAPES[0];
   const font = findFont(s.fontId);
   const [main, mathFont] = await Promise.all([loadFont(font.url), loadFont(MATH_URL)]);
   const laid = layoutText(main, mathFont, s, shape);
-  return { svg: textSvg(laid, s, bgMarkupFor(shape.w, shape.h), seconds), width: shape.w, height: shape.h };
+  return { svg: textSvg(laid, s, bgMarkupFor(shape.w, shape.h), seconds), width: shape.w, height: shape.h, size: laid.size, fit: laid.fit, ink: laid.ink, area: laid.area };
 }

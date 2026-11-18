@@ -16,6 +16,7 @@ type Host = {
   saveEnd(id: string): void;
   inputList(): string;
   info(): string;
+  back?(): void;
 };
 
 const host = (): Host | undefined => (globalThis as any).SukoBridge;
@@ -96,4 +97,10 @@ export async function inputFiles(): Promise<File[]> {
 export function hostInfo(): any {
   const h = host();
   return h ? JSON.parse(h.info() || "{}") : null;
+}
+
+/** The page's own back arrow: closes the screen inside the Suko app, goes back one page in a browser. */
+export function goBack(): void {
+  const h = host();
+  if (h?.back) h.back(); else history.back();
 }

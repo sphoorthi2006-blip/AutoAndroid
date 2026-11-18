@@ -62,4 +62,10 @@ ok(box.glyphs.length === 7, "Video-tab box layout still works");
   mod.removeCustomFont(c.id); mod.removeCustomFont(w.id);
   ok(mod.allFonts().length === 1 && mod.findFont(c.id).id === "patrick", "step 24: removing the uploaded fonts leaves only the bundled one");
 }
+const P = mod.layoutText(main, math, { ...base, px: 90 }, cv);
+ok(Math.abs(P.size - 90) < 0.01 && P.fit > 90, "exact px size: used as given, and the biggest fitting size is reported");
+const P2 = mod.layoutText(main, math, { ...base, px: 99999 }, cv);
+ok(Math.abs(P2.size - P2.fit) < 0.01, "exact px size is limited to what fits");
+const IA = mod.layoutText(main, math, { ...base, posX: 20, posY: 70 }, cv);
+ok(IA.ink && IA.area && Math.abs(IA.ink.x - (IA.area.x + (IA.area.w - IA.ink.w) * 0.2)) < 1.5 && Math.abs(IA.ink.y - (IA.area.y + (IA.area.h - IA.ink.h) * 0.7)) < 1.5, "reported ink box matches the chosen position (used by drag on the picture)");
 console.log(fails ? `${fails} FAILED` : "all passed"); process.exit(fails ? 1 : 0);

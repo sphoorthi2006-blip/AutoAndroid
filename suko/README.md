@@ -273,3 +273,10 @@ Nothing was compiled or run: the sandbox has no Gradle/Android SDK. The first re
 - The video tool is called **Auto Editor** everywhere users see it (the old "Cue Video" header and file names are gone; the Kotlin package stays `com.cuevideo.app`).
 - The old one-picture `UpscaleTestActivity` stays in the manifest but the home card now opens the new tool.
 - NOT verified: Android code never compiled here (CI is the compiler). `UpscaleBatch` was compiled and run on the JVM.
+
+## Text Editor: new screen from the owner's layout (Text Editor - write / export)
+- `web/src/TextEditor.tsx` + `TextEditor.css` replace the old sidebar page for `index.html?app=text` (Image and Video modes are untouched and still use the old Studio page).
+- Dark layout: back arrow (new `SukoBridge.back()` closes the screen), Export button, picture (16:9 / 9:16 / 1:1) with a resolution badge, **drag the text on the picture** to move it (bottom-right dot resizes), play button + scrubber + time, tabs **Text / Style / Motion / Export**.
+- Text: text box in Patrick Hand, font line + Add font file (uses the step 24 `fontStore`, kept on the phone), Size in px, Position (Center + 4 arrows). Style: colours, background colour or image, picture shape, align. Motion: handwritten or outline-then-fill. Export: 1080p / 2K / 4K, 30/60 fps (4K = 30), length, progress with Cancel.
+- The MP4 is saved to Download/Suko (the layout says Movies/Suko; the saver was not changed).
+- 3 new checks in `web/tests/text.test.mjs` (exact px size, size limit, ink box for dragging). NOT verified on a phone: Kotlin compile of `back()`, touch dragging, real export.

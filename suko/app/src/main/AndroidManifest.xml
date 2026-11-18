@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:largeHeap="true"
+        android:theme="@style/Theme.Suko">
+
+        <!-- Home screen: the three tools -->
+        <activity
+            android:name="com.suko.app.HubActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Upscale self-test (step 2) -->
+        <activity
+            android:name="com.suko.app.UpscaleTestActivity"
+            android:label="Upscale test"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
+
+        <!-- SVG Editor (step 24: intake only) -->
+        <activity
+            android:name="com.suko.app.SvgEditorActivity"
+            android:label="SVG Editor"
+            android:exported="false" />
+
+        <!-- Web host (steps 16-18): shows pages from assets/web, offline only. The app has no INTERNET permission. -->
+        <activity
+            android:name="com.suko.app.web.WebHostActivity"
+            android:label="Web"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
+
+        <!-- Intake test (step 8) -->
+        <activity
+            android:name="com.suko.app.IntakeTestActivity"
+            android:label="Intake test"
+            android:exported="false" />
+
+        <!-- Auto Editor = the Cue Video engine (package com.cuevideo.app, unchanged) -->
+        <activity
+            android:name="com.cuevideo.app.MainActivity"
+            android:label="Auto Editor"
+            android:exported="false" />
+    </application>
+</manifest>

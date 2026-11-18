@@ -58,7 +58,7 @@ jobs:
           ls -la app/src/main/assets/models
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Run web tests (Studio units and the Suko bridge)
         run: |
           set -o pipefail

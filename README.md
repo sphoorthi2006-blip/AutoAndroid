@@ -8,6 +8,14 @@ This repository contains three separate Android projects plus a browser extensio
 | **Suko** | `suko/` | Offline Android app with Auto Editor, SVG Editor and Text Editor | `.github/workflows/build-suko.yml` |
 | **Image Layer Studio Android** | `ils-android/` | Standalone handwriting / slide-rendering Android app | `.github/workflows/build-ils.yml` |
 
+## Suko Android video editor
+
+Suko is a separate offline Android app in [`suko/`](suko/README.md). Its Auto Editor turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds. The audio add-on supports voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export when enabled.
+
+The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Suko project has its own CI workflow: [`.github/workflows/build-suko.yml`](.github/workflows/build-suko.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Suko-debug-apk` artifact.
+
+Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The SVG Editor audio controls exist in the web Video Mode source, but that flow is not yet wired into the Android SVG Editor screen.
+
 ## Sukko Image Upscaler
 
 Two versions of the same tool:

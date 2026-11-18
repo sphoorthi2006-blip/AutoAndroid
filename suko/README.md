@@ -62,7 +62,7 @@ Last finished step: **23 of 30** (1-20, 22, 23 done; **21 skipped on purpose**, 
 2. Open the **Actions** tab. "Build Suko APK" starts by itself (or press Run workflow).
 3. When green, open the run and download **Suko-debug-apk** at the bottom. Unzip, copy `app-debug.apk` to the phone, allow "install unknown apps".
 4. If the run is red, the error log is on the `buildlog` branch (`log.txt`), or copy the red text from the run and paste it to Claude.
-5. Pushing to `main` also publishes `Suko.apk` under Releases -> `suko-latest`.
+5. Pushing to `main` also publishes `Sukko.apk` under Releases -> `suko-latest`.
 
 ## Steps 20-23: what is in them
 - **Font (20):** Patrick Hand is the ONLY text font, from the owner's `PatrickHand-Regular.ttf` (bundled in the web view, so it works offline; same file as the native app's font). The Font picker is gone (it shows the font name). The other five fonts and their npm packages were removed. Noto Sans Math stays as a hidden fallback so symbols like √ ∑ π still draw.

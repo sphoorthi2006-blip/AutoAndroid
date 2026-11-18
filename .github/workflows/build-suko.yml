@@ -1,4 +1,4 @@
-name: Build Suko APK
+name: Build Sukko APK
 on:
   push:
     branches: [ main ]
@@ -99,9 +99,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Suko.apk
+          cp app/build/outputs/apk/debug/app-debug.apk Sukko.apk
           gh release delete suko-latest -y --cleanup-tag || true
-          gh release create suko-latest Suko.apk --title "Suko (latest build)" --notes "Latest Suko debug APK from branch main." --target "${{ github.sha }}"
+          gh release create suko-latest Sukko.apk --title "Sukko (latest build)" --notes "Latest Suko debug APK from branch main." --target "${{ github.sha }}"
       - name: Save error log to the buildlog-suko branch
         if: failure()
         run: |

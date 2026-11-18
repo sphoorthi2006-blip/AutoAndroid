@@ -134,6 +134,11 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   const [seekReq, setSeekReq] = useState<{ t: number; id: number } | null>(null);
   const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
   const [quality, setQuality] = useState<Record<string, string>>({});   // step 9: result of the last-frame check, by slide key
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [elementSounds, setElementSounds] = useState(true);
+  const audioRef = useRef<HTMLInputElement>(null);
   const cancel = useRef(false);
   const run = useRef(0);
   const picRef = useRef<HTMLInputElement>(null);
@@ -256,9 +261,26 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
     const frames = Math.round(total * FPS);
     setExporting({ done: 0, total: frames });
     try {
+      const soundEvents = elementSounds ? rows.flatMap(r => (r.plan?.items ?? [])
+        .filter(item => item.dur > 0)
+        .map(item => ({ time: r.start + item.begin }))) : [];
+      let clickSound: AudioBuffer | null = null;
+      if (soundEvents.length) {
+        const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!Ctx) throw new Error("Audio playback is not available in this browser.");
+        const clickContext = new Ctx();
+        try {
+          const response = await fetch(`${import.meta.env.BASE_URL}click.wav`);
+          if (!response.ok) throw new Error("The bundled click.wav sound could not be loaded.");
+          clickSound = await clickContext.decodeAudioData(await response.arrayBuffer());
+        } finally { await clickContext.close(); }
+      }
       const blob = await renderMp4Timeline({
         resolution: resId,
         slides: rows.map(r => ({ svg: r.svg!, width: r.width, height: r.height, start: r.start, end: r.end })),
+        audio: audioBuffer,
+        clickSound,
+        soundEvents,
         onProgress: (d, t) => setExporting({ done: d, total: t }), cancelled: () => cancel.current,
       });
       download(`video-${resId}-${Math.round(total)}s.mp4`, blob);
@@ -305,6 +327,26 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         {!specs && slides.length > 0 && (
           <div className="row"><label className="inl">Seconds per image <input className="num" type="number" min="1" max="300" style={{ width: 70 }} value={defSec} onChange={e => setDefSec(Math.min(300, Math.max(1, +e.target.value || 10)))} /></label></div>
         )}
+
+        <h2>Audio</h2>
+        <div className="row wrap">
+          <button className="ghost" disabled={!!exporting || audioLoading} onClick={() => audioRef.current?.click()}>{audioFile ? "Change audio" : "Add audio"}</button>
+          {audioFile && <button className="ghost" disabled={!!exporting || audioLoading} onClick={() => { setAudioFile(null); setAudioBuffer(null); }}>Remove audio</button>}
+        </div>
+        <input ref={audioRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden onChange={async e => {
+          const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
+          setAudioLoading(true);
+          try {
+            const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!Ctx) throw new Error("Audio decoding is not available in this browser.");
+            const ctx = new Ctx();
+            try { const decoded = await ctx.decodeAudioData(await file.arrayBuffer()); setAudioFile(file); setAudioBuffer(decoded); }
+            finally { await ctx.close(); }
+          } catch (err: any) { onError(`Could not read ${file.name}: ${err?.message ?? "unsupported audio format"}`); }
+          finally { setAudioLoading(false); }
+        }} />
+        <p className="hint small">{audioLoading ? "Reading audio…" : audioFile ? `${audioFile.name} — audio will be synchronized to the video, trimmed if longer, or padded with silence if shorter.` : "Add a voice-over, music track, or other audio file. Common formats are supported when your device can decode them."}</p>
+        <label className="chk"><input type="checkbox" checked={elementSounds} disabled={!!exporting} onChange={e => setElementSounds(e.target.checked)} /> Use the bundled click.wav for every element (headings, arrows and illustrations)</label>
 
         <h2>Animation</h2>
         <div className="row"><label className="inl">Background <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: 44, height: 26, padding: 0, border: "1px solid #bbb" }} /></label>
@@ -391,7 +433,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
 
         <h2>Export</h2>
         {!exporting && <ResolutionPicker value={resId} onChange={setResId} fps={FPS} seconds={total} />}
-        {!exporting && <button style={{ marginTop: 8 }} onClick={exportMp4} disabled={!mp4Supported() || !ready || !rows.length}>Export {resId === "1080p" ? "1080p" : resId.toUpperCase()} MP4 ({fmt(total)})</button>}
+        {!exporting && <button style={{ marginTop: 8 }} onClick={exportMp4} disabled={!mp4Supported() || !ready || !rows.length || audioLoading}>Export {resId === "1080p" ? "1080p" : resId.toUpperCase()} MP4 ({fmt(total)})</button>}
         {exporting && (
           <div>
             <div className="bar"><div style={{ width: `${pct}%` }} /></div>
@@ -400,7 +442,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           </div>
         )}
         {!mp4Supported() && <p className="hint small">This browser cannot make MP4. Use Chrome or Edge.</p>}
-        <p className="hint small" style={{ marginTop: 8 }}>One silent MP4 with all images in order, in the size you picked (1080p, 2K or 4K), 30 frames per second. Add the voice-over in your editor.</p>
+        <p className="hint small" style={{ marginTop: 8 }}>Exports one MP4 with all images, the selected audio track, and optional element-specific sound effects, synchronized to the slide timeline.</p>
       </aside>
     </main>
   );

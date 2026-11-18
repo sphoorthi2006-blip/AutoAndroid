@@ -1,18 +1,18 @@
 # AutoAndroid repository
 
-This repository contains three separate Android projects plus a browser extension. They have independent build workflows; the Suko video-editor audio add-on does not replace the original image upscaler.
+This repository contains three separate Android projects plus a browser extension. They have independent build workflows; the Bezalel video-editor audio add-on does not replace the original image upscaler.
 
 | Project | Folder | Purpose | Build workflow |
 |---|---|---|---|
 | **Sukko Image Upscaler** | repository root (`app/`, `extension/`) | AI image upscaler for Android and browser extension | `.github/workflows/build.yml` |
-| **Suko** | `suko/` | Offline Android app with Auto Editor, SVG Editor and Text Editor | `.github/workflows/build-suko.yml` |
+| **Bezalel** | `suko/` | Offline Android app with Auto Editor, SVG Editor and Text Editor | `.github/workflows/build-suko.yml` |
 | **Image Layer Studio Android** | `ils-android/` | Standalone handwriting / slide-rendering Android app | `.github/workflows/build-ils.yml` |
 
-## Suko Android video editor
+## Bezalel Android video editor
 
-Suko is a separate offline Android app in [`suko/`](suko/README.md). Its Auto Editor turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds. The audio add-on supports voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export when enabled.
+Bezalel is a separate offline Android app in [`suko/`](suko/README.md). Its Auto Editor turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds. The audio add-on supports voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export when enabled.
 
-The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Suko project has its own CI workflow: [`.github/workflows/build-suko.yml`](.github/workflows/build-suko.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Suko-debug-apk` artifact.
+The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Bezalel project has its own CI workflow: [`.github/workflows/build-suko.yml`](.github/workflows/build-suko.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Bezalel-debug-apk` artifact.
 
 Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (source only, not yet compiled); the SVG video export that will carry them is still to do.
 
@@ -59,7 +59,7 @@ Light edge-preserving denoise, 2x Lanczos-3 upscale, gentle sharpen. Pictures la
 
 ## Get the Android APK
 Push to `main` (or run **Build Sukko Image Upscaler APK** in Actions). The release workflow publishes
-`Sukko.apk` under Releases -> `suko-latest`. This is the root image-upscaler app, not the Suko video editor.
+`Sukko.apk` under Releases -> `suko-latest`. This is the root image-upscaler app, not the Bezalel video editor.
 
 ## Install the extension
 See [`extension/README.md`](extension/README.md). In short: open `chrome://extensions`, switch on *Developer mode*,

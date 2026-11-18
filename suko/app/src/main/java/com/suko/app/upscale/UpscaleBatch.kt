@@ -12,14 +12,14 @@ class OutItem(val group: String, val relPath: String, val job: UpscaleJob)
 /**
  * Pure rules of the Upscale Images tool (no Android classes, tested on the JVM).
  *
- * Inputs are the same as everywhere in Suko: loose pictures, ZIPs (also nested) and folders. An intake path looks like
+ * Inputs are the same as everywhere in Bezalel: loose pictures, ZIPs (also nested) and folders. An intake path looks like
  * "1.jpg" (loose), "Folder/sub/1.jpg" (folder) or "pack.zip/inner/1.jpg" (ZIP). The first part names the group.
  * File names keep their number and only change the extension to .png, because the Auto Editor and the SVG Editor
  * match pictures by the number in the name.
  */
 object UpscaleBatch {
     const val LOOSE_GROUP = "pictures"
-    const val OUT_FOLDER = "Suko upscaled"
+    const val OUT_FOLDER = "Bezalel upscaled"
 
     private val BAD = Regex("[\\\\:*?\"<>|]")
 

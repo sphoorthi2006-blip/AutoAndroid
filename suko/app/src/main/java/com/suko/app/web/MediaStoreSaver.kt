@@ -11,7 +11,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 
-/** Step 17: saves a finished file to Download/Suko (Android 10+), or to the app's own Download folder (older Android). */
+/** Step 17: saves a finished file to Download/Bezalel (Android 10+), or to the app's own Download folder (older Android). */
 object MediaStoreSaver {
     fun open(ctx: Context, name: String, mime: String): SaveTarget =
         if (Build.VERSION.SDK_INT >= 29) viaMediaStore(ctx, name, mime) else viaAppFolder(ctx, name)
@@ -20,7 +20,7 @@ object MediaStoreSaver {
         val v = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, name)
             put(MediaStore.Downloads.MIME_TYPE, mime)
-            put(MediaStore.Downloads.RELATIVE_PATH, "Download/Suko")
+            put(MediaStore.Downloads.RELATIVE_PATH, "Download/Bezalel")
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri: Uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v)
@@ -29,7 +29,7 @@ object MediaStoreSaver {
         if (stream == null) { ctx.contentResolver.delete(uri, null, null); throw IOException("could not open the file in Downloads") }
         return object : SaveTarget {
             override val out: OutputStream = stream
-            override val where: String get() = "Download/Suko/$name"
+            override val where: String get() = "Download/Bezalel/$name"
             override fun commit() {
                 out.close()
                 ctx.contentResolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
@@ -42,7 +42,7 @@ object MediaStoreSaver {
     }
 
     private fun viaAppFolder(ctx: Context, name: String): SaveTarget {
-        val dir = File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Suko").apply { mkdirs() }
+        val dir = File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Bezalel").apply { mkdirs() }
         val file = File(dir, name)
         val stream = FileOutputStream(file)
         return object : SaveTarget {

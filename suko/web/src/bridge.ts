@@ -1,4 +1,4 @@
-// Suko host bridge. Inside the Suko Android app the page is served from the app's own files and
+// Bezalel host bridge. Inside the Bezalel Android app the page is served from the app's own files and
 // the Kotlin side injects `window.SukoBridge`. In a normal browser it does not exist, and every
 // caller falls back to the old behaviour (HTTP backend, <a download>).
 //
@@ -50,7 +50,7 @@ export async function toBase64(blob: Blob): Promise<string> {
 /** Runs a native method and returns its JSON result. Rejects with the native error message. */
 export async function nativeCall<T = any>(method: string, payload = ""): Promise<T> {
   const h = host();
-  if (!h) throw new Error("This page is not running inside the Suko app.");
+  if (!h) throw new Error("This page is not running inside the Bezalel app.");
   const id = `c${Date.now().toString(36)}${++seq}`;
   const done = wait(id);
   h.call(id, method, payload);
@@ -60,10 +60,10 @@ export async function nativeCall<T = any>(method: string, payload = ""): Promise
   return (await res.json()) as T;
 }
 
-/** Saves a file through Android (Download/Suko). Resolves with where it was saved. */
+/** Saves a file through Android (Download/Bezalel). Resolves with where it was saved. */
 export async function saveFile(name: string, blob: Blob, mime = blob.type || "application/octet-stream", chunk = SAVE_CHUNK_BYTES): Promise<string> {
   const h = host();
-  if (!h) throw new Error("This page is not running inside the Suko app.");
+  if (!h) throw new Error("This page is not running inside the Bezalel app.");
   const id = `s${Date.now().toString(36)}${++seq}`;
   const done = wait(id);
   done.catch(() => { /* reported to the caller below; stops a "failed early" answer from looking unhandled */ });
@@ -99,7 +99,7 @@ export function hostInfo(): any {
   return h ? JSON.parse(h.info() || "{}") : null;
 }
 
-/** The page's own back arrow: closes the screen inside the Suko app, goes back one page in a browser. */
+/** The page's own back arrow: closes the screen inside the Bezalel app, goes back one page in a browser. */
 export function goBack(): void {
   const h = host();
   if (h?.back) h.back(); else history.back();

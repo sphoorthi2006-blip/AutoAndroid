@@ -1,4 +1,4 @@
-// Step 18 smoke test: runs inside the Suko app and checks every part of the web host. It uses the same bridge.ts as the Studio.
+// Step 18 smoke test: runs inside the Bezalel app and checks every part of the web host. It uses the same bridge.ts as the Studio.
 import { hasHost, hostInfo, inputFiles, nativeCall, saveFile } from "./bridge";
 
 type Level = "pass" | "fail" | "info";
@@ -59,7 +59,7 @@ async function main() {
     return `blocked requests counted by the app: ${blocked}`;
   });
   await check("Save a file through Android (5 chunks)", async () => {
-    const body = "Suko web test file. ".repeat(250);   // 5000 bytes
+    const body = "Bezalel web test file. ".repeat(250);   // 5000 bytes
     const where = await saveFile("suko-web-test.txt", new Blob([body], { type: "text/plain" }), "text/plain", 1000);
     return where;
   });

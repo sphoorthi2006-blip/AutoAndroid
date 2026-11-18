@@ -6,7 +6,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:largeHeap="true"
-        android:theme="@style/Theme.Suko">
+        android:theme="@style/Theme.Bezalel">
 
         <!-- Home screen: the three tools -->
         <activity

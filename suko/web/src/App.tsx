@@ -43,7 +43,7 @@ function thumbOf(l: Layer): string {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
-/** Inside the Suko app the Text Editor card opens this page as ...index.html?app=text: the Text Editor screen (TextEditor.tsx), no Image/Video tabs. */
+/** Inside the Bezalel app the Text Editor card opens this page as ...index.html?app=text: the Text Editor screen (TextEditor.tsx), no Image/Video tabs. */
 const isTextApp = (): boolean => { try { return new URLSearchParams(window.location.search).get("app") === "text"; } catch { return false; } };
 
 export default function App() {
@@ -54,7 +54,7 @@ function Studio() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [project, setProject] = useState<Project | null>(null);
-  // Inside the Suko app the Text Editor card opens this page as ...index.html?app=text: text mode only, no Image/Video tabs.
+  // Inside the Bezalel app the Text Editor card opens this page as ...index.html?app=text: text mode only, no Image/Video tabs.
   const textOnly = useMemo(() => { try { return new URLSearchParams(window.location.search).get("app") === "text"; } catch { return false; } }, []);
   const [mode, setModeRaw] = useState<"image" | "text" | "video">(textOnly ? "text" : "video");
   const setMode = setModeRaw;

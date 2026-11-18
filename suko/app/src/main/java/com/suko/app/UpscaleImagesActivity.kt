@@ -115,7 +115,7 @@ private fun UpscaleImagesScreen(intake: IntakeViewModel, run: UpscaleImagesViewM
                 Text("Remove the corner mark", color = TextMain)
                 Switch(checked = removeMark, onCheckedChange = { if (!r.busy) removeMark = it })
             }
-            Text("You choose the folder; a \"Suko upscaled\" folder is created inside it.", fontSize = 12.sp, color = Muted)
+            Text("You choose the folder; a \"Bezalel upscaled\" folder is created inside it.", fontSize = 12.sp, color = Muted)
         }
 
         if (r.busy) {

@@ -24,7 +24,7 @@ globalThis.SukoBridge = {
   },
   saveBegin(id, name, mime) { saved.push({ id, name, mime, chunks: [], ended: false }); },
   saveChunk(id, b64) { saved.find(s => s.id === id).chunks.push(Buffer.from(b64, "base64")); },
-  saveEnd(id) { const s = saved.find(x => x.id === id); s.ended = true; setTimeout(() => globalThis.__sukoDone(id, true, "Download/Suko/" + s.name), 1); },
+  saveEnd(id) { const s = saved.find(x => x.id === id); s.ended = true; setTimeout(() => globalThis.__sukoDone(id, true, "Download/Bezalel/" + s.name), 1); },
   inputList() { return JSON.stringify(files.map(f => ({ name: f.name, mime: f.mime, size: f.bytes.length }))); },
   info() { return JSON.stringify({ host: "suko", blocked: 2 }); },
 };
@@ -43,7 +43,7 @@ ok(parallel.map(p => p.method).join() === "p1,p2,p3", "parallel calls do not mix
 const data = new Uint8Array(2500).map((_, i) => i % 251);
 const where = await mod.saveFile("out.mp4", new Blob([data]), "video/mp4", 1000);
 const s = saved[0];
-ok(where === "Download/Suko/out.mp4" && s.ended && s.mime === "video/mp4", "saveFile finishes and returns where it was saved");
+ok(where === "Download/Bezalel/out.mp4" && s.ended && s.mime === "video/mp4", "saveFile finishes and returns where it was saved");
 ok(s.chunks.length === 3 && Buffer.concat(s.chunks).equals(Buffer.from(data)), "the file arrives in 3 chunks, byte for byte");
 ok((await mod.toBase64(new Blob([new Uint8Array([0, 255, 128])]))) === Buffer.from([0, 255, 128]).toString("base64"), "base64 matches");
 
@@ -54,5 +54,5 @@ ok(mod.hostInfo().blocked === 2, "hostInfo is read");
 delete globalThis.SukoBridge;
 ok(mod.hasHost() === false && (await mod.inputFiles()).length === 0, "without a host: hasHost is false and there are no input files");
 let m2 = ""; try { await mod.nativeCall("health"); } catch (e) { m2 = e.message; }
-ok(m2.includes("not running inside the Suko app"), "without a host nativeCall explains itself");
+ok(m2.includes("not running inside the Bezalel app"), "without a host nativeCall explains itself");
 process.exit(fails ? 1 : 0);

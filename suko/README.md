@@ -1,4 +1,4 @@
-# Suko Android app (main roadmap: steps 1-24; step 21 skipped; steps 25-30 pending)
+# Bezalel Android app (formerly "Suko"; folder and package are still `suko` / `com.suko.app` on purpose) (main roadmap: steps 1-24; step 21 skipped; steps 25-30 pending)
 
 One Android app with three tools. Everything runs inside the app: no website, no server, no internet.
 
@@ -22,7 +22,7 @@ Last finished step: **23 of 30** (1-20, 22, 23 done; **21 skipped on purpose**, 
 
 | # | Step | Status | Where |
 |---|---|---|---|
-| 1 | Shell: Suko project, home screen with 3 tool cards, Auto Editor = Cue Video unchanged, one CI workflow | DONE (not yet built on GitHub) | `HubActivity.kt`, `build.yml` |
+| 1 | Shell: Bezalel project, home screen with 3 tool cards, Auto Editor = Cue Video unchanged, one CI workflow | DONE (not yet built on GitHub) | `HubActivity.kt`, `build.yml` |
 | 2 | Bring the Sukko native upscaler in (JNI `com.suko.app`, CMake, CI fetches NDK, ncnn, models) + one-image upscale self-test | DONE (JVM logic tests pass; native build not yet run on GitHub) | `cpp/`, `upscale/`, `UpscaleTestActivity.kt` |
 | 3 | Intake 1: file-kind classifier (image, video, audio, srt, txt, json, font, zip, junk, unknown) + reasons for skipped files | DONE (2 tests run and pass in sandbox) | `intake/FileKind.kt` |
 | 4 | Intake 2: read one ZIP into a list of entries (no extraction to disk yet) | DONE (tests pass in sandbox) | `intake/` |
@@ -59,14 +59,14 @@ Last finished step: **23 of 30** (1-20, 22, 23 done; **21 skipped on purpose**, 
 
 ## How to build the APK (GitHub Actions)
 1. The repository is already configured; do not upload a second copy or create another workflow.
-2. Push a change under `suko/**`, or open Actions and run **Build Suko APK** manually.
+2. Push a change under `suko/**`, or open Actions and run **Build Bezalel APK** manually.
 3. The workflow runs web tests, TypeScript checks, Kotlin unit tests, rebuilds the offline web assets, and assembles the debug APK with the native upscaler.
-4. When green, download **Suko-debug-apk** from the run artifacts. The APK is also published as `Sukko.apk` under Releases -> `suko-latest`.
-5. If the run is red, inspect the failed step and paste its error output. The separate root `build.yml` is for the image upscaler, not Suko.
+4. When green, download **Bezalel-debug-apk** from the run artifacts. The APK is also published as `Bezalel.apk` under Releases -> `bezalel-latest`.
+5. If the run is red, inspect the failed step and paste its error output. The separate root `build.yml` is for the image upscaler, not Bezalel.
 
 ## Audio add-on (separate feature track: steps 33-36)
 
-This add-on extends the existing Auto Editor. It does not replace the original Suko roadmap or the image-upscaling stage.
+This add-on extends the existing Auto Editor. It does not replace the original Bezalel roadmap or the image-upscaling stage.
 
 | Add-on step | Feature | Repository status |
 |---|---|---|
@@ -86,7 +86,7 @@ This add-on extends the existing Auto Editor. It does not replace the original S
 
 ### Build and verification for the audio add-on
 
-The canonical Suko workflow is `.github/workflows/build-suko.yml`. It runs the web tests and TypeScript check, Kotlin unit tests, builds the web assets, builds the Android debug APK with the native upscaler, checks the native library, and uploads the `Suko-debug-apk` artifact. A push that changes `suko/**` starts this workflow. The duplicate `android-apk.yml` workflow is retired so there is one automatic Suko build.
+The canonical Bezalel workflow is `.github/workflows/build-suko.yml`. It runs the web tests and TypeScript check, Kotlin unit tests, builds the web assets, builds the Android debug APK with the native upscaler, checks the native library, and uploads the `Bezalel-debug-apk` artifact. A push that changes `suko/**` starts this workflow. The duplicate `android-apk.yml` workflow is retired so there is one automatic Bezalel build.
 
 The new unit tests cover click-only and voice-only mixing at the pure audio-mix layer. The GitHub Actions result is the source of truth for Android compilation and APK build; a real-device export test is still required for audio playback, muxed MP4 compatibility, and actual phone performance.
 
@@ -106,7 +106,7 @@ The new unit tests cover click-only and voice-only mixing at the pure audio-mix 
 - **Font (20):** Patrick Hand is the ONLY text font, from the owner's `PatrickHand-Regular.ttf` (bundled in the web view, so it works offline; same file as the native app's font). The Font picker is gone (it shows the font name). The other five fonts and their npm packages were removed. Noto Sans Math stays as a hidden fallback so symbols like √ ∑ π still draw.
 - **Step 21 skipped:** importing your own .ttf/.otf was not built because you asked for Patrick Hand only.
 - **Preview (22):** already in the Studio: the picture updates a moment after you stop typing, with the writing animation and "Play again".
-- **Export (23):** Export section has **30 fps / 60 fps** buttons (default 30) and the button reads "Export 1080p MP4, 60 fps (20 s)". Always 1920x1080 H.264 (wide shape fills it; tall/square are fitted with bars of the background colour). 60 fps has twice the frames, so it takes about twice as long. H.264 levels up to 4.2 are tried so 1080p60 works on phones that have it; if the phone has no encoder for 60 fps the message says to try 30. File name `text-1080p-60fps-20s.mp4`, saved to `Download/Suko`. The same fps buttons also appear for the Studio's Image tab; the Video tab is unchanged (30 fps).
+- **Export (23):** Export section has **30 fps / 60 fps** buttons (default 30) and the button reads "Export 1080p MP4, 60 fps (20 s)". Always 1920x1080 H.264 (wide shape fills it; tall/square are fitted with bars of the background colour). 60 fps has twice the frames, so it takes about twice as long. H.264 levels up to 4.2 are tried so 1080p60 works on phones that have it; if the phone has no encoder for 60 fps the message says to try 30. File name `text-1080p-60fps-20s.mp4`, saved to `Download/Bezalel`. The same fps buttons also appear for the Studio's Image tab; the Video tab is unchanged (30 fps).
 - **Not built (needs your phone result first):** the native GL fallback for phones whose web view has no WebCodecs. If your phone shows "no WebCodecs" (Home -> Web test prints this), tell me and the fallback becomes the next job.
 
 ### Test list for steps 20-23 (on the phone)
@@ -141,14 +141,14 @@ The new unit tests cover click-only and voice-only mixing at the pure audio-mix 
 ## Steps 16-18: what is in them
 - **Layer Studio source** (v0.15.7, web part only) is copied into `web/`. Changed files: new `src/bridge.ts` and `src/smoke.ts`, `src/api.ts` (inside the app it calls the Kotlin bridge instead of `http://localhost:8000`; in a browser it behaves exactly as before), `src/compose.ts` (`download()` saves through Android inside the app), new `vite.suko.config.ts`. Rebuild after any change: `cd web && npm ci && npm run build:suko` (writes `app/src/main/assets/web/studio/`, which IS committed; CI also runs the web tests). The Python backend is not used: its code is ported to Kotlin in steps 26-28.
 - **Step 16 `web/WebHostActivity.kt` + `WebRules.kt`:** shows one page from `assets/web/` at `https://appassets.androidplatform.net/`. The app answers every request itself; any other address gets 403 and is counted; no `file://`; no INTERNET permission; Safe Browsing off. Paths with `..`, `%`, `\` or empty parts are refused.
-- **Step 17 `bridge.ts` <-> `SukoBridge.kt` + `BridgeCore.kt`:** `nativeCall(method, payload)` (answer is a JSON file read once from `/bridge/<id>`), `saveFile(name, blob)` (base64 chunks, saved to `Download/Suko`; older Android: the app's own Download folder), `inputFiles()` (files the app hands over, read from `/input/<n>`; the SVG/Text editors will use this with the shared intake), plus the Android file picker for the Studio's own "choose file" buttons and `alert`/`confirm` dialogs. `process` and `panels` answer "not ready" (steps 26-28) so the Studio shows a clear reason.
+- **Step 17 `bridge.ts` <-> `SukoBridge.kt` + `BridgeCore.kt`:** `nativeCall(method, payload)` (answer is a JSON file read once from `/bridge/<id>`), `saveFile(name, blob)` (base64 chunks, saved to `Download/Bezalel`; older Android: the app's own Download folder), `inputFiles()` (files the app hands over, read from `/input/<n>`; the SVG/Text editors will use this with the shared intake), plus the Android file picker for the Studio's own "choose file" buttons and `alert`/`confirm` dialogs. `process` and `panels` answer "not ready" (steps 26-28) so the Studio shows a clear reason.
 - **Step 18:** the Studio bundle and a smoke-test page are in `assets/web/studio/`. Home screen -> Developer tools -> **Web test** runs 8 checks and prints WebCodecs info for step 23; its button opens the Studio. **Layer Studio (raw)** opens the Studio directly.
 - Not supported by Android's WebView: folder picking inside the page (`webkitdirectory`). Folders and ZIPs come through the native intake instead.
 
 ### Test list for steps 16-18 (on the phone)
 1. GitHub Actions is green ("Run web tests" and "Run logic tests" both pass). If red, paste the red text (the WebView code was never compiled).
-2. Home -> Web test. Expect "All 8 checks passed", the file `suko-web-test.txt` in Downloads/Suko and a "Saved:" message. Write down the three INFO lines (WebCodecs, H.264 1080p at 30 and 60 fps): they decide step 23.
-3. Tap "Open the Studio": the Layer Studio opens with its handwriting fonts (Patrick Hand etc.). Switch to Text mode, type something, export PNG: "Saved: Download/Suko/composition.png".
+2. Home -> Web test. Expect "All 8 checks passed", the file `suko-web-test.txt` in Downloads/Bezalel and a "Saved:" message. Write down the three INFO lines (WebCodecs, H.264 1080p at 30 and 60 fps): they decide step 23.
+3. Tap "Open the Studio": the Layer Studio opens with its handwriting fonts (Patrick Hand etc.). Switch to Text mode, type something, export PNG: "Saved: Download/Bezalel/composition.png".
 4. In the Studio add a picture with its own button: the Android file picker opens. Processing it says picture separation is not built in yet (expected).
 5. Switch on airplane mode and repeat 2: same result (nothing needs the internet).
 
@@ -255,15 +255,15 @@ The new unit tests cover click-only and voice-only mixing at the pure audio-mix 
 ## Step 2: what is in it
 - **Upscale engine** copied from Sukko into `com.suko.app.upscale`: `NativeUpscaler.kt` and `ImageProcessor.kt` (only the package line changed; corner-mark removal, tiled Real-ESRGAN `realesr-animevideov3` x2, classic fallback) and `cpp/upscaler.cpp` + `CMakeLists.txt` (only the JNI function names changed to `Java_com_suko_app_upscale_...`).
 - `Upscaler.kt`: the small front door the exports will use later: `decode`, `run` (mark removal, then AI 2x, GPU first), `toBitmap`.
-- **Upscale test** screen (home screen -> "Developer tools" -> Upscale test): pick ONE picture, switch the corner-mark removal on/off, it upscales, saves `<name>_x2.png` to `Pictures/Suko` (Android 10+; older Android: the app's own Pictures folder), and shows the result with `AI step n/m`, GPU or CPU, and times.
+- **Upscale test** screen (home screen -> "Developer tools" -> Upscale test): pick ONE picture, switch the corner-mark removal on/off, it upscales, saves `<name>_x2.png` to `Pictures/Bezalel` (Android 10+; older Android: the app's own Pictures folder), and shows the result with `AI step n/m`, GPU or CPU, and times.
 - **CI** now installs CMake, picks NDK r28+, downloads ncnn (Vulkan) and the three model sizes from GitHub (same as Sukko), runs the tests, builds the APK for arm64-v8a and armeabi-v7a, and fails the build if `libupscaler.so` needs `libomp.so`. The ncnn folder and the models are NOT in the ZIP (git-ignored, downloaded by CI).
 - The app name now lives only in `res/values/strings.xml` (`app_name`). The launcher label and the home title both read it.
 - New tests: `Step2Test.kt` (mark removal fills the star at the fixed spot and leaves far pixels alone; the classic path doubles small pictures and keeps flat colour; mark off leaves the picture alone).
 
 ### Test list for step 2
 1. GitHub Actions is green. In the log: "Using NDK 28..", the ncnn and models downloads, "Run logic tests" passes, and "Check the native library is self-contained" lists `libupscaler.so` for both ABIs.
-2. Open Suko -> Upscale test. It says "AI library: loaded" and shows the phone memory.
-3. Pick a normal 1376x768 picture that has the sparkle. Expect: `Method: AI · GPU`, size 2752x1536, the star gone, file in `Pictures/Suko`. Open it in the gallery: it should look sharper than the original.
+2. Open Bezalel -> Upscale test. It says "AI library: loaded" and shows the phone memory.
+3. Pick a normal 1376x768 picture that has the sparkle. Expect: `Method: AI · GPU`, size 2752x1536, the star gone, file in `Pictures/Bezalel`. Open it in the gallery: it should look sharper than the original.
 4. Note the times. The old Sukko app measured about 9 s per picture (256 tiles) on a big-RAM phone; this should be similar.
 5. Switch "Remove the corner mark" off and pick the same picture: the star must stay.
 6. Pick a picture from another source (no sparkle) with the switch on, and look at the bottom-right corner area: it should look unchanged. This decides whether mark removal stays always-on (see decisions).
@@ -274,13 +274,13 @@ The new unit tests cover click-only and voice-only mixing at the pure audio-mix 
 - NOT verified: the Gradle/NDK/CMake build and the JNI link, the GPU and CPU AI paths on a real phone, the new screens compiling (Compose code, never compiled), speed, and mark removal on real pictures.
 
 ## Step 1: what is in it
-- New app id `com.suko.app`, name **Suko**, minSdk 26. It installs next to the old Cue Video and Sukko apps; it does not replace them.
+- New app id `com.suko.app`, name **Bezalel**, minSdk 26. It installs next to the old Cue Video and Sukko apps; it does not replace them.
 - `HubActivity` is the launcher: three cards. **Auto Editor** opens the Cue Video screen. **SVG Editor** and **Text Editor** are greyed out ("Coming in a later step").
-- The Cue Video engine is copied unchanged (still package `com.cuevideo.app`, with its Stage 1-5 unit tests). Only its manifest entry, theme name (`Theme.Suko`) and app id changed. The Android Back button returns to the home screen.
+- The Cue Video engine is copied unchanged (still package `com.cuevideo.app`, with its Stage 1-5 unit tests). Only its manifest entry, theme name (`Theme.Bezalel`) and app id changed. The Android Back button returns to the home screen.
 - The Auto Editor still has Cue Video's own file picker, no upscaling yet (steps 3-5).
 
 ### Test list for step 1 (on the phone, after the APK is built)
-1. The app opens on a dark home screen titled Suko with three cards; the last two are dimmed.
+1. The app opens on a dark home screen titled Bezalel with three cards; the last two are dimmed.
 2. Tap Auto Editor: the Cue Video screen opens ("+ Add project", Export video). Back returns to the home screen.
 3. Do a small Cue Video export (5-10 images + SRT + voice-over) to confirm the engine still works after the move. Compare with the old Cue Video app if in doubt.
 4. In GitHub Actions, the "Run logic tests" step passes (the old Stage 1-5 tests).
@@ -289,7 +289,7 @@ The new unit tests cover click-only and voice-only mixing at the pure audio-mix 
 Nothing was compiled or run: the sandbox has no Gradle/Android SDK. The first real check is the GitHub Actions run. The hub code is new; the rest is the unchanged Cue Video source.
 
 ## Decisions and assumptions
-- App name is **Suko** (owner, spelling assumed from dictation; change it in one place: `res/values/strings.xml`). Three tools, in this order: Auto Editor, SVG Editor, Text Editor.
+- App name is **Bezalel** (owner, spelling assumed from dictation; change it in one place: `res/values/strings.xml`). Three tools, in this order: Auto Editor, SVG Editor, Text Editor.
 - Upscale happens at Export, not on import. Upscaled images are cached so a second export does not repeat it. EVERY picture is upscaled, whatever its size; the engine keeps only its own memory protection for huge pictures (owner, step 11).
 - SVG Editor shows a rough preview on the original images first; the sharper pixels are used for the final video. (owner)
 - Layer Studio screens run in an embedded view inside the app (offline); the full native rewrite of its screens was NOT chosen. (assumption, confirm if wanted)
@@ -305,7 +305,7 @@ Nothing was compiled or run: the sandbox has no Gradle/Android SDK. The first re
 - The web bundle in `app/src/main/assets/web/studio` is generated: CI now runs `npm run build:suko` before the Android tests, so a push rebuilds it. To rebuild by hand: `cd web && npm ci && npm run build:suko`.
 
 ## Upscale Images tool + "Upscale images" switch
-- New tool **Upscale Images** (`UpscaleImagesActivity`, `upscale/UpscaleImagesViewModel.kt`, pure rules in `upscale/UpscaleBatch.kt`, tests `Step25Test.kt`). Pictures, ZIPs (also nested) and folders in. Output goes into a "Suko upscaled" folder inside the folder the user picks: PNG files (same sub-folders) or one ZIP per input. Names keep their numbers (1.jpg -> 1.png). Shares the upscale cache with the exports.
+- New tool **Upscale Images** (`UpscaleImagesActivity`, `upscale/UpscaleImagesViewModel.kt`, pure rules in `upscale/UpscaleBatch.kt`, tests `Step25Test.kt`). Pictures, ZIPs (also nested) and folders in. Output goes into a "Bezalel upscaled" folder inside the folder the user picks: PNG files (same sub-folders) or one ZIP per input. Names keep their numbers (1.jpg -> 1.png). Shares the upscale cache with the exports.
 - Auto Editor export: ONE **Upscale images** switch (default ON) with a visible sentence, a "Step 1 of 2 / Step 2 of 2" line while exporting, and an "Upscaling: ..." line in the result. Reusable composable `UpscaleOption` (for the SVG Editor export later). Off = pictures are used as they are.
 - `EngineAdapters` read pictures through `UpscaleBatch.open(job)` (file from a ZIP, or node), so ZIP content works in the engine.
 - The video tool is called **Auto Editor** everywhere users see it (the old "Cue Video" header and file names are gone; the Kotlin package stays `com.cuevideo.app`).
@@ -316,5 +316,5 @@ Nothing was compiled or run: the sandbox has no Gradle/Android SDK. The first re
 - `web/src/TextEditor.tsx` + `TextEditor.css` replace the old sidebar page for `index.html?app=text` (Image and Video modes are untouched and still use the old Studio page).
 - Dark layout: back arrow (new `SukoBridge.back()` closes the screen), Export button, picture (16:9 / 9:16 / 1:1) with a resolution badge, **drag the text on the picture** to move it (bottom-right dot resizes), play button + scrubber + time, tabs **Text / Style / Motion / Export**.
 - Text: text box in Patrick Hand, font line + Add font file (uses the step 24 `fontStore`, kept on the phone), Size in px, Position (Center + 4 arrows). Style: colours, background colour or image, picture shape, align. Motion: handwritten or outline-then-fill. Export: 1080p / 2K / 4K, 30/60 fps (4K = 30), length, progress with Cancel.
-- The MP4 is saved to Download/Suko (the layout says Movies/Suko; the saver was not changed).
+- The MP4 is saved to Download/Bezalel (the layout says Movies/Bezalel; the saver was not changed).
 - 3 new checks in `web/tests/text.test.mjs` (exact px size, size limit, ink box for dragging). NOT verified on a phone: Kotlin compile of `back()`, touch dragging, real export.

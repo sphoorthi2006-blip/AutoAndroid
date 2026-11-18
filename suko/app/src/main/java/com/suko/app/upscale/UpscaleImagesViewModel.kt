@@ -37,7 +37,7 @@ data class UpscaleImagesUi(
 
 /**
  * Upscale Images: the pictures found by intake (files, ZIPs, folders) are upscaled one at a time into the shared cache,
- * then written as PNG files or as one ZIP per input into a "Suko upscaled" folder inside the folder the user chose.
+ * then written as PNG files or as one ZIP per input into a "Bezalel upscaled" folder inside the folder the user chose.
  * The cache is the same one the Auto Editor uses, so a picture upscaled here is not upscaled again there (and a
  * cancelled run continues where it stopped).
  */

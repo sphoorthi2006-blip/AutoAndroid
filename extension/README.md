@@ -22,4 +22,4 @@ Everything runs locally in the browser. The extension asks for no permissions an
 
 ## Scope
 
-This extension is the standalone image upscaler only. It is separate from the Suko Android video editor in [../suko/README.md](../suko/README.md); Auto Editor audio mixing and SVG Editor export are not features of this extension.
+This extension is the standalone image upscaler only. It is separate from the Bezalel Android video editor in [../suko/README.md](../suko/README.md); Auto Editor audio mixing and SVG Editor export are not features of this extension.

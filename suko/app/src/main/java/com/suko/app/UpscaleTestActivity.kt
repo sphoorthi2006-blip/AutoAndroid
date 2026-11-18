@@ -180,20 +180,20 @@ private fun displayName(ctx: Context, uri: Uri): String {
     return "image"
 }
 
-/** Saves a PNG to Pictures/Suko (Android 10+) or to the app's own Pictures folder (older Android). Returns where. */
+/** Saves a PNG to Pictures/Bezalel (Android 10+) or to the app's own Pictures folder (older Android). Returns where. */
 private fun savePng(ctx: Context, bmp: Bitmap, name: String): String {
     val fileName = "${name}_x2.png"
     if (Build.VERSION.SDK_INT >= 29) {
         val v = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Suko")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Bezalel")
         }
         val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v)
             ?: throw IllegalStateException("could not create the output file")
         ctx.contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
             ?: throw IllegalStateException("could not write the output file")
-        return "Pictures/Suko/$fileName"
+        return "Pictures/Bezalel/$fileName"
     }
     val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
         ?: throw IllegalStateException("no storage available")

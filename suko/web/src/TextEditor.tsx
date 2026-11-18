@@ -299,7 +299,7 @@ export default function TextEditor() {
             </div>
             <p className="inset">No upscaling here: text is drawn sharp at every size, so the Upscale images switch is not shown in this tool. About {mb(estimateBytes(seconds, fpsFor(resId, fps), resId))} for {Math.round(seconds)} s.{resId === "4k" ? " 4K is 30 fps only." : ""}{resOk && !resOk[resId] ? " This phone's encoder may not support this size at this frame rate; try a smaller size." : ""}{estimateBytes(seconds, fpsFor(resId, fps), resId) > 400e6 ? " Big file: it is built in memory, so a phone with little RAM may fail." : ""}</p>
             <button className="go" disabled={!mp4Supported() || !durOk || !scene || !!exporting} onClick={exportMp4}>Export video</button>
-            <p className="lab">The MP4 is saved to Download/Suko.</p>
+            <p className="lab">The MP4 is saved to Download/Bezalel.</p>
             {!mp4Supported() && <p className="xwarn">This phone's web view cannot make MP4 (no WebCodecs). Update "Android System WebView" in the Play Store.</p>}
             {saved && !exporting && <p className="ok">Saved {saved}</p>}
             {exporting && (

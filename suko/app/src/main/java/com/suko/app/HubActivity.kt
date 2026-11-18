@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cuevideo.app.CueTheme
 
-/** Suko home screen: three tools. */
+/** Bezalel home screen: three tools. */
 class HubActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

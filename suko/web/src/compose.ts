@@ -307,7 +307,7 @@ export function composeSvg(p: Project, bg: Background, o: Opts = {}): string {
 }
 
 export function download(name: string, blob: Blob) {
-  if (hasHost()) {   // inside the Suko app a blob link does nothing: save through Android (Download/Suko)
+  if (hasHost()) {   // inside the Bezalel app a blob link does nothing: save through Android (Download/Bezalel)
     saveFile(name, blob).catch(e => alert(`Could not save ${name}: ${(e as Error).message}`));
     return;
   }

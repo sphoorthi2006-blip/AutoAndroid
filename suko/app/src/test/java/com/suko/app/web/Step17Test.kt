@@ -17,7 +17,7 @@ class Step17Test {
 
     private class MemTarget(val name: String) : SaveTarget {
         override val out = ByteArrayOutputStream()
-        override val where: String get() = "Download/Suko/$name"
+        override val where: String get() = "Download/Bezalel/$name"
         var committed = false
         var aborted = false
         override fun commit() { committed = true }
@@ -63,7 +63,7 @@ class Step17Test {
         val data = ByteArray(7000) { (it % 251).toByte() }
         reg.begin("s1", "../../evil/out:put?.mp4", "video/mp4")
         for (at in data.indices step 3000) reg.chunk("s1", Base64.getEncoder().encodeToString(data.copyOfRange(at, minOf(at + 3000, data.size))))
-        assertEquals("Download/Suko/output.mp4", reg.end("s1"))       // path parts and illegal characters removed
+        assertEquals("Download/Bezalel/output.mp4", reg.end("s1"))       // path parts and illegal characters removed
         val t = targets.getValue("output.mp4")
         assertTrue(t.committed && !t.aborted)
         assertTrue(t.out.toByteArray().contentEquals(data))

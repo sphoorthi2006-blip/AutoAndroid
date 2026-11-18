@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 export async function processImage(file: File): Promise<Project> {
   let data: any;
-  if (hasHost()) {   // inside the Suko app: the Kotlin engine answers instead of the HTTP backend
+  if (hasHost()) {   // inside the Bezalel app: the Kotlin engine answers instead of the HTTP backend
     data = await nativeCall("process", await toBase64(file));
     if (data?.error) throw new Error(data.detail ?? "Processing failed.");
   } else {

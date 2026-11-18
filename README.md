@@ -14,7 +14,7 @@ Suko is a separate offline Android app in [`suko/`](suko/README.md). Its Auto Ed
 
 The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Suko project has its own CI workflow: [`.github/workflows/build-suko.yml`](.github/workflows/build-suko.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Suko-debug-apk` artifact.
 
-Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The SVG Editor audio controls exist in the web Video Mode source, but that flow is not yet wired into the Android SVG Editor screen.
+Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The Suko home-screen SVG Editor now opens the dedicated offline Video Mode inside Android WebView. It includes voice-over/music selection, custom or built-in click sounds with an enable/disable switch, AAC audio mixed into MP4 export, and native saving to Download/Suko. Auto Editor remains unchanged.
 
 ## Sukko Image Upscaler
 

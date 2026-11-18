@@ -54,8 +54,9 @@ function Studio() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [project, setProject] = useState<Project | null>(null);
-  // Inside the Suko app the Text Editor card opens this page as ...index.html?app=text: text mode only, no Image/Video tabs.
+  // The Suko app opens focused pages: text mode or the SVG Editor's video mode.
   const textOnly = useMemo(() => { try { return new URLSearchParams(window.location.search).get("app") === "text"; } catch { return false; } }, []);
+  const svgOnly = useMemo(() => { try { return new URLSearchParams(window.location.search).get("app") === "svg"; } catch { return false; } }, []);
   const [mode, setModeRaw] = useState<"image" | "text" | "video">(textOnly ? "text" : "video");
   const setMode = setModeRaw;
   const [imgBg, setImgBg] = useState<Background>({ kind: "color", color: "#ffffff" });
@@ -180,8 +181,8 @@ function Studio() {
   return (
     <div className="app">
       <header>
-        <h1>{textOnly ? "Text Editor" : "Image Layer Studio"}</h1>
-        {!textOnly && <div className="tabs">
+        <h1>{textOnly ? "Text Editor" : svgOnly ? "SVG Editor" : "Image Layer Studio"}</h1>
+        {!textOnly && !svgOnly && <div className="tabs">
           <button className={mode === "image" ? "tab on" : "tab"} disabled={busyAny} onClick={() => setMode("image")}>Image</button>
           <button className={mode === "text" ? "tab on" : "tab"} disabled={busyAny} onClick={() => setMode("text")}>Text</button>
           <button className={mode === "video" ? "tab on" : "tab"} disabled={busyAny} onClick={() => setMode("video")}>Video</button>

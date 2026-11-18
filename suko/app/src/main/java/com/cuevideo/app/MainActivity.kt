@@ -376,9 +376,6 @@ fun MainScreen(vm: AppViewModel) {
         }
 
         // ---- tools
-        TextButton(onClick = { details = !details }) {
-            Text(if (details) "Hide tools and details" else "Show tools and details  (timing, slide preview, audio test)", color = Muted)
-        }
         if (details) {
         Section("Timing") {
             val t = s.timing

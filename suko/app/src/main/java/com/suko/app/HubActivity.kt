@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cuevideo.app.CueTheme
 
-/** Suko home screen: three tools. Only the Auto Editor is live in step 1. */
+/** Suko home screen: three tools. */
 class HubActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,18 +46,10 @@ class HubActivity : ComponentActivity() {
                         onOpenAutoEditor = {
                             startActivity(Intent(this, com.cuevideo.app.MainActivity::class.java))
                         },
-                        onOpenUpscaleTest = {
-                            startActivity(Intent(this, UpscaleTestActivity::class.java))
-                        },
                         onOpenSvgEditor = {
                             startActivity(Intent(this, SvgEditorActivity::class.java))
                         },
-                        onOpenIntakeTest = {
-                            startActivity(Intent(this, IntakeTestActivity::class.java))
-                        },
                         onOpenTextEditor = { openWeb(TEXT_EDITOR_PAGE, "Text Editor") },
-                        onOpenWebTest = { openWeb("web/studio/smoke.html", "Web test", sample = true) },
-                        onOpenStudio = { openWeb("web/studio/index.html", "Layer Studio") },
                     )
                 }
             }
@@ -90,8 +82,7 @@ private val Accent2 = Color(0xFF38BDF8)
 
 @Composable
 private fun HubScreen(
-    onOpenAutoEditor: () -> Unit, onOpenUpscaleTest: () -> Unit, onOpenIntakeTest: () -> Unit, onOpenSvgEditor: () -> Unit,
-    onOpenWebTest: () -> Unit, onOpenStudio: () -> Unit, onOpenTextEditor: () -> Unit,
+    onOpenAutoEditor: () -> Unit, onOpenSvgEditor: () -> Unit, onOpenTextEditor: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -103,54 +94,24 @@ private fun HubScreen(
 
         ToolCard(
             title = "Auto Editor",
-            blurb = "Images, script, SRT files and voice-over become a video in 1080p, 2K or 4K.",
-            status = null,
+            blurb = "Images, script, SRT files and voice-over become a 1080p video.",
             onClick = onOpenAutoEditor,
         )
         ToolCard(
             title = "SVG Editor",
-            blurb = "Layer editor: images and JSON become a drawn, animated video.",
-            status = "Step 24: adding pictures and JSON works; preview and export come later",
+            blurb = "Turn your pictures and a timing file into a drawn, animated video.",
             onClick = onOpenSvgEditor,
         )
         ToolCard(
             title = "Text Editor",
-            blurb = "Type text in Patrick Hand, place it anywhere, upload your own font, export 1080p, 2K or 4K at 30 or 60 fps.",
-            status = "Patrick Hand or your own font, position, preview, 1080p / 2K / 4K export at 30 or 60 fps",
+            blurb = "Write text by hand-style animation. Use your own font and export in 1080p, 2K or 4K.",
             onClick = onOpenTextEditor,
-        )
-
-        Spacer(Modifier.height(10.dp))
-        Text("Developer tools", fontSize = 13.sp, color = Muted)
-        ToolCard(
-            title = "Upscale test",
-            blurb = "Step 2: try the AI upscaler on one picture.",
-            status = null,
-            onClick = onOpenUpscaleTest,
-        )
-        ToolCard(
-            title = "Intake test",
-            blurb = "Step 8: add files, ZIPs and folders and see how they are sorted.",
-            status = null,
-            onClick = onOpenIntakeTest,
-        )
-        ToolCard(
-            title = "Web test",
-            blurb = "Step 18: checks the offline web view, the bridge and saving. Has a button to open the Studio.",
-            status = null,
-            onClick = onOpenWebTest,
-        )
-        ToolCard(
-            title = "Layer Studio (raw)",
-            blurb = "Steps 16-18: the Image Layer Studio page itself. Picture separation is not built in yet.",
-            status = null,
-            onClick = onOpenStudio,
         )
     }
 }
 
 @Composable
-private fun ToolCard(title: String, blurb: String, status: String?, onClick: (() -> Unit)?) {
+private fun ToolCard(title: String, blurb: String, onClick: (() -> Unit)?) {
     val shape = RoundedCornerShape(22.dp)
     val live = onClick != null
     val base = Modifier.fillMaxWidth().clip(shape).background(PanelBg).border(1.dp, Hairline, shape)
@@ -169,7 +130,6 @@ private fun ToolCard(title: String, blurb: String, status: String?, onClick: (()
         Column(modifier = Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = if (live) TextMain else Muted)
             Text(blurb, fontSize = 13.sp, color = Muted)
-            if (status != null) Text(status, fontSize = 12.sp, color = Accent2)
         }
     }
 }

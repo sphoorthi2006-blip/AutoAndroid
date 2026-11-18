@@ -29,7 +29,7 @@ import com.suko.app.intake.IntakePanel
 import com.suko.app.intake.IntakeViewModel
 import com.suko.app.intake.SvgInputs
 
-/** SVG Editor, step 24: add pictures + the JSON (files, ZIPs, folders). Preview and export come in later steps. */
+/** SVG Editor: add pictures + the JSON (files, ZIPs, folders). */
 class SvgEditorActivity : ComponentActivity() {
     private val vm: IntakeViewModel by viewModels()
 
@@ -63,7 +63,6 @@ private fun SvgEditorScreen(vm: IntakeViewModel) {
         Section("SVG Editor") {
             Text(input.headline, fontSize = 15.sp, color = if (input.ready) Color(0xFF34D399) else Color(0xFFFBBF24))
             for (w in input.warnings) Text(w, fontSize = 12.sp, color = Color(0xFFFBBF24))
-            Text("Preview with the panel check comes in a later step.", fontSize = 12.sp, color = Color(0xFF8A93A6))
         }
         IntakePanel(
             ui = ui,

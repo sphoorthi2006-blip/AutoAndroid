@@ -82,7 +82,8 @@ function loadSvg(text: string): Promise<HTMLImageElement> {
 export interface Mp4Options { svg: string; width: number; height: number; seconds: number; fps?: number; resolution?: string; onProgress?: (done: number, total: number) => void; cancelled?: () => boolean }
 /** One image of a longer video: its animated drawing and where it sits on the video clock. */
 export interface TimelineSlide { svg: string; width: number; height: number; start: number; end: number }
-export interface TimelineOptions { slides: TimelineSlide[]; fps?: number; resolution?: string; onProgress?: (done: number, total: number) => void; cancelled?: () => boolean }
+export interface SoundEvent { time: number }
+export interface TimelineOptions { slides: TimelineSlide[]; fps?: number; resolution?: string; audio?: AudioBuffer | null; clickSound?: AudioBuffer | null; soundEvents?: SoundEvent[]; onProgress?: (done: number, total: number) => void; cancelled?: () => boolean }
 
 export const mp4Supported = () => typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined";
 
@@ -172,6 +173,67 @@ export async function checkFinalFrame(sl: { svg: string; width: number; height: 
   return compareFrames(A.getImageData(0, 0, w, h).data, B.getImageData(0, 0, w, h).data, w, h, regions?.map(r => ({ x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k })));
 }
 
+/** Builds stereo PCM at 48 kHz and encodes it as the MP4 AAC track. */
+async function encodeTimelineAudio(muxer: any, seconds: number, source: AudioBuffer | null, clickSound: AudioBuffer | null, events: SoundEvent[], cancelled?: () => boolean): Promise<void> {
+  if (typeof AudioEncoder === "undefined" || typeof AudioData === "undefined") throw new Error("This device cannot encode AAC audio. Update Android System WebView and try again.");
+  const rate = 48000, frames = Math.max(1, Math.ceil(seconds * rate));
+  const pcm = new Float32Array(frames * 2);
+  if (source) {
+    const left = source.getChannelData(0), right = source.numberOfChannels > 1 ? source.getChannelData(1) : left;
+    for (let i = 0; i < frames; i++) {
+      const at = i * source.sampleRate / rate, a = Math.floor(at), q = at - a;
+      if (a < left.length) {
+        const b = Math.min(a + 1, left.length - 1);
+        pcm[i * 2] = (left[a] + (left[b] - left[a]) * q) * 0.88;
+        pcm[i * 2 + 1] = (right[a] + (right[b] - right[a]) * q) * 0.88;
+      }
+    }
+  }
+  // Reuse the exact click.wav bundled with the Android app for EVERY element entrance.
+  // Resample it onto the same 48 kHz timeline as the video and optional narration/music.
+  if (clickSound) {
+    const clickL = clickSound.getChannelData(0);
+    const clickR = clickSound.numberOfChannels > 1 ? clickSound.getChannelData(1) : clickL;
+    const clickFrames = Math.max(1, Math.ceil(clickSound.length * rate / clickSound.sampleRate));
+    for (const event of events) {
+      if (cancelled?.()) throw new Error("Export cancelled.");
+      const start = Math.max(0, Math.round(event.time * rate));
+      for (let n = 0; n < clickFrames && start + n < frames; n++) {
+        const at = n * clickSound.sampleRate / rate;
+        const a = Math.floor(at), q = at - a;
+        const b = Math.min(a + 1, clickL.length - 1);
+        const l = clickL[a] + (clickL[b] - clickL[a]) * q;
+        const r = clickR[a] + (clickR[b] - clickR[a]) * q;
+        const ix = (start + n) * 2;
+        pcm[ix] += l; pcm[ix + 1] += r;
+      }
+    }
+  }
+  // Gentle saturation prevents clipping when a cue lands over loud source audio.
+  for (let i = 0; i < pcm.length; i++) pcm[i] = Math.tanh(pcm[i] * 1.08) * 0.94;
+
+  const cfg: AudioEncoderConfig = { codec: "mp4a.40.2", sampleRate: rate, numberOfChannels: 2, bitrate: 160000 };
+  const supported = await AudioEncoder.isConfigSupported(cfg);
+  if (!supported.supported) throw new Error("This device cannot encode AAC audio for MP4. Try updating Android System WebView.");
+  let encErr: Error | null = null;
+  const encoder = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: e => { encErr = e as Error; } });
+  encoder.configure(cfg);
+  const block = 1024;
+  try {
+    for (let start = 0; start < frames; start += block) {
+      if (cancelled?.()) throw new Error("Export cancelled.");
+      if (encErr) throw encErr;
+      const count = Math.min(block, frames - start);
+      const data = pcm.subarray(start * 2, (start + count) * 2);
+      const audio = new AudioData({ format: "f32", sampleRate: rate, numberOfFrames: count, numberOfChannels: 2, timestamp: Math.round(start * 1e6 / rate), data });
+      encoder.encode(audio); audio.close();
+      while (encoder.encodeQueueSize > 8) await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    await encoder.flush();
+    if (encErr) throw encErr;
+  } finally { encoder.close(); }
+}
+
 /** Renders a whole video: every image in turn on one clock (frame by frame, so the timing is exact), as one MP4. */
 export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
   if (!mp4Supported()) throw new Error("This phone's web view cannot make MP4 files (no WebCodecs). Update \"Android System WebView\" in the Play Store and try again.");
@@ -191,7 +253,9 @@ export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
   if (!config) throw new Error(`This phone has no H.264 encoder for ${plan.res.id === "1080p" ? "1080p" : plan.res.id.toUpperCase()} at ${fps} frames per second. Try a smaller size${fps > 30 ? " or 30 frames per second" : ""}.`);
 
   const target = new ArrayBufferTarget();
-  const muxer = new Muxer({ target, video: { codec: "avc", width: W, height: H, frameRate: fps }, fastStart: "in-memory" });
+  const wantsAudio = !!o.audio || !!o.soundEvents?.length;
+  const muxer: any = new Muxer({ target, video: { codec: "avc", width: W, height: H, frameRate: fps },
+    ...(wantsAudio ? { audio: { codec: "aac", sampleRate: 48000, numberOfChannels: 2 } } : {}), fastStart: "in-memory" });
   let encErr: Error | null = null;
   const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { encErr = e as Error; } });
   enc.configure(config);
@@ -226,6 +290,10 @@ export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
   await enc.flush();
   enc.close();
   if (encErr) throw encErr;
+
+  // Audio is rendered on the same video clock: uploaded music/voice is trimmed or padded,
+  // and small element-specific cues are mixed at each element's exact entrance time.
+  if (wantsAudio) await encodeTimelineAudio(muxer, seconds, o.audio ?? null, o.clickSound ?? null, o.soundEvents ?? [], o.cancelled);
   muxer.finalize();
   o.onProgress?.(total, total);
   return new Blob([target.buffer], { type: "video/mp4" });

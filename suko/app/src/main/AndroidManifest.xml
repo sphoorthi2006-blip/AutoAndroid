@@ -19,7 +19,7 @@
         <!-- Upscale self-test (step 2) -->
         <activity
             android:name="com.suko.app.UpscaleTestActivity"
-            android:label="Upscale test"
+            android:label="Upscale Images"
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
 

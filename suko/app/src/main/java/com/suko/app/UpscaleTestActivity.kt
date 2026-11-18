@@ -69,7 +69,7 @@ private fun UpscaleTestScreen(ctx: Context) {
     val scope = rememberCoroutineScope()
     var removeMark by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Pick one picture to test the AI upscaler.") }
+    var status by remember { mutableStateOf("Pick a picture to upscale.") }
     var tileLine by remember { mutableStateOf("") }
     var resultLines by remember { mutableStateOf("") }
     var preview by remember { mutableStateOf<Bitmap?>(null) }
@@ -129,7 +129,7 @@ private fun UpscaleTestScreen(ctx: Context) {
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("Upscale test", fontSize = 28.sp, color = Color(0xFFF2F4F8))
+        Text("Upscale Images", fontSize = 28.sp, color = Color(0xFFF2F4F8))
 
         Section("Engine") {
             Text(

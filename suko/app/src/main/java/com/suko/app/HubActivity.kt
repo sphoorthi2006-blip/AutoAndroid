@@ -46,6 +46,9 @@ class HubActivity : ComponentActivity() {
                         onOpenAutoEditor = {
                             startActivity(Intent(this, com.cuevideo.app.MainActivity::class.java))
                         },
+                        onOpenUpscale = {
+                            startActivity(Intent(this, UpscaleTestActivity::class.java))
+                        },
                         onOpenSvgEditor = {
                             startActivity(Intent(this, SvgEditorActivity::class.java))
                         },
@@ -82,7 +85,7 @@ private val Accent2 = Color(0xFF38BDF8)
 
 @Composable
 private fun HubScreen(
-    onOpenAutoEditor: () -> Unit, onOpenSvgEditor: () -> Unit, onOpenTextEditor: () -> Unit,
+    onOpenAutoEditor: () -> Unit, onOpenUpscale: () -> Unit, onOpenSvgEditor: () -> Unit, onOpenTextEditor: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -96,6 +99,11 @@ private fun HubScreen(
             title = "Auto Editor",
             blurb = "Images, script, SRT files and voice-over become a 1080p video.",
             onClick = onOpenAutoEditor,
+        )
+        ToolCard(
+            title = "Upscale Images",
+            blurb = "Remove the corner mark and make pictures sharper with AI (2x).",
+            onClick = onOpenUpscale,
         )
         ToolCard(
             title = "SVG Editor",

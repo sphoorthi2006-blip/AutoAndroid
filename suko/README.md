@@ -5,20 +5,10 @@ One Android app with three tools. Everything runs inside the app: no website, no
 | Tool | What it does | Engine |
 |---|---|---|
 | **Auto Editor** | Images + script + SRT files + optional voice-over + optional click sounds (+ scene clips) become a 1080p MP4. Export can be voice-only, click-only, mixed, or silent. On Export the images are AI-upscaled first, then the video is rendered (one progress bar). | Cue Video (Kotlin, OpenGL, MediaCodec), native audio mixer and MP4 muxer, upscaler from Sukko (ncnn Vulkan) |
-| **SVG Editor** | Dedicated offline Video Mode screen embedded in Android. Imports images (loose files, ZIPs or folders) and optional timing JSON; adds voice-over/music and custom or built-in per-element click sounds; exports an MP4 through Android to Download/Suko. | Image Layer Studio Video Mode in WebView; Android file picker and MediaStore save bridge |
+| **SVG Editor** | Android screen currently accepts images + JSON through shared intake. The web Video Mode source has a rough preview/export flow with optional audio and per-element click sounds, but that flow is not yet connected to the Android SVG Editor screen. | Image Layer Studio web source; Android intake screen |
 | **Text Editor** | Type text, use the built-in Patrick Hand font, and export 1080p, 2K or 4K at 30 or 60 fps. No upscaling. Custom font import (step 21) remains intentionally skipped. | Image Layer Studio text engine |
 
 **Input rule for all tools:** accept any entry type: loose files, ZIPs (also ZIPs inside ZIPs), folders with subfolders, or a mix. Route every file by its type; never reject a type without telling the user why.
-
-## SVG Editor audio and click controls
-
-The home-screen SVG Editor opens the dedicated offline Video Mode page (index.html?app=svg) inside the Android WebView; it no longer opens the older intake-only Compose screen.
-
-- **Voice-over / music:** choose an audio file, replace it, or remove it. The audio is synchronized to the video timeline, trimmed if longer, or padded with silence if shorter.
-- **Click sound:** choose a custom audio file or return to the bundled click.wav. The click toggle independently enables or disables a click at each animated element's entrance.
-- **Export:** the WebCodecs renderer mixes voice-over and click sounds into AAC audio in the MP4. In the Suko app, the save bridge writes the finished MP4 to Download/Suko.
-- Supported audio formats depend on the Android System WebView decoder. MP4 export also requires WebCodecs and AAC encoder support in the installed WebView.
-- The existing Auto Editor controls are unchanged. The standalone Image Layer Studio Android prototype in ils-android/ is unchanged.
 
 ## Rules for every session (credit-saving, from the owner)
 1. **One step per session:** do the next `todo` row below, then stop. Do not start the next step unless asked.
@@ -83,7 +73,7 @@ This add-on extends the existing Auto Editor. It does not replace the original S
 | 33 | Native audio mixing | **DONE in source:** optional voice-over; built-in click by default or a custom click file; click enable/disable; loudness matching, limiter and AAC-LC encoding. |
 | 34 | MP4 audio/video muxing | **DONE in source:** the AAC track is copied into the H.264 MP4 by the existing `VideoSink` muxer. |
 | 35 | Auto Editor export integration | **DONE in source:** voice + clicks, voice only, clicks only, or no audio track (silent MP4). The existing one-bar export progress and cancellation remain in use. |
-| 36 | SVG Editor audio controls | **PARTIAL:** `web/src/VideoMode.tsx` has an optional audio file and a per-element click-sound switch. The Android SVG Editor currently opens the native intake screen, so this web export/audio UI is not yet available through the Android SVG Editor flow. |
+| 36 | SVG Editor audio controls | **DONE in source (native, never compiled):** the Android SVG Editor screen now has Voice-over / audio input, Click sound (built-in or custom, on/off, one click per panel start time from the JSON, or at slide start when a slide has no panels) and an Audio mix test saving a .m4a, using the Auto Editor's `AudioJob`. The final SVG video export (step 29) is still todo, so the audio is not yet in an MP4. Code: `svg/SvgClickPlan.kt`, `svg/SvgAudioViewModel.kt`, `SvgEditorActivity.kt`. |
 
 ### Auto Editor audio rules
 
@@ -187,7 +177,7 @@ The new unit tests cover click-only and voice-only mixing at the pure audio-mix 
 - Step 12 `upscale/UpscaleRunner.kt`: `UpscaleRunner(cache, primary, fallback, onLowMemory).run(plan, isCancelled, onProgress, onPicture)` upscales the plan's pictures one at a time into the cache through an `UpscaleEngine` (writes the finished PNG to the given file, or throws). Progress gives picture index plus tile progress. Cancel works between pictures and inside a picture (no half file stays). Identical or cached pictures are not repeated. One failed picture is recorded and the batch goes on. The real engine adapter (wrapping `Upscaler.run`) is part of step 14.
 - Step 15 (same file): out of memory -> `onLowMemory()` then ONE retry; still failing -> the fallback engine (classic method) and the picture is marked DEGRADED with the reason; no result at all -> FAILED (the export must then use the original picture); a full disk stops the batch with the reason "storage is full". Resume: leftover half-written files are removed at the start and finished results are reused, so pressing Export again after a cancel or crash only does the rest.
 - Step 13 `upscale/ExportProgress.kt`: ONE bar for two phases. Each phase gets a share equal to its estimated time (default 9 s per picture, corrected from the pictures already done); the bar never goes backwards; with nothing to upscale it starts in the render phase; labels "Upscaling picture 3 of 12" and "Rendering video".
-- Step 24 `intake/SvgInput.kt` + `SvgEditorActivity.kt` added a native intake prototype for pictures + JSON. The current home-screen SVG Editor card now opens the embedded Video Mode page instead, with a dedicated SVG Editor title and no Image/Text tabs. Voice-over/music selection, custom or bundled click sound, click enable/disable and MP4 export are active in that route.
+- Step 24 `intake/SvgInput.kt` (+ `SvgEditorActivity.kt`): the SVG Editor takes pictures plus ONE JSON, from files, ZIPs, folders. Pictures sorted by number; with several JSON files the largest is used and the others are named in a warning; same-named pictures get a warning; other types are reported "not used by this tool". The home screen's SVG Editor card is now open and shows the readiness line. Preview and panel check are step 25.
 
 ### Test list for these steps (on the phone, after the APK is built)
 1. GitHub Actions is green; "Run logic tests" shows Step3-Step7, Step11-18 and Step24 passing. If red, paste the red text (the Android parts were never compiled).

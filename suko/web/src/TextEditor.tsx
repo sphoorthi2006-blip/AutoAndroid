@@ -225,6 +225,10 @@ export default function TextEditor() {
           {tab === "text" && (<>
             <label className="lab" htmlFor="te-text">Your text (a new line makes a new line on the picture)</label>
             <textarea id="te-text" className="field hand" rows={3} value={tx.text} placeholder="Type or paste a verse, heading or formula" onChange={e => set({ text: e.target.value })} />
+            <div className="row between"><label className="lab" htmlFor="te-len">Video length (seconds)</label>
+              <input id="te-len" className="field numf" type="text" inputMode="decimal" value={durText} disabled={!!exporting} onChange={e => setDurText(e.target.value)} />
+            </div>
+            <p className="note">The text is written in exactly this time. Press play above to watch it; the exported video is the same length.</p>
             <div className="row between">
               <div><span className="lab">Font</span><b className="val">{font.id === "patrick" ? "Patrick Hand (built in)" : font.label}</b></div>
               <button className="pill" onClick={() => fontFile.current?.click()}>Add font file</button>
@@ -280,20 +284,18 @@ export default function TextEditor() {
             <span className="lab">How the text appears</span>
             <button className={tx.style === "write" ? "opt on" : "opt"} onClick={() => set({ style: "write" })}><b>Handwritten</b><small>The pen follows each stroke of every letter.</small></button>
             <button className={tx.style === "trace" ? "opt on" : "opt"} onClick={() => set({ style: "trace" })}><b>Outline, then fill</b><small>Each letter is traced by its outline, then filled in.</small></button>
-            <p className="note">All the text is written in exactly the video length (set it in Export). Press play above to watch it.</p>
+            <p className="note">All the text is written in exactly the video length (set it in the Text tab). Press play above to watch it.</p>
           </>)}
 
           {tab === "export" && (<>
             <h2>Export video</h2>
             <div className="row between"><span className="lab">Size</span><b className="val">{safeRes(resId).w} x {safeRes(resId).h}</b></div>
+            <div className="row between"><span className="lab">Video length</span><b className="val">{seconds} s (change it in the Text tab)</b></div>
             <div className="row wrap">
               {RESOLUTIONS.map(r => <button key={r.id} className={resId === r.id ? "pill on" : "pill"} disabled={!!exporting} onClick={() => { setResId(r.id); setFps(f => fpsFor(r.id, f)); }}>{r.id === "1080p" ? "1080p" : r.id.toUpperCase()}{resOk && !resOk[r.id] ? " ✕" : ""}</button>)}
             </div>
             <div className="row"><span className="lab">Frame rate</span>
               {FPS_CHOICES.map(f => <button key={f} className={fps === f ? "pill on" : "pill"} disabled={!!exporting || f !== fpsFor(resId, f)} onClick={() => setFps(f)}>{f} fps</button>)}
-            </div>
-            <div className="row between"><label className="lab" htmlFor="te-len">Length (seconds)</label>
-              <input id="te-len" className="field numf" type="text" inputMode="decimal" value={durText} disabled={!!exporting} onChange={e => setDurText(e.target.value)} />
             </div>
             <p className="inset">No upscaling here: text is drawn sharp at every size, so the Upscale images switch is not shown in this tool. About {mb(estimateBytes(seconds, fpsFor(resId, fps), resId))} for {Math.round(seconds)} s.{resId === "4k" ? " 4K is 30 fps only." : ""}{resOk && !resOk[resId] ? " This phone's encoder may not support this size at this frame rate; try a smaller size." : ""}{estimateBytes(seconds, fpsFor(resId, fps), resId) > 400e6 ? " Big file: it is built in memory, so a phone with little RAM may fail." : ""}</p>
             <button className="go" disabled={!mp4Supported() || !durOk || !scene || !!exporting} onClick={exportMp4}>Export video</button>

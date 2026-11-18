@@ -137,12 +137,8 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
-  const [clickFile, setClickFile] = useState<File | null>(null);
-  const [clickBuffer, setClickBuffer] = useState<AudioBuffer | null>(null);
-  const [clickLoading, setClickLoading] = useState(false);
   const [elementSounds, setElementSounds] = useState(true);
   const audioRef = useRef<HTMLInputElement>(null);
-  const clickRef = useRef<HTMLInputElement>(null);
   const cancel = useRef(false);
   const run = useRef(0);
   const picRef = useRef<HTMLInputElement>(null);
@@ -270,18 +266,14 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         .map(item => ({ time: r.start + item.begin }))) : [];
       let clickSound: AudioBuffer | null = null;
       if (soundEvents.length) {
-        if (clickBuffer) {
-          clickSound = clickBuffer;
-        } else {
-          const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-          if (!Ctx) throw new Error("Audio playback is not available in this browser.");
-          const clickContext = new Ctx();
-          try {
-            const response = await fetch(`${import.meta.env.BASE_URL}click.wav`);
-            if (!response.ok) throw new Error("The bundled click.wav sound could not be loaded.");
-            clickSound = await clickContext.decodeAudioData(await response.arrayBuffer());
-          } finally { await clickContext.close(); }
-        }
+        const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!Ctx) throw new Error("Audio playback is not available in this browser.");
+        const clickContext = new Ctx();
+        try {
+          const response = await fetch(`${import.meta.env.BASE_URL}click.wav`);
+          if (!response.ok) throw new Error("The bundled click.wav sound could not be loaded.");
+          clickSound = await clickContext.decodeAudioData(await response.arrayBuffer());
+        } finally { await clickContext.close(); }
       }
       const blob = await renderMp4Timeline({
         resolution: resId,
@@ -354,25 +346,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           finally { setAudioLoading(false); }
         }} />
         <p className="hint small">{audioLoading ? "Reading audio…" : audioFile ? `${audioFile.name} — audio will be synchronized to the video, trimmed if longer, or padded with silence if shorter.` : "Add a voice-over, music track, or other audio file. Common formats are supported when your device can decode them."}</p>
-        <h2>Click sounds</h2>
-        <div className="row wrap">
-          <button className="ghost" disabled={!!exporting || clickLoading} onClick={() => clickRef.current?.click()}>{clickFile ? "Change click sound" : "Choose click sound"}</button>
-          {clickFile && <button className="ghost" disabled={!!exporting || clickLoading} onClick={() => { setClickFile(null); setClickBuffer(null); }}>Use built-in sound</button>}
-        </div>
-        <input ref={clickRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden onChange={async e => {
-          const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
-          setClickLoading(true);
-          try {
-            const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-            if (!Ctx) throw new Error("Audio decoding is not available in this browser.");
-            const ctx = new Ctx();
-            try { const decoded = await ctx.decodeAudioData(await file.arrayBuffer()); setClickFile(file); setClickBuffer(decoded); }
-            finally { await ctx.close(); }
-          } catch (err: any) { onError("Could not read click sound " + file.name + ": " + (err?.message ?? "unsupported audio format")); }
-          finally { setClickLoading(false); }
-        }} />
-        <p className="hint small">{clickLoading ? "Reading click sound…" : clickFile ? clickFile.name + " — played at each element's entrance." : "Using the built-in click.wav sound."}</p>
-        <label className="chk"><input type="checkbox" checked={elementSounds} disabled={!!exporting || clickLoading} onChange={e => setElementSounds(e.target.checked)} /> Play a click at every element entrance (headings, arrows and illustrations)</label>
+        <label className="chk"><input type="checkbox" checked={elementSounds} disabled={!!exporting} onChange={e => setElementSounds(e.target.checked)} /> Use the bundled click.wav for every element (headings, arrows and illustrations)</label>
 
         <h2>Animation</h2>
         <div className="row"><label className="inl">Background <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: 44, height: 26, padding: 0, border: "1px solid #bbb" }} /></label>

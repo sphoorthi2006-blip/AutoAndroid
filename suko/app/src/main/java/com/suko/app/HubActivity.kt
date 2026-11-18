@@ -49,7 +49,9 @@ class HubActivity : ComponentActivity() {
                         onOpenUpscale = {
                             startActivity(Intent(this, UpscaleImagesActivity::class.java))
                         },
-                        onOpenSvgEditor = { openWeb(SVG_EDITOR_PAGE, "SVG Editor") },
+                        onOpenSvgEditor = {
+                            startActivity(Intent(this, SvgEditorActivity::class.java))
+                        },
                         onOpenTextEditor = { openWeb(TEXT_EDITOR_PAGE, "Text Editor") },
                     )
                 }
@@ -57,9 +59,6 @@ class HubActivity : ComponentActivity() {
         }
     }
 }
-
-/** SVG Editor: the dedicated Video Mode page, embedded in the app and available offline. */
-const val SVG_EDITOR_PAGE = "web/studio/index.html?app=svg"
 
 /** Step 19: the Text Editor is the Layer Studio's Text tab, opened inside the app (offline web view) with the other tabs hidden. */
 const val TEXT_EDITOR_PAGE = "web/studio/index.html?app=text"
@@ -108,7 +107,7 @@ private fun HubScreen(
         )
         ToolCard(
             title = "SVG Editor",
-            blurb = "Turn pictures and timing JSON into an animated video, with voice-over and click-sound controls.",
+            blurb = "Turn your pictures and a timing file into a drawn, animated video.",
             onClick = onOpenSvgEditor,
         )
         ToolCard(

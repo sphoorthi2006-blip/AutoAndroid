@@ -66,3 +66,8 @@ GitHub Actions (`.github/workflows/build.yml`) builds the debug APK on every pus
 - The export runs while the app is open (screen is kept on). Leaving the app can stop it.
 - Hidden elements are erased with the image's single background colour, so a textured or shaded background shows patches until the element appears.
 - The video is always 16:9.
+
+
+## Scope
+
+This is a standalone Image Layer Studio Android prototype. It is separate from the Suko Android app in [../suko/README.md](../suko/README.md); the Suko Auto Editor audio add-on does not change this project's pipeline or APK.

@@ -18,3 +18,8 @@ Click the toolbar icon to open the Upscaler page in a tab.
 - Get the results as single PNGs, **Download all (ZIP)**, or **Save to folder...** (Chrome / Edge).
 
 Everything runs locally in the browser. The extension asks for no permissions and makes no network requests.
+
+
+## Scope
+
+This extension is the standalone image upscaler only. It is separate from the Suko Android video editor in [../suko/README.md](../suko/README.md); Auto Editor audio mixing and SVG Editor export are not features of this extension.

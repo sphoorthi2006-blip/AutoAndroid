@@ -1,4 +1,14 @@
-# Sukko (Upscaler)
+# AutoAndroid repository
+
+This repository contains three separate Android projects plus a browser extension. They have independent build workflows; the Suko video-editor audio add-on does not replace the original image upscaler.
+
+| Project | Folder | Purpose | Build workflow |
+|---|---|---|---|
+| **Sukko Image Upscaler** | repository root (`app/`, `extension/`) | AI image upscaler for Android and browser extension | `.github/workflows/build.yml` |
+| **Suko** | `suko/` | Offline Android app with Auto Editor, SVG Editor and Text Editor | `.github/workflows/build-suko.yml` |
+| **Image Layer Studio Android** | `ils-android/` | Standalone handwriting / slide-rendering Android app | `.github/workflows/build-ils.yml` |
+
+## Sukko Image Upscaler
 
 Two versions of the same tool:
 
@@ -40,8 +50,8 @@ Light edge-preserving denoise, 2x Lanczos-3 upscale, gentle sharpen. Pictures la
 - Licences: ncnn (BSD-3-Clause), Real-ESRGAN and its models (BSD-3-Clause), Real-ESRGAN-ncnn-vulkan (MIT).
 
 ## Get the Android APK
-Push to `main` (or run "Build APK" in the Actions tab). The APK is published at
-Releases -> latest -> `Upscaler.apk`. It installs over older builds.
+Push to `main` (or run **Build Sukko Image Upscaler APK** in Actions). The release workflow publishes
+`Sukko.apk` under Releases -> `suko-latest`. This is the root image-upscaler app, not the Suko video editor.
 
 ## Install the extension
 See [`extension/README.md`](extension/README.md). In short: open `chrome://extensions`, switch on *Developer mode*,

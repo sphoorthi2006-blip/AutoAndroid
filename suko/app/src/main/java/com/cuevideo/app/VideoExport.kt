@@ -20,7 +20,7 @@ class ExportOutcome(
     val videoFile: File,
     val frames: Int,
     val seconds: Double,
-    val audio: AudioResult,
+    val audio: AudioResult?,
     /** Step 14: plain sentence about pictures that were not upscaled normally, or null. */
     val upscaleNote: String? = null,
 )
@@ -45,7 +45,8 @@ object VideoExport {
         progressOverall: (String, Double) -> Unit,
         cancelled: () -> Boolean,
     ): ExportOutcome? {
-        val voice = s.audio ?: throw IllegalStateException("No voice-over chosen.")
+        val voice = s.audio
+        val audioEnabled = voice != null || s.clicksEnabled
         val total = s.timing?.totalSeconds ?: throw IllegalStateException("No timing yet.")
         val fps = s.fps
         val W = Defaults.W
@@ -90,15 +91,16 @@ object VideoExport {
             cache.trimTo(CACHE_LIMIT, upPlan.jobs.map { it.key }.toSet())
         }
         // everything below is phase 2: its own 0..1 is mapped onto the rest of the one bar
+        val audioShare = if (audioEnabled) AUDIO_SHARE else 0.0
         val progress: (String, Double) -> Unit = { label, p -> progressOverall(label, ep.overall(ExportProgress.Phase.RENDER, p)) }
 
-        // 1. audio (section 13)
+        // 1. Optional audio mix. With no voice-over and clicks off, the MP4 has no audio track.
         val mix = File(workDir, "mix.m4a")
-        val audio = AudioJob.run(
-            ctx, voice, s.click, clickTimes, total, s.audioSeconds, mix,
-            { label, p -> progress(label, p * AUDIO_SHARE) },
+        val audio = if (audioEnabled) AudioJob.run(
+            ctx, voice, s.click, s.clicksEnabled, clickTimes, total, s.audioSeconds, mix,
+            { label, p -> progress(label, p * audioShare) },
             cancelled,
-        ) ?: return null
+        ) ?: return null else null
 
         // 2. video
         outVideo.delete()
@@ -107,7 +109,7 @@ object VideoExport {
         var draw: GlDraw? = null
         val started = System.currentTimeMillis()
         try {
-            val sk = VideoSink(outVideo, W, H, fps, mix)
+            val sk = VideoSink(outVideo, W, H, fps, if (audio != null) mix else null)
             sink = sk
             val eg = EglCore(sk.inputSurface)
             egl = eg
@@ -129,7 +131,7 @@ object VideoExport {
                 val pct = (frameIdx * 100 / totalFrames).toInt()
                 if (pct != lastPct) {
                     lastPct = pct
-                    progress("Drawing video: frame $frameIdx of $totalFrames", AUDIO_SHARE + (1 - AUDIO_SHARE) * 0.97 * frameIdx / totalFrames)
+                    progress("Drawing video: frame $frameIdx of $totalFrames", audioShare + (1 - audioShare) * 0.97 * frameIdx / totalFrames)
                 }
             }
 
@@ -200,7 +202,7 @@ object VideoExport {
                 }
             }
             if (frameIdx != totalFrames.toLong()) throw RuntimeException("Frame count mismatch ($frameIdx of $totalFrames).")
-            progress("Finishing the video file...", AUDIO_SHARE + (1 - AUDIO_SHARE) * 0.97)
+            progress("Finishing the video file...", audioShare + (1 - audioShare) * 0.97)
             sk.finish()
             sink = null
             return ExportOutcome(outVideo, totalFrames, (System.currentTimeMillis() - started) / 1000.0, audio, upscaleNote)
@@ -214,7 +216,7 @@ object VideoExport {
             try { draw?.release() } catch (e: Exception) { }
             try { egl?.release() } catch (e: Exception) { }
             try { sink?.release() } catch (e: Exception) { }
-            mix.delete()
+            if (audio != null) mix.delete()
         }
     }
 }

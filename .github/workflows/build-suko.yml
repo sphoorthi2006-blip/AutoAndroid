@@ -1,4 +1,4 @@
-name: Build Sukko APK
+name: Build Suko APK
 on:
   push:
     branches: [ main ]

@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
@@ -303,7 +304,7 @@ fun MainScreen(vm: AppViewModel) {
             FoundRow(
                 "Voice-over",
                 s.audio?.name,
-                if (s.audio != null) 0 else 2,
+                if (s.audio != null) 0 else 1,
                 { pickAudio.launch(arrayOf("audio/*")) }, null,
             )
             val missingN = c?.missing?.size ?: 0
@@ -326,6 +327,13 @@ fun MainScreen(vm: AppViewModel) {
                 0,
                 { pickClick.launch(arrayOf("audio/*")) }, if (s.click != null) ({ vm.clearClick() }) else null,
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = s.clicksEnabled, onCheckedChange = { vm.setClicksEnabled(it) }, enabled = !ex.busy && !au.busy)
+                Column {
+                    Text("Add click sounds", fontSize = 14.sp, color = TextMain)
+                    Text("At each image start except the first (scene clips follow the same cue rule).", fontSize = 11.sp, color = Muted)
+                }
+            }
         }
 
         // ---- scene clips
@@ -349,7 +357,7 @@ fun MainScreen(vm: AppViewModel) {
         // ---- export
         Section("Export") {
             val c = s.check
-            val ready = c != null && c.canExport && s.audio != null && s.timing != null
+            val ready = c != null && c.canExport && s.timing != null
             if (c == null) {
                 Text("Add your files to get started. The master SRT decides how many slides there are.", fontSize = 13.sp, color = Muted)
             } else {
@@ -360,7 +368,11 @@ fun MainScreen(vm: AppViewModel) {
                 Text("${c.cueCount} cues  -  ${c.headingCues} headings  -  ${c.subscribeCues} subscribe  -  ${c.covered.size} under scene clips", fontSize = 12.sp, color = Muted)
                 for (e in c.errors) Text(e, color = Red, fontSize = 13.sp)
                 if (c.missing.isNotEmpty()) Text(c.missingText, color = Red, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                if (s.audio == null) Text("Voice-over not found yet.", color = Red, fontSize = 13.sp)
+                if (s.audio == null) Text(
+                    if (s.clicksEnabled) "No voice-over selected. Export will contain click sounds only."
+                    else "No voice-over or click sounds selected. Export will be silent.",
+                    color = Muted, fontSize = 12.sp,
+                )
                 if (c.missing.isNotEmpty() || c.headingCues + c.subscribeCues > 0)
                     Text("Heading and subscribe cues also need a picture file. It is never shown, but it must be there.", fontSize = 11.sp, color = Muted)
                 for (w in c.warnings) Text(w, color = Amber, fontSize = 12.sp)
@@ -391,7 +403,12 @@ fun MainScreen(vm: AppViewModel) {
             if (r != null) {
                 Text("Done: ${r.videoName}", color = Green, fontWeight = FontWeight.Bold)
                 Text("Report: ${r.reportName}", fontSize = 13.sp, color = Muted)
-                Text("${r.frames} frames, ${"%.1f".format(r.seconds)} s of video, made in ${"%.0f".format(r.took)} s. ${r.clicks} clicks, voice-over ${"%.1f".format(r.lufs)} LUFS.", fontSize = 13.sp, color = Muted)
+                val audioSummary = when {
+                    r.lufs != null -> "voice-over ${"%.1f".format(r.lufs)} LUFS"
+                    r.clicks > 0 -> "clicks only"
+                    else -> "silent MP4"
+                }
+                Text("${r.frames} frames, ${"%.1f".format(r.seconds)} s of video, made in ${"%.0f".format(r.took)} s. ${r.clicks} clicks, $audioSummary.", fontSize = 13.sp, color = Muted)
                 Text("Pictures used: ${r.usedImages} of ${r.givenImages}.", fontSize = 13.sp, color = Muted)
                 if (!r.upscaleOn) Text("Upscaling: off, pictures were used as they are.", fontSize = 12.sp, color = Muted)
                 else if (r.upscaleNote != null) Text("Upscaling: ${r.upscaleNote}", fontSize = 12.sp, color = Amber)
@@ -491,16 +508,18 @@ fun MainScreen(vm: AppViewModel) {
 
 
         Section("Audio mix test") {
-            val times = clickTimesFor(s)
-            Text("Mixes the voice-over with the clicks (loudness-matched, limited, AAC 192 kbps) and saves a .m4a you can play to check the clicks.", fontSize = 13.sp)
+            val times = if (s.clicksEnabled) clickTimesFor(s) else emptyList()
+            Text("Mixes the optional voice-over and optional click sounds, then saves a limited AAC 192 kbps .m4a for checking.", fontSize = 13.sp)
             if (times == null) {
                 Text("Choose the master SRT first.", color = Muted, fontSize = 13.sp)
-            } else {
+            } else if (s.clicksEnabled) {
                 Text("${times.size} clicks planned at ${s.fps} fps. First: " +
                     times.take(8).joinToString(", ") { "%.2f".format(it) } + if (times.size > 8) ", ..." else "", fontSize = 13.sp)
+            } else {
+                Text("Click sounds are disabled.", color = Muted, fontSize = 13.sp)
             }
-            val canMix = times != null && s.audio != null && (s.check?.errors?.isEmpty() == true) && !au.busy && !ex.busy
-            if (s.audio == null) Text("Voice-over not chosen yet.", color = Red, fontSize = 13.sp)
+            val canMix = times != null && s.timing != null && (s.audio != null || s.clicksEnabled) && (s.check?.errors?.isEmpty() == true) && !au.busy && !ex.busy
+            if (s.audio == null) Text(if (s.clicksEnabled) "No voice-over: this test will contain clicks only." else "No voice-over or clicks: there is no audio to mix.", color = Muted, fontSize = 12.sp)
             if (au.busy) {
                 Text(au.label, color = Amber)
                 LinearProgressIndicator(progress = { au.progress.toFloat() }, modifier = Modifier.fillMaxWidth())
@@ -513,7 +532,8 @@ fun MainScreen(vm: AppViewModel) {
             val r = au.result
             if (r != null) {
                 Text("Done. Length ${"%.2f".format(r.seconds)} s, ${r.clicks} clicks.", color = Green, fontWeight = FontWeight.Medium)
-                Text("Voice-over loudness: ${"%.1f".format(r.lufs)} LUFS" + if (r.lufsMeasured) "" else " (could not be measured, -20 used)", fontSize = 13.sp)
+                if (r.lufs != null) Text("Voice-over loudness: ${"%.1f".format(r.lufs)} LUFS" + if (r.lufsMeasured) "" else " (could not be measured, -20 used)", fontSize = 13.sp)
+                else Text("No voice-over in this mix.", fontSize = 13.sp, color = Muted)
                 Text("Click: rms ${"%.1f".format(r.clickRmsDb)} dB, peak ${"%.3f".format(r.clickPeak)}, gain ${"%+.1f".format(r.gainDb)} dB", fontSize = 13.sp)
             }
         }

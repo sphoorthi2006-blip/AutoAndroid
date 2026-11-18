@@ -87,6 +87,30 @@ class Stage4Test {
         assertEquals(0, got[2 * (44100 + 100)].toInt())
     }
 
+    @Test fun clickOnlyMixWorksWithoutVoiceOver() {
+        val click = FloatArray(120) { 0.4f }
+        val samples = ArrayList<Short>()
+        val ok = AudioMix.mix(null, click, 1.0, listOf(0.5), 1.0, { pcm, n ->
+            for (i in 0 until n * 2) samples.add(pcm[i])
+        })
+        assertTrue(ok)
+        assertEquals(44100, samples.size / 2)
+        assertTrue(samples.drop(2 * 22050).any { it.toInt() != 0 })
+    }
+
+    @Test fun voiceOnlyMixWorksWithoutClickTrack() {
+        val f = File.createTempFile("voice-only", ".pcm")
+        f.writeBytes(ByteArray(44100 * 4))
+        val samples = ArrayList<Short>()
+        val ok = AudioMix.mix(f, FloatArray(0), 1.0, emptyList(), 1.0, { pcm, n ->
+            for (i in 0 until n * 2) samples.add(pcm[i])
+        })
+        f.delete()
+        assertTrue(ok)
+        assertEquals(44100, samples.size / 2)
+        assertTrue(samples.all { it.toInt() == 0 })
+    }
+
     @Test fun resamplerKeepsTone() {
         val rs = Resampler(48000, 44100)
         val sine = FloatArray(48000) { (0.5 * sin(2 * PI * 1000 * it / 48000.0)).toFloat() }

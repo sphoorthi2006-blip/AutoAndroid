@@ -1,12 +1,12 @@
-# Suko (v0.23, steps 1-20, 22, 23 and 24 of 30; step 21 skipped by the owner)
+# Suko Android app (main roadmap: steps 1-24; step 21 skipped; steps 25-30 pending)
 
 One Android app with three tools. Everything runs inside the app: no website, no server, no internet.
 
 | Tool | What it does | Engine |
 |---|---|---|
-| **Auto Editor** | Images + script + SRT files + voice-over (+ scene clips) become a 1080p MP4. On Export the images are AI-upscaled first, then the video is rendered (one progress bar). | Cue Video (Kotlin, OpenGL, MediaCodec), upscaler from Sukko (ncnn Vulkan) |
-| **SVG Editor** | Images + JSON. Rough preview first (panels found vs JSON), then on Export: upscale, split panels, render the drawn/animated video. | Image Layer Studio, shown inside the app, panel detection ported to Kotlin |
-| **Text Editor** | Type text anywhere, choose fonts (built-in or upload your own .ttf / .otf / .woff), export 1080p, 2K or 4K at 30 or 60 fps. No upscaling. | Image Layer Studio text engine |
+| **Auto Editor** | Images + script + SRT files + optional voice-over + optional click sounds (+ scene clips) become a 1080p MP4. Export can be voice-only, click-only, mixed, or silent. On Export the images are AI-upscaled first, then the video is rendered (one progress bar). | Cue Video (Kotlin, OpenGL, MediaCodec), native audio mixer and MP4 muxer, upscaler from Sukko (ncnn Vulkan) |
+| **SVG Editor** | Android screen currently accepts images + JSON through shared intake. The web Video Mode source has a rough preview/export flow with optional audio and per-element click sounds, but that flow is not yet connected to the Android SVG Editor screen. | Image Layer Studio web source; Android intake screen |
+| **Text Editor** | Type text, use the built-in Patrick Hand font, and export 1080p, 2K or 4K at 30 or 60 fps. No upscaling. Custom font import (step 21) remains intentionally skipped. | Image Layer Studio text engine |
 
 **Input rule for all tools:** accept any entry type: loose files, ZIPs (also ZIPs inside ZIPs), folders with subfolders, or a mix. Route every file by its type; never reject a type without telling the user why.
 
@@ -58,11 +58,49 @@ Last finished step: **23 of 30** (1-20, 22, 23 done; **21 skipped on purpose**, 
 (The old 13-step plan was split into 30 smaller steps in session 3. Steps 1-2 are unchanged.)
 
 ## How to build the APK (GitHub Actions)
-1. Create a GitHub repository, upload ALL files of this ZIP (keep folders, including the hidden `.github`).
-2. Open the **Actions** tab. "Build Suko APK" starts by itself (or press Run workflow).
-3. When green, open the run and download **Suko-debug-apk** at the bottom. Unzip, copy `app-debug.apk` to the phone, allow "install unknown apps".
-4. If the run is red, the error log is on the `buildlog` branch (`log.txt`), or copy the red text from the run and paste it to Claude.
-5. Pushing to `main` also publishes `Sukko.apk` under Releases -> `suko-latest`.
+1. The repository is already configured; do not upload a second copy or create another workflow.
+2. Push a change under `suko/**`, or open Actions and run **Build Suko APK** manually.
+3. The workflow runs web tests, TypeScript checks, Kotlin unit tests, rebuilds the offline web assets, and assembles the debug APK with the native upscaler.
+4. When green, download **Suko-debug-apk** from the run artifacts. The APK is also published as `Sukko.apk` under Releases -> `suko-latest`.
+5. If the run is red, inspect the failed step and paste its error output. The separate root `build.yml` is for the image upscaler, not Suko.
+
+## Audio add-on (separate feature track: steps 33-36)
+
+This add-on extends the existing Auto Editor. It does not replace the original Suko roadmap or the image-upscaling stage.
+
+| Add-on step | Feature | Repository status |
+|---|---|---|
+| 33 | Native audio mixing | **DONE in source:** optional voice-over; built-in click by default or a custom click file; click enable/disable; loudness matching, limiter and AAC-LC encoding. |
+| 34 | MP4 audio/video muxing | **DONE in source:** the AAC track is copied into the H.264 MP4 by the existing `VideoSink` muxer. |
+| 35 | Auto Editor export integration | **DONE in source:** voice + clicks, voice only, clicks only, or no audio track (silent MP4). The existing one-bar export progress and cancellation remain in use. |
+| 36 | SVG Editor audio controls | **PARTIAL:** `web/src/VideoMode.tsx` has an optional audio file and a per-element click-sound switch. The Android SVG Editor currently opens the native intake screen, so this web export/audio UI is not yet available through the Android SVG Editor flow. |
+
+### Auto Editor audio rules
+
+- Voice-over is optional.
+- Click sounds are enabled by default. They play at each cue/image start except the first cue; scene clips use the existing clip-aware click timing.
+- A custom click file replaces the bundled `click.wav`; removing it restores the built-in click.
+- With voice-over and clicks enabled, both are mixed. With clicks disabled, the export contains only the voice-over. With no voice-over, enabled clicks produce a click-only audio track. With neither selected, the MP4 has no audio track and is silent.
+- The mix is normalized to 44.1 kHz stereo, click gain is matched against measured voice loudness (or the documented fallback), a look-ahead limiter is applied, and AAC-LC at 192 kbps is muxed with the H.264 video.
+- The Audio mix test creates a separate `.m4a` for checking. Audio preview playback inside the editor is not part of this add-on.
+
+### Build and verification for the audio add-on
+
+The canonical Suko workflow is `.github/workflows/build-suko.yml`. It runs the web tests and TypeScript check, Kotlin unit tests, builds the web assets, builds the Android debug APK with the native upscaler, checks the native library, and uploads the `Suko-debug-apk` artifact. A push that changes `suko/**` starts this workflow. The duplicate `android-apk.yml` workflow is retired so there is one automatic Suko build.
+
+The new unit tests cover click-only and voice-only mixing at the pure audio-mix layer. The GitHub Actions result is the source of truth for Android compilation and APK build; a real-device export test is still required for audio playback, muxed MP4 compatibility, and actual phone performance.
+
+### Phone test list
+
+1. Export with voice-over + clicks; confirm both are audible and clicks are not excessively loud.
+2. Turn clicks off and export with voice-over; confirm only the voice-over is present.
+3. Remove voice-over but leave clicks on; confirm only clicks are present.
+4. Remove voice-over and turn clicks off; confirm the MP4 plays silently.
+5. Select a custom click file; confirm it replaces the bundled click. Remove it and confirm the bundled click returns.
+6. Test a project containing scene clips; confirm click timing follows the clip-aware cue plan.
+7. Run the Audio mix test and confirm the resulting `.m4a` can be played.
+
+---
 
 ## Steps 20-23: what is in them
 - **Font (20):** Patrick Hand is the ONLY text font, from the owner's `PatrickHand-Regular.ttf` (bundled in the web view, so it works offline; same file as the native app's font). The Font picker is gone (it shows the font name). The other five fonts and their npm packages were removed. Noto Sans Math stays as a hidden fallback so symbols like √ ∑ π still draw.

@@ -1,4 +1,4 @@
-name: Build Sukko APK
+name: Build Sukko Image Upscaler APK
 
 on:
   push:

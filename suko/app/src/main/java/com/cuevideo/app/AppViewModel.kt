@@ -36,6 +36,8 @@ data class UiState(
     val originalCueList: List<Cue> = emptyList(),
     val audio: FileInfo? = null,
     val click: FileInfo? = null,
+    /** Click sound at image/clip starts; off means voice-only or a silent MP4. */
+    val clicksEnabled: Boolean = true,
     val masterCues: List<Cue> = emptyList(),
     val images: List<ImageEntry> = emptyList(),
     val clips: List<ClipEntry> = emptyList(),
@@ -61,7 +63,7 @@ data class ExportSummary(
     val usedImages: Int,
     val givenImages: Int,
     val unusedImages: List<String>,
-    val lufs: Double,
+    val lufs: Double?,
     val clicks: Int,
     val upscaleNote: String? = null,
     val upscaleOn: Boolean = true,
@@ -200,8 +202,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         val voice = s.audio
         val t = s.timing
-        val times = clickTimesFor(s)
-        if (voice == null || t == null || times == null || _audio.value.busy) return
+        val times = if (s.clicksEnabled) clickTimesFor(s) else emptyList()
+        if ((voice == null && !s.clicksEnabled) || t == null || times == null || _audio.value.busy) return
         audioCancel = false
         _audio.value = AudioUi(busy = true, label = "Starting...")
         audioJob = viewModelScope.launch(Dispatchers.IO) {
@@ -209,7 +211,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 var lastPct = -1
                 val res = AudioJob.run(
-                    ctx, voice, s.click, times, t.totalSeconds, s.audioSeconds, tmp,
+                    ctx, voice, s.click, s.clicksEnabled, times, t.totalSeconds, s.audioSeconds, tmp,
                     { label, p ->
                         val pct = (p * 100).toInt()
                         if (pct != lastPct) {
@@ -257,8 +259,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         val chk = s.check
         val t = s.timing
-        val times = clickTimesFor(s)
-        if (chk == null || t == null || times == null || s.audio == null || !chk.canExport || _export.value.busy) return
+        val times = if (s.clicksEnabled) clickTimesFor(s) else emptyList()
+        if (chk == null || t == null || times == null || !chk.canExport || _export.value.busy) return
         exportCancel = false
         _export.value = ExportUi(busy = true, label = "Starting...")
         exportJob = viewModelScope.launch(Dispatchers.IO) {
@@ -303,7 +305,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _export.value = ExportUi(
                     result = ExportSummary(
                         vname, rf.name ?: "report.csv", out.frames, out.frames.toDouble() / s.fps, out.seconds,
-                        used, s.images.size, unused, out.audio.lufs, out.audio.clicks, out.upscaleNote, s.upscale,
+                        used, s.images.size, unused, out.audio?.lufs, out.audio?.clicks ?: 0, out.upscaleNote, s.upscale,
                     ),
                 )
             } catch (e: OutOfMemoryError) {
@@ -601,6 +603,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearClick() = change { it.copy(click = null) }
+
+    fun setClicksEnabled(enabled: Boolean) = change { it.copy(clicksEnabled = enabled) }
 
     // ---------- images ----------
 

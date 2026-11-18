@@ -47,7 +47,7 @@ class HubActivity : ComponentActivity() {
                             startActivity(Intent(this, com.cuevideo.app.MainActivity::class.java))
                         },
                         onOpenUpscale = {
-                            startActivity(Intent(this, UpscaleTestActivity::class.java))
+                            startActivity(Intent(this, UpscaleImagesActivity::class.java))
                         },
                         onOpenSvgEditor = {
                             startActivity(Intent(this, SvgEditorActivity::class.java))
@@ -102,7 +102,7 @@ private fun HubScreen(
         )
         ToolCard(
             title = "Upscale Images",
-            blurb = "Remove the corner mark and make pictures sharper with AI (2x).",
+            blurb = "AI upscale 2x. Pictures, ZIPs and folders in; PNG folder or ZIPs out.",
             onClick = onOpenUpscale,
         )
         ToolCard(

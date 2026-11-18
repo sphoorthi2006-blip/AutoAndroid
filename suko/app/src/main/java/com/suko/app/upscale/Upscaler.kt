@@ -32,6 +32,16 @@ object Upscaler {
         return img
     }
 
+    /** Same as [decode] for any source (file, ZIP content, picked uri): [open] is called once. */
+    fun decode(open: () -> java.io.InputStream): ImageProcessor.Img? {
+        val bmp = open().use { BitmapFactory.decodeStream(it) } ?: return null
+        val px = IntArray(bmp.width * bmp.height)
+        bmp.getPixels(px, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+        val img = ImageProcessor.Img(bmp.width, bmp.height, px)
+        bmp.recycle()
+        return img
+    }
+
     fun run(
         ctx: Context,
         src: ImageProcessor.Img,

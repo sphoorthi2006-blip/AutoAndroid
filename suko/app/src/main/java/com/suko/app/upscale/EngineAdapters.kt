@@ -2,7 +2,6 @@ package com.suko.app.upscale
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.net.Uri
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -27,7 +26,7 @@ private fun writePng(img: ImageProcessor.Img, dest: File) {
  */
 class AiEngine(private val ctx: Context, private val removeMark: Boolean) : UpscaleEngine {
     override fun upscale(job: UpscaleJob, dest: File, onTile: (Int, Int) -> Unit) {
-        val src = Upscaler.decode(ctx, Uri.parse(ExportUpscale.sourceUri(job)))
+        val src = Upscaler.decode { UpscaleBatch.open(job) }
             ?: throw IOException("could not read the picture ${job.entry.name}")
         val pending = AtomicReference<Throwable?>(null)
         val res = Upscaler.run(ctx, src, removeMark) { d, t ->
@@ -42,7 +41,7 @@ class AiEngine(private val ctx: Context, private val removeMark: Boolean) : Upsc
 /** Fallback (step 15): the classic pipeline (mark removal, denoise, 2x, sharpen). No AI, no GPU. */
 class ClassicEngine(private val ctx: Context, private val removeMark: Boolean) : UpscaleEngine {
     override fun upscale(job: UpscaleJob, dest: File, onTile: (Int, Int) -> Unit) {
-        val src = Upscaler.decode(ctx, Uri.parse(ExportUpscale.sourceUri(job)))
+        val src = Upscaler.decode { UpscaleBatch.open(job) }
             ?: throw IOException("could not read the picture ${job.entry.name}")
         val out = ImageProcessor.process(src, removeMark = removeMark, cropStrip = false, aiScale = 0)
         writePng(out, dest)

@@ -16,10 +16,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Upscale Images: batch AI upscale (files, ZIPs, folders in; PNG folder or ZIPs out) -->
+        <activity
+            android:name="com.suko.app.UpscaleImagesActivity"
+            android:label="Upscale Images"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
+
         <!-- Upscale self-test (step 2) -->
         <activity
             android:name="com.suko.app.UpscaleTestActivity"
-            android:label="Upscale Images"
+            android:label="Upscale test"
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
 
@@ -42,7 +49,7 @@
             android:label="Intake test"
             android:exported="false" />
 
-        <!-- Auto Editor = the Cue Video engine (package com.cuevideo.app, unchanged) -->
+        <!-- Auto Editor (code package is still com.cuevideo.app; the name users see is only "Auto Editor") -->
         <activity
             android:name="com.cuevideo.app.MainActivity"
             android:label="Auto Editor"

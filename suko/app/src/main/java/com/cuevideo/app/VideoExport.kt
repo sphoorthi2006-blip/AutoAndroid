@@ -55,12 +55,13 @@ object VideoExport {
         //    Finished results are reused, so a second export or a resume after a cancel only does the rest.
         val settings = UpscaleSettings(removeMark = true)
         val cache = UpscaleCache(File(ctx.cacheDir, "upscale"))
-        val pics = plan.segments.filter { it.kind == SegKind.STILL }.mapNotNull { it.image }
+        //    The "Upscale images" switch (s.upscale) turns the whole phase off: pictures are then used as they are.
+        val pics = if (!s.upscale) emptyList() else plan.segments.filter { it.kind == SegKind.STILL }.mapNotNull { it.image }
             .distinctBy { it.uri }.map { ExportUpscale.Pic(it.name, it.uri) }
         var swap: Map<String, String> = emptyMap()
         var upscaleNote: String? = null
-        progressOverall("Checking pictures...", 0.0)
-        val upPlan = try {
+        if (s.upscale) progressOverall("Checking pictures...", 0.0)
+        val upPlan = if (!s.upscale) null else try {
             ExportUpscale.prepare(pics, cache, settings) { uri ->
                 ctx.contentResolver.openInputStream(Uri.parse(uri)) ?: throw IOException("could not open $uri")
             }

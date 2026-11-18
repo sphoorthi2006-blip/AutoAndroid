@@ -140,6 +140,25 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
     ) { Text(text, color = if (selected) Color.White else Muted, fontWeight = FontWeight.Medium, fontSize = 14.sp) }
 }
 
+/**
+ * The "Upscale images" option shown in every export section (Auto Editor now, SVG Editor when its export exists).
+ * One switch plus a visible sentence that says what the export does with the pictures.
+ */
+@Composable
+fun UpscaleOption(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Upscale images", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextMain)
+            Text(
+                if (checked) "On: every picture is AI-upscaled 2x first (step 1), then the video is rendered (step 2). One progress bar covers both."
+                else "Off: pictures are used as they are. Faster, but less sharp.",
+                fontSize = 12.sp, color = if (checked) Accent2 else Amber,
+            )
+        }
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    }
+}
+
 /** level: 0 = found, 1 = optional and missing, 2 = needed and missing */
 @Composable
 fun FoundRow(title: String, value: String?, level: Int, onChange: (() -> Unit)?, onClear: (() -> Unit)?) {
@@ -211,10 +230,10 @@ fun MainScreen(vm: AppViewModel) {
                 modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
                     .background(Brush.linearGradient(listOf(Accent, Accent2))),
                 contentAlignment = Alignment.Center,
-            ) { Text("C", color = Color.White, fontWeight = FontWeight.Black, fontSize = 22.sp) }
+            ) { Text("A", color = Color.White, fontWeight = FontWeight.Black, fontSize = 22.sp) }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Cue Video", fontSize = 26.sp, fontWeight = FontWeight.Black, color = TextMain)
+                Text("Auto Editor", fontSize = 26.sp, fontWeight = FontWeight.Black, color = TextMain)
                 Text("Images, captions and voice-over to a 1080p video", fontSize = 12.sp, color = Muted)
             }
         }
@@ -347,12 +366,17 @@ fun MainScreen(vm: AppViewModel) {
                 for (w in c.warnings) Text(w, color = Amber, fontSize = 12.sp)
                 if (s.original == null) Text("No original SRT: master timestamps will be used.", color = Amber, fontSize = 12.sp)
             }
+            UpscaleOption(s.upscale, !ex.busy) { vm.setUpscale(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Frame rate", color = Muted, fontSize = 13.sp)
                 Spacer(Modifier.width(4.dp))
                 for (f in listOf(30, 60)) Pill("$f fps", s.fps == f) { vm.setFps(f) }
             }
             if (ex.busy) {
+                if (s.upscale) Text(
+                    if (ex.label.startsWith("Upscaling") || ex.label.startsWith("Checking")) "Step 1 of 2: upscaling pictures" else "Step 2 of 2: rendering video",
+                    color = Accent2, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                )
                 Text(ex.label, color = Amber, fontSize = 13.sp)
                 LinearProgressIndicator(progress = { ex.progress.toFloat() }, modifier = Modifier.fillMaxWidth(), color = Accent, trackColor = Hairline)
                 OutlinedButton(onClick = { vm.cancelExport() }, border = BorderStroke(1.dp, Hairline)) { Text("Cancel", color = TextMain) }
@@ -369,7 +393,9 @@ fun MainScreen(vm: AppViewModel) {
                 Text("Report: ${r.reportName}", fontSize = 13.sp, color = Muted)
                 Text("${r.frames} frames, ${"%.1f".format(r.seconds)} s of video, made in ${"%.0f".format(r.took)} s. ${r.clicks} clicks, voice-over ${"%.1f".format(r.lufs)} LUFS.", fontSize = 13.sp, color = Muted)
                 Text("Pictures used: ${r.usedImages} of ${r.givenImages}.", fontSize = 13.sp, color = Muted)
-                if (r.upscaleNote != null) Text("Upscaling: ${r.upscaleNote}", fontSize = 12.sp, color = Amber)
+                if (!r.upscaleOn) Text("Upscaling: off, pictures were used as they are.", fontSize = 12.sp, color = Muted)
+                else if (r.upscaleNote != null) Text("Upscaling: ${r.upscaleNote}", fontSize = 12.sp, color = Amber)
+                else Text("Upscaling: all pictures were AI-upscaled 2x.", fontSize = 12.sp, color = Green)
                 if (r.unusedImages.isNotEmpty())
                     Text("Not used: " + r.unusedImages.take(30).joinToString(", ") + if (r.unusedImages.size > 30) ", ..." else "", fontSize = 12.sp, color = Amber)
             }
@@ -480,7 +506,7 @@ fun MainScreen(vm: AppViewModel) {
                 LinearProgressIndicator(progress = { au.progress.toFloat() }, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = { vm.cancelAudio() }) { Text("Cancel") }
             } else {
-                Button(onClick = { saveAudio.launch("cuevideo_audio_test.m4a") }, enabled = canMix) { Text("Mix audio and save .m4a") }
+                Button(onClick = { saveAudio.launch("auto_editor_audio_test.m4a") }, enabled = canMix) { Text("Mix audio and save .m4a") }
             }
             val err = au.error
             if (err != null) Text(err, color = Red)

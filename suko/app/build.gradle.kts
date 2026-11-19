@@ -55,12 +55,14 @@ android {
 
 chaquopy {
     defaultConfig {
-        version = "3.11"
+        // Chaquopy's wheel repo has OpenCV only for Python 3.8 and 3.10 (opencv-python-headless 4.5.1.48), so the app runs Python 3.10.
+        // Versions are pinned: unpinned, pip picks the newest PyPI source package, which Chaquopy cannot compile.
+        version = "3.10"
         buildPython("python3")
         pip {
-            install("numpy")
-            install("opencv-python-headless")
-            install("pillow")
+            install("numpy==1.26.2")
+            install("opencv-python-headless==4.5.1.48")
+            install("pillow==9.2.0")
         }
     }
 }

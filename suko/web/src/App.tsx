@@ -46,8 +46,11 @@ function thumbOf(l: Layer): string {
 /** Inside the Bezalel app the Text Editor card opens this page as ...index.html?app=text: the Text Editor screen (TextEditor.tsx), no Image/Video tabs. */
 const isTextApp = (): boolean => { try { return new URLSearchParams(window.location.search).get("app") === "text"; } catch { return false; } };
 
+/** Inside the Bezalel app the SVG Editor card opens this page as ...index.html?app=video: the SVG Editor screen (VideoMode.tsx), a full-window app screen with its own top bar. */
+const isVideoApp = (): boolean => { try { return new URLSearchParams(window.location.search).get("app") === "video"; } catch { return false; } };
+
 export default function App() {
-  return isTextApp() ? <TextEditor /> : <Studio />;
+  return isTextApp() ? <TextEditor /> : isVideoApp() ? <VideoMode standalone /> : <Studio />;
 }
 
 function Studio() {

@@ -132,3 +132,7 @@ aside{min-height:0;overflow-y:auto;overflow-x:hidden}
 /* step 24: font upload */
 .fontpick { display: flex; flex-direction: column; gap: 6px; }
 .fontpick .hint { margin: 0; }
+
+/* Inside the Bezalel app the page is a dark app screen, never a white web page (see main.tsx). */
+html[data-app] { overscroll-behavior: none; }
+html[data-app], html[data-app] body { background: #0b0d12; }

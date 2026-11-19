@@ -62,6 +62,9 @@ class WebHostActivity : ComponentActivity() {
         val saves = SaveRegistry { name, mime -> MediaStoreSaver.open(this, name, mime) }
 
         web = WebView(this)
+        // An app screen, not a web page: the view is dark from the first frame (no white flash while the page loads) and has no overscroll glow.
+        web.setBackgroundColor(0xFF0B0D12.toInt())
+        web.overScrollMode = android.view.View.OVER_SCROLL_NEVER
         bridge = SukoBridge(
             core, saves, inputs, { blocked.get() },
             { js -> runOnUiThread { if (!isDestroyed) web.evaluateJavascript(js, null) } },

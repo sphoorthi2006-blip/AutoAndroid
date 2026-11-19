@@ -1,18 +1,20 @@
 # Bezalel Android app (formerly "Suko"; folder and package are still `suko` / `com.suko.app` on purpose)
 **STATUS 2026-11-19: every roadmap step (1-30, SVG workflow 1-10, audio 33-36) is written, the whole app BUILDS GREEN on GitHub Actions and the APK is published at Releases -> `bezalel-latest` (`Bezalel.apk`). Nothing has been run on a phone yet: the phone test lists below are the only thing left, plus the optional signed-release secrets.**
 
+**UPDATE 2026-11-19 (step 37, see the end of this file): the SVG Editor is now a full-window, dark, native-looking app screen (own top bar, pinned preview, tabs) instead of the old white web page, the home screen got premium cards, and the web assets were rebuilt. Web side verified in the sandbox; the Kotlin edits (`WebHostActivity.kt`, `HubActivity.kt`) are NOT compiled here, so the next CI run is their compiler.**
+
 One Android app with three tools. Everything runs inside the app: no website, no server, no internet.
 
 | Tool | What it does | Engine |
 |---|---|---|
 | **Auto Editor** | Images + script + SRT files + optional voice-over + optional click sounds (+ scene clips) become a 1080p MP4. Export can be voice-only, click-only, mixed, or silent. On Export the images are AI-upscaled first, then the video is rendered (one progress bar). | Cue Video (Kotlin, OpenGL, MediaCodec), native audio mixer and MP4 muxer, upscaler from Sukko (ncnn Vulkan) |
-| **SVG Editor** | Android screen currently accepts images + JSON through shared intake. The web Video Mode source has a rough preview/export flow with optional audio and per-element click sounds, but that flow is not yet connected to the Android SVG Editor screen. | Image Layer Studio web source; Android intake screen |
+| **SVG Editor** | The home card opens the web Video screen INSIDE the app as a full-window dark app screen (top bar with back arrow + Export, pinned preview with play / timeline, tabs Import / Style / Audio / Images / Export). Pictures + timing JSON + scene clips + voice-over, hand-drawn panel animation, AI-sharpened MP4 export. | `web/src/VideoMode.tsx`, `VideoMode.css`; Python analyser via Chaquopy |
 | **Text Editor** | Type text, use the built-in Patrick Hand font, and export 1080p, 2K or 4K at 30 or 60 fps. No upscaling. Custom font import (step 21) remains intentionally skipped. | Image Layer Studio text engine |
 
 **Input rule for all tools:** accept any entry type: loose files, ZIPs (also ZIPs inside ZIPs), folders with subfolders, or a mix. Route every file by its type; never reject a type without telling the user why.
 
 ## WHAT THE APP HAS (all features, 2026-11-19)
-Home screen with three tool cards (Auto Editor, SVG Editor, Text Editor), an Upscale Images tool, and a Developer tools area (Upscale test, Intake test, Web test). Dark theme `Theme.Bezalel`, Bezalel icon, everything offline (no INTERNET permission), arm64-v8a only.
+Home screen (premium dark cards with a gradient badge, tag line and arrow per tool) with four tools: Auto Editor, Upscale Images, SVG Editor, Text Editor. Dark theme `Theme.Bezalel`, Bezalel icon, everything offline (no INTERNET permission), arm64-v8a only.
 
 **Shared for all tools**
 - Intake: loose files, ZIPs (also ZIPs inside ZIPs), folders with sub-folders, or a mix; every file is routed by kind (image, video, audio, SRT, text, JSON, font, ZIP) and anything skipped is listed with a reason. Zip-bomb guards.
@@ -30,6 +32,7 @@ Home screen with three tool cards (Auto Editor, SVG Editor, Text Editor), an Ups
 - Scene videos stay videos: letterboxed, muted, in step with the playhead in the preview and drawn frame by frame in the MP4.
 - Timing report and CSV (with `image_kind` column), per-element click sounds, voice-over.
 - Export: "Make every picture sharper" (AI upscale, cached between exports, cancel works mid-picture), then the MP4, one progress bar, screen-off protection.
+- Looks like an app, not a web page (step 37): dark theme shared with the Text Editor, own top bar (back arrow, title with image count and length, gradient Export button), picture + play / previous / next + timeline pinned on tall phones, five tabs (Import, Style, Audio, Images, Export) with one card each, switches instead of tick boxes, import tiles that turn green when loaded, two-column layout on wide windows.
 - Native intake screen with audio controls (voice-over, click sound, audio mix test; `svg/SvgClickPlan.kt`, `SvgAudioViewModel.kt`). The home card now opens the web screen; whether the native audio controls are still reachable is not checked.
 
 **Text Editor** (Layer Studio text engine, Patrick Hand built in)
@@ -99,6 +102,7 @@ OLD ROADMAP: steps 1-24 DONE (21 skipped on purpose). **Steps 25-30 are OPEN AGA
 | 28 | Vision 3: port `ink.py` and `segment.py` (decide about `vtracer` fallback) | DONE in source (A3): `ink.py` + `segment.py` run the same way; `vtracer` is not on Android, traced groups are empty, the app uses raster crops (decided) | `app/src/main/python/ils/` |
 | 29 | SVG Editor 3: export: upscale, then render, one progress bar | DONE in source, NEVER RUN: at Export inside the app (checkbox, default ON) every picture goes through the AI upscaler (`upscale` bridge method, `PhoneEngine.kt`), is analysed again, then the MP4 is drawn; ONE bar (upscale = first third); a picture that fails keeps its normal version. **Later the same day (DONE IN SOURCE, built green on CI):** cache between exports (`PhoneEngine.upscale` uses the Auto Editor's cache folder `cacheDir/upscale` and keys; only real AI results are cached; a cached picture answers `method:"cached"` at once) and cancel mid-picture (page calls `cancelNative()` -> `SukoBridge.cancelWork()` -> `WorkControl.cancelled`, checked in the tile callback; answer `{error:"cancelled"}`; NOT queued behind the running job). Note: if the AI step is stopped, ImageProcessor may still run its classic fallback for a moment before the stop is answered. Not seen on a phone | `VideoMode.tsx` `exportMp4`, `PhoneEngine.kt` |
 | 30 | Polish: one theme, background service while exporting, icon, release APK | DONE in source (never built): background service while exporting (`web/ExportKeepAliveService.kt`: foreground service + wake lock, started/stopped by the page via bridge method `keepalive`, used by the Video and Text editors' exports; manifest permissions added), release signing from environment variables (`BEZALEL_KEYSTORE`, `BEZALEL_STORE_PASSWORD`, `BEZALEL_KEY_ALIAS`, `BEZALEL_KEY_PASSWORD`; without them release falls back to the debug key). The icon and the one dark theme (`Theme.Bezalel`) already existed; no new icon was designed. The CI still builds the DEBUG apk; a signed release needs the owner's keystore as GitHub secrets and a release step (not added) | `ExportKeepAliveService.kt`, `PhoneEngine.kt`, `bridge.ts`, `build.gradle.kts` |
+| 37 | SVG Editor as a native-looking premium app screen (owner request 2026-11-19: not a white web page; neat, organised, premium overall) | DONE in source. Web side built into the app assets and checked in a headless browser at phone and desktop sizes; `npm test` 292 checks pass, `tsc` clean. Kotlin edits (`WebHostActivity.kt` dark WebView, `HubActivity.kt` home cards) are NOT compiled in the sandbox; the next CI run compiles them. NOT seen on a phone. | `VideoMode.tsx`, `VideoMode.css`, `App.tsx`, `main.tsx`, `styles.css`, `index.html`, `WebHostActivity.kt`, `HubActivity.kt` |
 
 (The owner may ask for several steps in one session; then do them in order and test once at the end.)
 (This README lives INSIDE the source ZIP at `Bezalel/suko/README.md`; always update it there and ship the whole ZIP. Never hand over a separate README.)
@@ -405,3 +409,31 @@ Nothing was compiled or run: the sandbox has no Gradle/Android SDK. The first re
 - Text: text box in Patrick Hand, font line + Add font file (uses the step 24 `fontStore`, kept on the phone), Size in px, Position (Center + 4 arrows). Style: colours, background colour or image, picture shape, align. Motion: handwritten or outline-then-fill. Export: 1080p / 2K / 4K, 30/60 fps (4K = 30), length, progress with Cancel.
 - The MP4 is saved to Download/Bezalel (the layout says Movies/Bezalel; the saver was not changed).
 - 3 new checks in `web/tests/text.test.mjs` (exact px size, size limit, ink box for dragging). NOT verified on a phone: Kotlin compile of `back()`, touch dragging, real export.
+
+## Step 37: SVG Editor as a native-looking premium app screen (2026-11-19)
+Owner request: the SVG Editor window must feel like it is INSIDE the app, not like a white web page; the interior must be neat and well organised; the whole app should look premium. Nothing about what the editor DOES was changed (same state, same export, same timing logic); only the screen around it.
+
+**What changed**
+- `web/src/VideoMode.tsx`: the render part was rebuilt, the logic was kept. New prop `standalone` (true for the app screen, set in `App.tsx` for `index.html?app=video`): it draws its own top bar (back arrow -> `goBack()`, title + "N images - length", gradient **Export** button that jumps to the Export tab) and its own error line (`report()` also still calls the old `onError`, so the browser Studio keeps working; there it is drawn with `standalone` off as an embedded block under the old header). New `Icon` component (inline line icons, no emoji). New tab state `import | style | audio | images | export`, one card per tab. After a successful export the Export tab says `Saved <name>`.
+- `web/src/VideoMode.css` (new, ALL rules scoped under `.se`): dark tokens identical to the Text Editor (`--bg #0b0d12`, `--card #141824`, accent `#7c3aed` / `#8b5cf6`, blue `#38bdf8`, warn `#f5b82e`, ok `#34d399`), gradient `--grad` for primary actions, pill buttons, switch-style checkboxes, custom range and select, import tiles, list cards, progress bar. Layout: phone = one column, the preview + transport + timeline stay pinned on tall screens (`min-height: 760px`), tabs scroll in one row; windows >= 900 px wide = preview on the left, tabs + card on the right, both scroll on their own.
+- `web/src/App.tsx`: `app=video` now renders `<VideoMode standalone />` directly (the old Studio header and `.app` shell are no longer used for the SVG Editor). `web/src/main.tsx` marks the page `html[data-app]` and paints html/body dark before React starts, `styles.css` keeps them dark, `index.html` / `app.html` got `viewport-fit=cover`, `color-scheme` and `theme-color`. No white flash, no light page behind the app screens.
+- `WebHostActivity.kt`: `web.setBackgroundColor(0xFF0B0D12)` and `OVER_SCROLL_NEVER`, so the native window is dark from the first frame. (Theme and status / navigation bar colours were already `#0B0D12`; targetSdk 34 is not edge-to-edge, so no inset code was needed.)
+- `HubActivity.kt`: home screen restyled: brand badge + "Offline video studio", "PICK A TOOL" label, each tool card has a gradient badge, a small tag (Video / Images / Animation / Text), title, blurb and an arrow, plus an "Everything runs on your phone" line. Behaviour and the four click handlers are unchanged. (`ToolCard` now takes `tag` and `colors`.)
+- `app/src/main/assets/web/studio/` rebuilt with `npm run build:suko` (CSS 31.8 kB, JS 587 kB). CI rebuilds it again anyway.
+
+**Rules for the next session (so the look stays consistent)**
+1. New SVG Editor controls go inside the `.se` scope and reuse the existing classes (`se-card`, `se-tile`, `se-list`, `se-stats`, `se-sum`, `row`, `hint`, `ghost` / `on` / `go` buttons, `label.chk` for a switch). Do not add light colours or inline hex colours; use the CSS variables.
+2. `styles.css` still holds the OLD light styles for the Image tab and the browser Studio. They leak into `.se` only where a rule is not overridden, so when a control looks odd in the app, check for an old rule with the same class name (example fixed in this step: `.sliders label` had a two-column grid; `.se .sliders > label` now resets `grid-template-columns`).
+3. Keep every tab reachable without scrolling sideways at 360 px width (five tabs share the row now).
+4. The browser has no picture analyser, so in a plain browser every picture shows "could not be read"; that is expected. Use the phone (or Chaquopy backend) to judge the picture states.
+
+**Verified in the sandbox:** `tsc --noEmit` clean, `npm test` 292 checks pass, `npm run build:suko` OK, the built bundle loads for `?app=video` and `?app=text` with no page errors and a dark body, headless Chromium screenshots at 390x844 (phone) and 1280x760 (wide) for the empty state and all five tabs with real sample pictures and the example timing JSON.
+**NOT verified:** the Kotlin edits compile (CI will tell), the look on a real phone and inside the real Android WebView (fonts, safe areas, keyboard), the pinned-preview behaviour with the on-screen keyboard open, a full export from the new screen on a phone.
+
+**Phone check for this step**
+1. Home screen: four cards with coloured badges; every card still opens its tool.
+2. Home -> SVG Editor: the screen is dark from the first frame (no white flash), has a top bar with back arrow and a gradient Export button, and nothing looks like a web page.
+3. Add a ZIP + JSON: the two import tiles turn green, the preview shows the first picture, play / previous / next and dragging the timeline work.
+4. Scroll the tabs content on a tall phone: the preview stays pinned. Rotate the phone: the layout switches to two columns when wide enough.
+5. Export tab: shows images / length / audio, resolution buttons, the big Export button; during export one progress block with Cancel; at the end `Saved video-....mp4`.
+6. Back arrow closes the screen and returns to the home screen.

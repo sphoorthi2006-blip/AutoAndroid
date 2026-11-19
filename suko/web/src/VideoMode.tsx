@@ -9,7 +9,8 @@ import { ResolutionPicker } from "./ResolutionPicker";
 import { DEFAULT_SKETCH, type Dir, type DrawStyle, type Entrance, type LinesMode, type Project, type SketchSettings } from "./types";
 import { checkFinalFrame, mp4Supported, renderMp4Timeline } from "./video";
 import { qualityVerdict } from "./quality";
-import { cancelNative, hasHost, keepAlive, nativeCall, toBase64 } from "./bridge";
+import { cancelNative, goBack, hasHost, keepAlive, nativeCall, toBase64 } from "./bridge";
+import "./VideoMode.css";
 
 const FPS = 30;
 
@@ -24,6 +25,25 @@ interface Row { slide: Slide; spec?: SlideSpec; start: number; end: number; svg:
 
 const fmt = (t: number) => { const s = Math.max(0, t), m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`; };
 const ENTRANCES: { id: Entrance; label: string }[] = [{ id: "draw", label: "Draw (hand-drawn)" }, { id: "fade", label: "Fade in" }, { id: "pop", label: "Pop in (bounce)" }, { id: "slide", label: "Move in" }, { id: "none", label: "Appear at once" }];
+
+
+type IconName = "back" | "play" | "pause" | "prev" | "next" | "image" | "folder" | "clock" | "music" | "film";
+/** Small line icons (no emoji, so the buttons look the same on every phone). */
+function Icon({ n, size = 22 }: { n: IconName; size?: number }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+  switch (n) {
+    case "back": return <svg {...p}><path d="M15 5l-7 7 7 7" /></svg>;
+    case "play": return <svg {...p}><path d="M8 5v14l11-7z" fill="currentColor" /></svg>;
+    case "pause": return <svg {...p}><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor" /><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor" /></svg>;
+    case "prev": return <svg {...p}><path d="M6 5v14" /><path d="M19 5L9 12l10 7z" fill="currentColor" /></svg>;
+    case "next": return <svg {...p}><path d="M18 5v14" /><path d="M5 5l10 7-10 7z" fill="currentColor" /></svg>;
+    case "image": return <svg {...p}><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="1.7" /><path d="M4 18l5-5 4 4 3-3 4 4" /></svg>;
+    case "folder": return <svg {...p}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>;
+    case "clock": return <svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+    case "music": return <svg {...p}><path d="M9 18V6l10-2v12" /><circle cx="7" cy="18" r="2.5" /><circle cx="17" cy="16" r="2.5" /></svg>;
+    case "film": return <svg {...p}><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" /></svg>;
+  }
+}
 
 /* ------------------------------------------------------------------ the player: picture, play / pause, playhead ------------------------------------------------------------------ */
 
@@ -110,27 +130,27 @@ function Player({ rows, total, seekReq, onIndex }: { rows: Row[]; total: number;
 
   return (
     <>
-      <div className="vview">
+      <div className="se-view">
         {row && (row.scene
-          ? <div className="vscene"><SceneVideo file={row.scene.clip.file} lt={t - row.start} playing={playing} /></div>
+          ? <div className="se-scene"><SceneVideo file={row.scene.clip.file} lt={t - row.start} playing={playing} /></div>
           : row.svg
-          ? <div ref={host} className="vscene" dangerouslySetInnerHTML={{ __html: row.svg }} />
-          : <div className="vscene"><img src={row.slide.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", opacity: .55 }} /><p className="busy">{row.slide.status === "error" ? "This image could not be read" : row.slide.thumb ? "Finding the elements…" : "No picture for this image"}</p></div>)}
+          ? <div ref={host} className="se-scene" dangerouslySetInnerHTML={{ __html: row.svg }} />
+          : <div className="se-scene"><img src={row.slide.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", opacity: .55 }} /><p className="busy">{row.slide.status === "error" ? "This image could not be read" : row.slide.thumb ? "Finding the elements…" : "No picture for this image"}</p></div>)}
       </div>
-      <div className="vbar">
-        <button className="icon big" title="Previous image" aria-label="Previous image" onClick={() => goSlide(-1)}>⏮</button>
-        <button className="big" title={playing ? "Pause (Space)" : "Play (Space)"} aria-label={playing ? "Pause" : "Play"} onClick={toggle}>{playing ? "⏸ Pause" : "▶ Play"}</button>
-        <button className="icon big" title="Next image" aria-label="Next image" onClick={() => goSlide(1)}>⏭</button>
-        <span className="vtime" aria-label="Time">{fmt(t)} / {fmt(total)}</span>
-        <span className="vwhere">Image {row?.slide.n ?? "-"} of {rows.length}</span>
+      <div className="se-ctl">
+        <button className="se-round" title="Previous image" aria-label="Previous image" onClick={() => goSlide(-1)}><Icon n="prev" size={18} /></button>
+        <button className="se-play" title={playing ? "Pause (Space)" : "Play (Space)"} aria-label={playing ? "Pause" : "Play"} onClick={toggle}><Icon n={playing ? "pause" : "play"} size={24} /></button>
+        <button className="se-round" title="Next image" aria-label="Next image" onClick={() => goSlide(1)}><Icon n="next" size={18} /></button>
+        <span className="se-time" aria-label="Time">{fmt(t)} <i>/ {fmt(total)}</i></span>
+        <span className="se-chip" title="Current image" aria-label={`Image ${row?.slide.n ?? "-"} of ${rows.length}`}>{row?.slide.n ?? "-"} / {rows.length}</span>
       </div>
-      <div className="vtrack" ref={track} role="slider" aria-label="Playhead" aria-valuemin={0} aria-valuemax={Math.round(total)} aria-valuenow={Math.round(t)}
+      <div className="se-track" ref={track} role="slider" aria-label="Playhead" aria-valuemin={0} aria-valuemax={Math.round(total)} aria-valuenow={Math.round(t)}
         onPointerDown={e => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); resume.current = playing; setPlaying(false); fromPointer(e); }}
         onPointerMove={e => { if (e.buttons) fromPointer(e); }}
         onPointerUp={() => { if (resume.current && tRef.current < total) setPlaying(true); resume.current = false; }}>
-        {rows.map((r, i) => <div key={r.slide.key} className={"vseg" + (i === idx ? " on" : "") + (r.slide.status === "error" ? " bad" : "")} style={{ left: pct(r.start), width: pct(r.end - r.start) }}><span>{r.slide.n}</span></div>)}
-        {rows.flatMap(r => r.marks.map((m, j) => <i key={r.slide.key + "-" + j} className="vtick" style={{ left: pct(m) }} />))}
-        <div className="vhead" style={{ left: pct(t) }} />
+        {rows.map((r, i) => <div key={r.slide.key} className={"se-seg" + (i === idx ? " on" : "") + (r.slide.status === "error" ? " bad" : "")} style={{ left: pct(r.start), width: pct(r.end - r.start) }}><span>{r.slide.n}</span></div>)}
+        {rows.flatMap(r => r.marks.map((m, j) => <i key={r.slide.key + "-" + j} className="se-tick" style={{ left: pct(m) }} />))}
+        <div className="se-head" style={{ left: pct(t) }} />
       </div>
     </>
   );
@@ -138,7 +158,11 @@ function Player({ rows, total, seekReq, onIndex }: { rows: Row[]; total: number;
 
 /* ------------------------------------------------------------------ the whole video mode ------------------------------------------------------------------ */
 
-export default function VideoMode({ onError }: { onError: (m: string) => void }) {
+type Tab = "import" | "style" | "audio" | "images" | "export";
+const TABS: { id: Tab; label: string }[] = [{ id: "import", label: "Import" }, { id: "style", label: "Style" }, { id: "audio", label: "Audio" }, { id: "images", label: "Images" }, { id: "export", label: "Export" }];
+
+/** `standalone` = the SVG Editor screen inside the app (own top bar, own error line, fills the window). Without it (Image Layer Studio in a browser) the old page header is used. */
+export default function VideoMode({ onError, standalone = false }: { onError?: (m: string) => void; standalone?: boolean }) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [specs, setSpecs] = useState<SlideSpec[] | null>(null);
   const [specNotes, setSpecNotes] = useState<string[]>([]);
@@ -175,6 +199,11 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   const picRef = useRef<HTMLInputElement>(null);
   const dirRef = useRef<HTMLInputElement>(null);
   const specRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>("import");
+  const [err, setErr] = useState("");
+  const [saved, setSaved] = useState("");
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const report = (m: string) => { setErr(m); onError?.(m); };
 
   useEffect(() => {
     let live = true;
@@ -222,7 +251,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   }
 
   async function addFiles(files: File[]) {
-    onError("");
+    report("");
     const timing = files.filter(f => /\.(json|txt)$/i.test(f.name));
     const pics = files.filter(f => !timing.includes(f));
     let gotClips = false;
@@ -239,7 +268,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         setSlides(list); setCur(0); setSeekReq({ t: 0, id: Date.now() });
         void processAll(list);
       }
-    } catch (e: any) { onError(e?.message ?? "Could not open these files."); }
+    } catch (e: any) { report(e?.message ?? "Could not open these files."); }
   }
 
   const spans = useMemo(() => sceneSpans(clips), [clips]);
@@ -321,7 +350,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   
 
   async function exportMp4() {
-    onError(""); cancel.current = false;
+    report(""); setSaved(""); cancel.current = false;
     const frames = Math.round(total * FPS);
     setExporting({ done: 0, total: frames });
     void keepAlive(true);
@@ -347,7 +376,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
       }
       if (cancel.current) throw new Error("Export cancelled.");
       if (todo.length) await new Promise(r => setTimeout(r, 150));   // let the page rebuild its rows from the sharper pictures
-      if (failedUp) onError(`${failedUp} picture${failedUp > 1 ? "s" : ""} could not be made sharper and ${failedUp > 1 ? "were" : "was"} used as it is.`);
+      if (failedUp) report(`${failedUp} picture${failedUp > 1 ? "s" : ""} could not be made sharper and ${failedUp > 1 ? "were" : "was"} used as it is.`);
       const R = rowsRef.current;
       const soundEvents = elementSounds ? R.flatMap(r => r.textKind || r.scene ? [{ time: r.start }] : (r.plan?.items ?? [])
         .filter(item => item.dur > 0)
@@ -371,8 +400,10 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         soundEvents,
         onProgress: (d, t) => setExporting({ done: W_UP + d, total: W_UP + t, phase: todo.length ? "Drawing the video" : undefined }), cancelled: () => cancel.current,
       });
-      download(`video-${resId}-${Math.round(total)}s.mp4`, blob);
-    } catch (e: any) { if (!cancel.current) onError(e?.message ?? "MP4 export failed."); }
+      const outName = `video-${resId}-${Math.round(total)}s.mp4`;
+      download(outName, blob);
+      setSaved(outName);
+    } catch (e: any) { if (!cancel.current) report(e?.message ?? "MP4 export failed."); }
     void keepAlive(false);
     setExporting(null);
   }
@@ -383,53 +414,91 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   // a heading, subscribe or scene row never needs a picture; every other row needs its analysed picture
   const ready = rows.length > 0 && rows.every(r => r.scene || (!!r.svg && (r.textKind || r.slide.status === "ok")));
 
-  return (
-    <main className="vmain">
-      <section className="vstage" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void dropFiles(e.dataTransfer); }}>
-        {rows.length > 0
-          ? <Player rows={rows} total={total} seekReq={seekReq} onIndex={setCur} />
-          : (
-            <div className="vview"><div className="empty vempty" onClick={() => picRef.current?.click()}>
-              <p>Drop the images (ZIP, a folder, or the pictures), scene videos and the timing JSON here</p>
-              <span>{specs ? `Timing loaded (${specs.length} images). Now add the images.` : "Or use the two buttons on the right"}</span>
-            </div></div>
-          )}
-      </section>
+  const resLabel = resId === "1080p" ? "1080p" : resId.toUpperCase();
+  const sub = rows.length ? `${rows.length} ${rows.length === 1 ? "image" : "images"} · ${fmt(total)}` : "Pictures + timing → video";
+  const openExport = () => { setTab("export"); requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); };
 
-      <aside className="vside">
-        <h2>Import</h2>
-        <div className="row wrap">
-          <button className="ghost" disabled={!!exporting} onClick={() => picRef.current?.click()}>{slides.length ? "Change images" : "Images (ZIP)"}</button>
-          <button className="ghost" disabled={!!exporting} onClick={() => dirRef.current?.click()}>Images (folder)</button>
-          <button className="ghost" disabled={!!exporting} onClick={() => specRef.current?.click()}>{specs ? "Change JSON" : "Timing (JSON)"}</button>
+  return (
+    <div className={"se" + (standalone ? "" : " embedded")}>
+      {standalone && (
+        <div className="se-bar">
+          <button className="se-back" onClick={goBack} aria-label="Back"><Icon n="back" /></button>
+          <div className="se-title"><h1>SVG Editor</h1><span>{sub}</span></div>
+          <button className="se-cta" onClick={openExport}>Export</button>
         </div>
-        <input ref={picRef} type="file" multiple accept=".zip,image/*,.svg,video/*,.mp4,.mov,.webm,.m4v" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
-        <input ref={dirRef} type="file" hidden {...({ webkitdirectory: "", directory: "" } as any)} onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
-        <input ref={specRef} type="file" accept=".json,.txt" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
-        <p className="hint small">
-          {slides.length ? `${slides.length} images${covered.size ? ` (${slides.filter(s => covered.has(s.n)).length} replaced by scene videos)` : ""}` : "No images yet"}{specs ? `, timing for ${specs.length} images (${specName})` : ", no timing file"}
-          {busy ? ` . Finding elements: ${done} of ${procSlides.length}` : ""}{failed ? ` . ${failed} could not be read` : ""}
-        </p>
+      )}
+      {standalone && err && <div className="se-err" role="alert"><span>{err}</span><button onClick={() => setErr("")}>Dismiss</button></div>}
+
+      <div className="se-main">
+        <section className="se-stage" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void dropFiles(e.dataTransfer); }}>
+          {rows.length > 0
+            ? <Player rows={rows} total={total} seekReq={seekReq} onIndex={setCur} />
+            : (
+              <div className="se-empty" onClick={() => picRef.current?.click()}>
+                <div className="orb"><Icon n="image" size={26} /></div>
+                <b>Add your pictures</b>
+                <span>{specs ? `Timing loaded (${specs.length} images). Now add the images.` : "Pictures (ZIP or folder), scene videos and the timing JSON. Drop them here or tap."}</span>
+              </div>
+            )}
+        </section>
+
+        <div className="se-panel">
+          <div className="se-tabs" role="tablist" ref={tabsRef}>
+            {TABS.map(x => <button key={x.id} role="tab" aria-selected={tab === x.id} className={tab === x.id ? "se-tab on" : "se-tab"} onClick={() => setTab(x.id)}>{x.label}{x.id === "import" && ready && <i className="dot" />}</button>)}
+          </div>
+
+          <section className="se-card">
+            {tab === "import" && (<>
+              <h2>Import <small>pictures, timing and scene videos</small></h2>
+              <div className="se-tiles">
+                <button className={"se-tile" + (slides.length ? " done" : "")} disabled={!!exporting} onClick={() => picRef.current?.click()}><Icon n="image" /><span>{slides.length ? "Change images" : "Images (ZIP)"}</span><small>{slides.length ? `${slides.length} added` : "pictures or ZIP"}</small></button>
+                <button className="se-tile" disabled={!!exporting} onClick={() => dirRef.current?.click()}><Icon n="folder" /><span>Images (folder)</span><small>a whole folder</small></button>
+                <button className={"se-tile" + (specs ? " done" : "")} disabled={!!exporting} onClick={() => specRef.current?.click()}><Icon n="clock" /><span>{specs ? "Change JSON" : "Timing (JSON)"}</span><small>{specs ? specName : "cue times"}</small></button>
+              </div>
+              <div className="se-stats">
+                <span className={slides.length ? "ok" : ""}>{slides.length ? `${slides.length} images${covered.size ? ` (${slides.filter(s => covered.has(s.n)).length} replaced by scene videos)` : ""}` : "No images yet"}</span>
+                <span className={specs ? "ok" : ""}>{specs ? `Timing for ${specs.length} images` : "No timing file"}</span>
+                {busy && <span>Finding elements: {done} of {procSlides.length}</span>}
+                {failed > 0 && <span className="bad">{failed} could not be read</span>}
+              </div>
         {specs && specNotes.length + batchNotes.length > 0 && (
-          <div className="hint small" style={{ color: "#b45309" }}>
+          <div className="hint small se-warn">
             <b>Timing file notes:</b>
             <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{[...batchNotes, ...specNotes].slice(0, 6).map((n, i) => <li key={i}>{n}</li>)}{specNotes.length + batchNotes.length > 6 ? <li>and {specNotes.length + batchNotes.length - 6} more</li> : null}</ul>
           </div>
         )}
         {!specs && slides.length > 0 && (
-          <div className="row"><label className="inl">Seconds per image <input className="num" type="number" min="1" max="300" style={{ width: 70 }} value={defSec} onChange={e => setDefSec(Math.min(300, Math.max(1, +e.target.value || 10)))} /></label></div>
+          <label className="se-field">Seconds per image <input className="num" type="number" min="1" max="300" style={{ width: 70 }} value={defSec} onChange={e => setDefSec(Math.min(300, Math.max(1, +e.target.value || 10)))} /></label>
         )}
-
         {(clips.length > 0 || unnamedClips.length > 0) && (<>
           <h2>Scene videos <small>{clips.length} clip{clips.length === 1 ? "" : "s"}</small></h2>
-          <ul className="vlist">
+          <ul className="se-list">
             {clips.map(c => <li key={c.name}><span className="meta"><b>{c.name}</b><small>{c.first === c.last ? `replaces cue ${c.first}` : `replaces cues ${c.first} to ${c.last}`}</small></span></li>)}
           </ul>
-          {unnamedClips.length > 0 && <p className="hint small" style={{ color: "#b45309" }}>No number in the name, so not used: {unnamedClips.join(", ")}. Rename like 53.mp4 or 12-14.mp4.</p>}
-          {clipNotes(clips, specs?.map(sp => sp.n)).map((n, i) => <p key={i} className="hint small" style={{ color: "#b45309" }}>{n}</p>)}
+          {unnamedClips.length > 0 && <p className="hint small se-warn">No number in the name, so not used: {unnamedClips.join(", ")}. Rename like 53.mp4 or 12-14.mp4.</p>}
+          {clipNotes(clips, specs?.map(sp => sp.n)).map((n, i) => <p key={i} className="hint small se-warn">{n}</p>)}
           <p className="hint small">A scene stays a video (it is never turned into SVG). Each scene is a row on the timeline (times from the JSON) and plays muted in the preview. Its pictures are skipped. The MP4 draws each scene frame by frame (muted, black bars, one click at its start).</p>
         </>)}
+            </>)}
 
+            {tab === "style" && (<>
+        <h2>Animation</h2>
+        <div className="row"><label className="inl">Background <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} /></label>
+          {bgColor.toLowerCase() !== "#ffffff" && <button className="ghost" onClick={() => setBgColor("#ffffff")}>White</button>}</div>
+        <div className="sliders">
+          <label>Entrance <select value={entrance} onChange={e => setEntrance(e.target.value as Entrance)}>{ENTRANCES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></label>
+          {entrance === "draw" && <label>Draw style <select value={style} onChange={e => setStyle(e.target.value as DrawStyle)}><option value="illustrate">Follow the lines</option><option value="reveal">Reveal top to bottom</option></select></label>}
+          {entrance === "draw" && <label>Lines then colour <select value={lines} onChange={e => setLines(e.target.value as LinesMode)}><option value="auto">Auto (panels one by one, other pictures all lines first)</option><option value="each">One piece at a time: its lines, then its colour</option><option value="all">All lines first, then all colour</option><option value="off">Off (outline and colour together)</option></select></label>}
+          {entrance === "draw" && <label>{lines !== "off" ? "Lines share" : "Pen share"} <span className="inl"><input type="range" min="10" max="90" step="5" style={{ ["--fill" as string]: `${((Math.round(pen * 100) - 10) / 80) * 100}%` }} value={Math.round(pen * 100)} onChange={e => setPen(+e.target.value / 100)} /> {Math.round(pen * 100)}% pen, {100 - Math.round(pen * 100)}% colour</span></label>}
+          <label>Longest idle <span className="inl"><input className="num" type="number" min="1" max="30" style={{ width: 56 }} value={maxIdle} onChange={e => setMaxIdle(Math.min(30, Math.max(1, +e.target.value || 5)))} /> s</span></label>
+          <label className="chk"><input type="checkbox" checked={replaceText} onChange={e => setReplaceText(e.target.checked)} /> Write headings and captions with handwriting</label>
+          {replaceText && <p className="hint small">Font: Patrick Hand (locked, built in). Headings, subscribe, labels and captions all use it.</p>}
+          {replaceText && <label className="inl">Text colour <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} /></label>}
+          <label className="chk"><input type="checkbox" checked={writeAll} onChange={e => setWriteAll(e.target.checked)} /> Write the heading again on every image</label>
+        </div>
+            </>)}
+
+            {tab === "audio" && (<>
         <h2>Audio</h2>
         <div className="row wrap">
           <button className="ghost" disabled={!!exporting || audioLoading} onClick={() => audioRef.current?.click()}>{audioFile ? "Change audio" : "Add audio"}</button>
@@ -444,32 +513,19 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
             const ctx = new Ctx();
             try { const decoded = await ctx.decodeAudioData(await file.arrayBuffer()); setAudioFile(file); setAudioBuffer(decoded); }
             finally { await ctx.close(); }
-          } catch (err: any) { onError(`Could not read ${file.name}: ${err?.message ?? "unsupported audio format"}`); }
+          } catch (err: any) { report(`Could not read ${file.name}: ${err?.message ?? "unsupported audio format"}`); }
           finally { setAudioLoading(false); }
         }} />
         <p className="hint small">{audioLoading ? "Reading audio…" : audioFile ? `${audioFile.name} — audio will be synchronized to the video, trimmed if longer, or padded with silence if shorter.` : "Add a voice-over, music track, or other audio file. Common formats are supported when your device can decode them."}</p>
         <label className="chk"><input type="checkbox" checked={elementSounds} disabled={!!exporting} onChange={e => setElementSounds(e.target.checked)} /> Use the bundled click.wav for every element (headings, arrows and illustrations)</label>
+            </>)}
 
-        <h2>Animation</h2>
-        <div className="row"><label className="inl">Background <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: 44, height: 26, padding: 0, border: "1px solid #bbb" }} /></label>
-          {bgColor.toLowerCase() !== "#ffffff" && <button className="ghost" onClick={() => setBgColor("#ffffff")}>White</button>}</div>
-        <div className="sliders">
-          <label>Entrance <select value={entrance} onChange={e => setEntrance(e.target.value as Entrance)}>{ENTRANCES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></label>
-          {entrance === "draw" && <label>Draw style <select value={style} onChange={e => setStyle(e.target.value as DrawStyle)}><option value="illustrate">Follow the lines</option><option value="reveal">Reveal top to bottom</option></select></label>}
-          {entrance === "draw" && <label>Lines then colour <select value={lines} onChange={e => setLines(e.target.value as LinesMode)}><option value="auto">Auto (panels one by one, other pictures all lines first)</option><option value="each">One piece at a time: its lines, then its colour</option><option value="all">All lines first, then all colour</option><option value="off">Off (outline and colour together)</option></select></label>}
-          {entrance === "draw" && <label>{lines !== "off" ? "Lines share" : "Pen share"} <span className="inl"><input type="range" min="10" max="90" step="5" value={Math.round(pen * 100)} onChange={e => setPen(+e.target.value / 100)} /> {Math.round(pen * 100)}% pen, {100 - Math.round(pen * 100)}% colour</span></label>}
-          <label>Longest idle <span className="inl"><input className="num" type="number" min="1" max="30" style={{ width: 56 }} value={maxIdle} onChange={e => setMaxIdle(Math.min(30, Math.max(1, +e.target.value || 5)))} /> s</span></label>
-          <label className="chk"><input type="checkbox" checked={replaceText} onChange={e => setReplaceText(e.target.checked)} /> Write headings and captions with handwriting</label>
-          {replaceText && <p className="hint small">Font: Patrick Hand (locked, built in). Headings, subscribe, labels and captions all use it.</p>}
-          {replaceText && <label className="inl">Text colour <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} style={{ width: 44, height: 26, padding: 0, border: "1px solid #bbb" }} /></label>}
-          <label className="chk"><input type="checkbox" checked={writeAll} onChange={e => setWriteAll(e.target.checked)} /> Write the heading again on every image</label>
-        </div>
-
+            {tab === "images" && (<>
         <h2>Images <small>{rows.length ? `${fmt(total)} in total` : ""}</small></h2>
-        <ul className="vlist">
+        <ul className="se-list">
           {rows.map((r, i) => (
             <li key={r.slide.key} className={(i === cur ? "sel " : "") + r.slide.status} onClick={() => setSeekReq({ t: r.start, id: Date.now() })}>
-              {r.scene ? <span className="thumb" style={{ background: "#000", color: "#fff", display: "grid", placeItems: "center" }}>▶</span> : r.slide.thumb ? <img className="thumb" src={r.slide.thumb} alt="" /> : <span className="thumb" style={{ background: "#fff", border: "1px solid #bbb" }} />}
+              {r.scene ? <span className="thumb scene"><Icon n="film" size={20} /></span> : r.slide.thumb ? <img className="thumb" src={r.slide.thumb} alt="" /> : <span className="thumb blank" />}
               <span className="meta">
                 <b>{r.scene ? (r.scene.cues.length > 1 ? `Scene ${r.scene.cues[0]}-${r.scene.cues[r.scene.cues.length - 1]}` : `Scene ${r.scene.cues[0]}`) : `Image ${r.slide.n}`} <small>{fmt(r.start)} to {fmt(r.end)}</small></b>
                 <small>{r.scene ? `Video: ${r.scene.clip.name} (muted, kept as a video)` : r.textKind === "subscribe" ? `Subscribe slide: "${r.words}"` : r.textKind === "heading" ? `Heading slide: "${r.words}"` : (r.heading ?? r.slide.name)}</small>
@@ -544,21 +600,39 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
             </div>)}
           </>);
         })()}
+            </>)}
 
-        <h2>Export</h2>
+            {tab === "export" && (<>
+              <h2>Export <small>MP4 video</small></h2>
+              <div className="se-sum">
+                <div><span>Images</span><b>{rows.length}</b></div>
+                <div><span>Length</span><b>{fmt(total)}</b></div>
+                <div><span>Audio</span><b>{audioFile ? audioFile.name : "none"}</b></div>
+              </div>
         {hasHost() && !exporting && <label className="chk"><input type="checkbox" checked={upscale} onChange={e => setUpscale(e.target.checked)} /> Make every picture sharper (AI upscale) when exporting. Takes longer; the preview stays on the normal pictures.</label>}
         {!exporting && <ResolutionPicker value={resId} onChange={setResId} fps={FPS} seconds={total} />}
-        {!exporting && <button style={{ marginTop: 8 }} onClick={exportMp4} disabled={!mp4Supported() || !ready || !rows.length || audioLoading}>Export {resId === "1080p" ? "1080p" : resId.toUpperCase()} MP4 ({fmt(total)})</button>}
-        {exporting && (
-          <div>
-            <div className="bar"><div style={{ width: `${pct}%` }} /></div>
-            <p className="hint small">{exporting.phase ? `${exporting.phase}` : "Making the video"}: {pct}%. Keep this window open.</p>
-            <button className="ghost" onClick={() => { cancel.current = true; cancelNative(); }}>Cancel</button>
-          </div>
-        )}
+              {!exporting && <button className="go" onClick={exportMp4} disabled={!mp4Supported() || !ready || !rows.length || audioLoading}>Export {resLabel} MP4 ({fmt(total)})</button>}
+              {!exporting && !ready && <p className="hint small">{rows.length ? "Wait until every picture has been read." : "Add pictures first (Import tab)."}</p>}
+              {hasHost() && !exporting && <p className="hint small">The MP4 is saved to Download/Bezalel.</p>}
+              {saved && !exporting && <p className="se-ok">Saved {saved}</p>}
+              {exporting && (
+                <div className="se-busy">
+                  <span className="cap">While exporting</span>
+                  <p className="lab">{exporting.phase ? `${exporting.phase}` : "Making the video"}: {pct}%</p>
+                  <div className="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${pct}%` }} /></div>
+                  <div className="row"><p className="hint small" style={{ flex: 1 }}>Keep the app open and the phone plugged in.</p><button className="ghost" onClick={() => { cancel.current = true; cancelNative(); }}>Cancel</button></div>
+                </div>
+              )}
         {!mp4Supported() && <p className="hint small">This browser cannot make MP4. Use Chrome or Edge.</p>}
         <p className="hint small" style={{ marginTop: 8 }}>Exports one MP4 with all images, the selected audio track, and optional element-specific sound effects, synchronized to the slide timeline.</p>
-      </aside>
-    </main>
+            </>)}
+          </section>
+        </div>
+      </div>
+
+      <input ref={picRef} type="file" multiple accept=".zip,image/*,.svg,video/*,.mp4,.mov,.webm,.m4v" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+      <input ref={dirRef} type="file" hidden {...({ webkitdirectory: "", directory: "" } as any)} onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+      <input ref={specRef} type="file" accept=".json,.txt" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+    </div>
   );
 }

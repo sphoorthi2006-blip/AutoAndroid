@@ -85,6 +85,7 @@ private val TextMain = Color(0xFFF2F4F8)
 private val Muted = Color(0xFF8A93A6)
 private val Accent = Color(0xFF8B5CF6)
 private val Accent2 = Color(0xFF38BDF8)
+private val CardTop = Color(0xFF1A1E2B)
 
 @Composable
 private fun HubScreen(
@@ -94,53 +95,79 @@ private fun HubScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(R.string.app_name), fontSize = 34.sp, fontWeight = FontWeight.Bold, color = TextMain)
-        Text("Pick a tool", fontSize = 15.sp, color = Muted)
-        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(15.dp))
+                    .background(Brush.linearGradient(listOf(Accent, Accent2))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("B", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Column(modifier = Modifier.padding(start = 14.dp)) {
+                Text(stringResource(R.string.app_name), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                Text("Offline video studio", fontSize = 13.sp, color = Muted)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text("PICK A TOOL", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Muted, letterSpacing = 1.2.sp)
 
         ToolCard(
             title = "Auto Editor",
+            tag = "Video",
             blurb = "Images, script, SRT files and voice-over become a 1080p video.",
+            colors = listOf(Accent, Accent2),
             onClick = onOpenAutoEditor,
         )
         ToolCard(
             title = "Upscale Images",
+            tag = "Images",
             blurb = "AI upscale 2x. Pictures, ZIPs and folders in; PNG folder or ZIPs out.",
+            colors = listOf(Color(0xFF34D399), Accent2),
             onClick = onOpenUpscale,
         )
         ToolCard(
             title = "SVG Editor",
+            tag = "Animation",
             blurb = "Turn your pictures and a timing file into a drawn, animated video.",
+            colors = listOf(Color(0xFFF472B6), Accent),
             onClick = onOpenSvgEditor,
         )
         ToolCard(
             title = "Text Editor",
+            tag = "Text",
             blurb = "Write text by hand-style animation. Use your own font and export in 1080p, 2K or 4K.",
+            colors = listOf(Color(0xFFFBBF24), Color(0xFFF472B6)),
             onClick = onOpenTextEditor,
         )
+        Spacer(Modifier.height(6.dp))
+        Text("Everything runs on your phone. Nothing is uploaded.", fontSize = 12.sp, color = Muted)
     }
 }
 
 @Composable
-private fun ToolCard(title: String, blurb: String, onClick: (() -> Unit)?) {
-    val shape = RoundedCornerShape(22.dp)
+private fun ToolCard(title: String, tag: String, blurb: String, colors: List<Color>, onClick: (() -> Unit)?) {
+    val shape = RoundedCornerShape(24.dp)
     val live = onClick != null
-    val base = Modifier.fillMaxWidth().clip(shape).background(PanelBg).border(1.dp, Hairline, shape)
+    val base = Modifier.fillMaxWidth().clip(shape)
+        .background(Brush.linearGradient(listOf(CardTop, PanelBg)))
+        .border(1.dp, Hairline, shape)
     val mod = if (live) base.clickable(onClick = onClick!!) else base
     Row(modifier = mod.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp))
+            modifier = Modifier.size(58.dp).clip(RoundedCornerShape(18.dp))
                 .background(
-                    if (live) Brush.linearGradient(listOf(Accent, Accent2))
+                    if (live) Brush.linearGradient(colors)
                     else Brush.linearGradient(listOf(Color(0xFF262B38), Color(0xFF262B38)))
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Text(title.first().toString(), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(title.first().toString(), fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
-        Column(modifier = Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.padding(start = 16.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(tag.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.first(), letterSpacing = 1.sp)
             Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = if (live) TextMain else Muted)
             Text(blurb, fontSize = 13.sp, color = Muted)
         }
+        Text("\u203A", fontSize = 30.sp, color = Muted, modifier = Modifier.padding(start = 8.dp))
     }
 }

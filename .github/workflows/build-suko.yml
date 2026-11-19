@@ -66,11 +66,14 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
           npx tsc --noEmit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Check the picture analyser (desktop Python code) on the real reference pictures
         run: |
           set -o pipefail
-          python3 -m pip install --quiet numpy opencv-python-headless pillow
-          python3 -I app/src/test/python/check_engine.py app/src/main/python docs/reference
+          python -m pip install --quiet numpy opencv-python-headless pillow 2>&1 | tee /tmp/build.log
+          python -I app/src/test/python/check_engine.py app/src/main/python docs/reference 2>&1 | tee -a /tmp/build.log
       - name: Build the web screens into the app (Studio and Text Editor)
         run: |
           set -o pipefail
@@ -111,6 +114,7 @@ jobs:
         if: failure()
         run: |
           mkdir /tmp/out
+          touch /tmp/build.log
           { grep -E "^e: |^w: |FAILED|Exception|Error|What went wrong|expected|but was" /tmp/build.log | head -150; echo ----; tail -60 /tmp/build.log; } > /tmp/out/log.txt
           cd /tmp/out
           git init -q

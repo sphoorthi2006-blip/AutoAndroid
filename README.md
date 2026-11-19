@@ -14,7 +14,7 @@ Bezalel is a separate offline Android app in [`suko/`](suko/README.md). Its Auto
 
 The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Bezalel project has its own CI workflow: [`.github/workflows/build-suko.yml`](.github/workflows/build-suko.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Bezalel-debug-apk` artifact.
 
-Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (source only, not yet compiled); the SVG video export that will carry them is still to do.
+Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (built green on GitHub Actions; not yet run on a phone); the web SVG Editor screen now exports the MP4 (with AI upscale, cache and cancel).
 
 ## Sukko Image Upscaler
 

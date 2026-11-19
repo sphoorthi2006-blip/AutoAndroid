@@ -1,4 +1,5 @@
-# Bezalel Android app (formerly "Suko"; folder and package are still `suko` / `com.suko.app` on purpose) (old roadmap 1-24 done; 25-30 reopened 2026-11-19 and worked in the same session: 26-30 + 7 all DONE IN SOURCE, NOT YET BUILT ON GITHUB; see "WHERE WE ARE" below)
+# Bezalel Android app (formerly "Suko"; folder and package are still `suko` / `com.suko.app` on purpose)
+**STATUS 2026-11-19: every roadmap step (1-30, SVG workflow 1-10, audio 33-36) is written, the whole app BUILDS GREEN on GitHub Actions and the APK is published at Releases -> `bezalel-latest` (`Bezalel.apk`). Nothing has been run on a phone yet: the phone test lists below are the only thing left, plus the optional signed-release secrets.**
 
 One Android app with three tools. Everything runs inside the app: no website, no server, no internet.
 
@@ -9,6 +10,33 @@ One Android app with three tools. Everything runs inside the app: no website, no
 | **Text Editor** | Type text, use the built-in Patrick Hand font, and export 1080p, 2K or 4K at 30 or 60 fps. No upscaling. Custom font import (step 21) remains intentionally skipped. | Image Layer Studio text engine |
 
 **Input rule for all tools:** accept any entry type: loose files, ZIPs (also ZIPs inside ZIPs), folders with subfolders, or a mix. Route every file by its type; never reject a type without telling the user why.
+
+## WHAT THE APP HAS (all features, 2026-11-19)
+Home screen with three tool cards (Auto Editor, SVG Editor, Text Editor), an Upscale Images tool, and a Developer tools area (Upscale test, Intake test, Web test). Dark theme `Theme.Bezalel`, Bezalel icon, everything offline (no INTERNET permission), arm64-v8a only.
+
+**Shared for all tools**
+- Intake: loose files, ZIPs (also ZIPs inside ZIPs), folders with sub-folders, or a mix; every file is routed by kind (image, video, audio, SRT, text, JSON, font, ZIP) and anything skipped is listed with a reason. Zip-bomb guards.
+- AI upscaler (Sukko engine: corner-mark removal, Real-ESRGAN `realesr-animevideov3` 2x through ncnn on the GPU via Vulkan, CPU fallback, classic fallback). Results are cached on content (SHA-256) so nothing is upscaled twice; interrupted work resumes; low-memory retry.
+- Background export: foreground service with a notification and wake lock while a long export runs.
+
+**Auto Editor** (images + script + SRT files -> 1080p H.264 MP4)
+- Optional voice-over, click sounds (built-in or your own file, on/off), scene clips (video files named by cue number, e.g. `12-14.mp4`).
+- Audio modes: voice + clicks, voice only, clicks only, or a silent MP4. Loudness matching, limiter, AAC-LC 192 kbps muxed into the MP4.
+- Export step 1 upscales the pictures (switch, default ON), step 2 renders the video; ONE progress bar, cancel works; `<n>_report.csv` is saved next to the MP4. Audio mix test saves a `.m4a`.
+
+**SVG Editor** (opens the web Video screen inside the app; pictures + timing JSON + optional scene clips + voice)
+- Picture analyser on the phone (the desktop Python vision code through Chaquopy, Python 3.10 + numpy + OpenCV): finds comic panels, labels, captions, arrows; hand-drawn panel animation with a pen plan; Panel check against the JSON.
+- Heading and subscribe slides are plain white screens with black Patrick Hand text written by hand (no zoom, fade, box or colour); manual control per row (Auto / Picture / Heading / Subscribe, editable words).
+- Scene videos stay videos: letterboxed, muted, in step with the playhead in the preview and drawn frame by frame in the MP4.
+- Timing report and CSV (with `image_kind` column), per-element click sounds, voice-over.
+- Export: "Make every picture sharper" (AI upscale, cached between exports, cancel works mid-picture), then the MP4, one progress bar, screen-off protection.
+- Native intake screen with audio controls (voice-over, click sound, audio mix test; `svg/SvgClickPlan.kt`, `SvgAudioViewModel.kt`). The home card now opens the web screen; whether the native audio controls are still reachable is not checked.
+
+**Text Editor** (Layer Studio text engine, Patrick Hand built in)
+- Type text (formulas like `x^2`, symbols like the square root), drag the text on the picture, resize, position buttons, colours, background colour or image, shape (16:9 / 9:16 / 1:1), align, handwritten or outline-then-fill motion.
+- Upload your own .ttf/.otf/.woff font (kept on the phone). Export 1080p, 2K or 4K at 30 or 60 fps (4K is 30 only) to `Download/Bezalel`.
+
+**Upscale Images tool**: pictures, ZIPs and folders in, PNGs or one ZIP per input out, into a "Bezalel upscaled" folder; names keep their numbers.
 
 ## Rules for every session (credit-saving, from the owner)
 1. **One step per session:** do the next `todo` row below, then stop. Do not start the next step unless asked.
@@ -36,6 +64,8 @@ Still true: numpy/OpenCV/Chaquopy only compile and package; whether they RUN on 
 ## PROGRESS  <-- update at the end of every step
 OLD ROADMAP: steps 1-24 DONE (21 skipped on purpose). **Steps 25-30 are OPEN AGAIN (owner decision 2026-11-19).** The owner had closed them believing the picture-to-animation converter was finished; it is NOT (see KNOWN GAP above). Steps 26-28 ARE the converter (= plan A1-A3 in the NEW WORKFLOW section); do them, then 25, 29 and 30. The Layer Studio source (v0.15.7) is in `web/`; the Python vision code (`panels.py`, `raster.py`, `reveal.py`, `ink.py`, `segment.py`) must be read from the Image Layer Studio zip, which the owner still has to send.
 
+**Reading the table below (2026-11-19):** every row is written. Remarks like "never compiled", "not yet built on GitHub" or "not yet built" are OUTDATED for compiling and building: CI built all of it green. What stays true is every "NOT seen on a phone" / "NOT verified on a phone" remark. Total: 30 old steps (21 skipped on purpose, 24 appears twice = export sizes + SVG intake), SVG workflow 1-10, audio 33-36, Upscale Images tool.
+
 | # | Step | Status | Where |
 |---|---|---|---|
 | 1 | Shell: Bezalel project, home screen with 3 tool cards, Auto Editor = Cue Video unchanged, one CI workflow | DONE (not yet built on GitHub) | `HubActivity.kt`, `build.yml` |
@@ -62,7 +92,7 @@ OLD ROADMAP: steps 1-24 DONE (21 skipped on purpose). **Steps 25-30 are OPEN AGA
 | 22 | Text Editor 4: preview | DONE (the Studio's live preview with Play again; nothing new was needed) | `web/src/App.tsx` |
 | 23 | Text Editor 5: export 1080p at 30/60 fps | DONE for the WebCodecs path (24 export checks pass with a fake encoder); real phone speed NOT measured; native GL fallback NOT built | `web/src/video.ts`, `App.tsx` |
 | 24 | Export sizes 1080p / 2K / 4K and font upload | DONE in the web source; CI rebuilds the web bundle (`npm run build:suko`). 4K speed and memory NOT measured on a phone | `web/src/video.ts`, `FontPicker.tsx`, `fontStore.ts`, `ResolutionPicker.tsx` |
-| 24 | SVG Editor 1: intake (images + JSON) using the shared intake | DONE (rules: 5 tests pass; screen never compiled) | `VideoMode.tsx` |
+| 24b | SVG Editor 1: intake (images + JSON) using the shared intake | DONE (rules: 5 tests pass; screen never compiled) | `VideoMode.tsx` |
 | 25 | SVG Editor 2: rough preview with Panel check (panels found vs JSON) | DONE in source (the Video screen's Panel check uses the analyser now; NOT seen on a phone) | `panelmatch.ts`, `VideoMode.tsx` |
 | 26 | Vision 1: port `panels.py` to Kotlin + OpenCV Android, check against `docs/reference` | DONE in source via the desktop Python through Chaquopy (A1; 11 sandbox checks on the real reference pictures pass; Android build NOT run) | `app/src/main/python/ils/panels.py`, `engine.py`, `PhoneEngine.kt` |
 | 27 | Vision 2: port `raster.py` and `reveal.py` | DONE in source (A2): `raster.py` + `reveal.py` run the same way | `app/src/main/python/ils/` |
@@ -130,7 +160,7 @@ This add-on extends the existing Auto Editor. It does not replace the original B
 | 33 | Native audio mixing | **DONE in source:** optional voice-over; built-in click by default or a custom click file; click enable/disable; loudness matching, limiter and AAC-LC encoding. |
 | 34 | MP4 audio/video muxing | **DONE in source:** the AAC track is copied into the H.264 MP4 by the existing `VideoSink` muxer. |
 | 35 | Auto Editor export integration | **DONE in source:** voice + clicks, voice only, clicks only, or no audio track (silent MP4). The existing one-bar export progress and cancellation remain in use. |
-| 36 | SVG Editor audio controls | **DONE in source (native, never compiled):** the Android SVG Editor screen now has Voice-over / audio input, Click sound (built-in or custom, on/off, one click per panel start time from the JSON, or at slide start when a slide has no panels) and an Audio mix test saving a .m4a, using the Auto Editor's `AudioJob`. The final SVG video export (step 29) is still todo, so the audio is not yet in an MP4. Code: `svg/SvgClickPlan.kt`, `svg/SvgAudioViewModel.kt`, `SvgEditorActivity.kt`. |
+| 36 | SVG Editor audio controls | **DONE in source (native, never compiled):** the Android SVG Editor screen now has Voice-over / audio input, Click sound (built-in or custom, on/off, one click per panel start time from the JSON, or at slide start when a slide has no panels) and an Audio mix test saving a .m4a, using the Auto Editor's `AudioJob`. The SVG export (step 29) now exists in the web screen; whether it carries the native screen's voice/click choices is not verified. Code: `svg/SvgClickPlan.kt`, `svg/SvgAudioViewModel.kt`, `SvgEditorActivity.kt`. |
 
 ### Auto Editor audio rules
 

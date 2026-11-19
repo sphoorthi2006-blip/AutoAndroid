@@ -175,7 +175,14 @@
 
 .se .pcheck { position: relative; width: 100%; margin: 2px 0; border: 1px solid var(--line2); border-radius: 12px; overflow: hidden; line-height: 0; background: #000; }
 .se .pcheck img, .se .pcheck svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.se .report { margin: 0; padding: 10px 12px; font: 11.5px/1.5 ui-monospace, Menlo, Consolas, monospace; color: #cfd5e4; background: var(--field); border: 1px solid var(--line); border-radius: 12px; max-height: 240px; overflow: auto; white-space: pre; }
+.se .report { margin: 0; padding: 10px 12px; font: 11.5px/1.5 ui-monospace, Menlo, Consolas, monospace; color: #cfd5e4; background: var(--field); border: 1px solid var(--line); border-radius: 12px; max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* one tidy Download report button with a small menu (replaces the two loose buttons) */
+.se .se-dl { display: flex; flex-direction: column; gap: 8px; }
+.se .se-dl-main { width: 100%; height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 23px; }
+.se .se-dl-caret { opacity: .8; font-size: 12px; }
+.se .se-dl-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.se .se-dl-menu button { height: auto; padding: 10px 8px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.se .se-dl-menu button small { font-size: 11.5px; font-weight: 500; color: var(--muted); }
 
 /* ---------- export ---------- */
 .se .se-sum { display: grid; gap: 8px; padding: 12px 14px; background: var(--field); border: 1px solid var(--line); border-radius: 14px; }

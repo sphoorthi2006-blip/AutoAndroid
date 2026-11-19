@@ -437,3 +437,5 @@ Owner request: the SVG Editor window must feel like it is INSIDE the app, not li
 4. Scroll the tabs content on a tall phone: the preview stays pinned. Rotate the phone: the layout switches to two columns when wide enough.
 5. Export tab: shows images / length / audio, resolution buttons, the big Export button; during export one progress block with Cancel; at the end `Saved video-....mp4`.
 6. Back arrow closes the screen and returns to the home screen.
+
+**UPDATE 2026-11-19 (Images tab tidy-up): the two loose report buttons ("Download report (.txt)" and "Download (.csv)") are now ONE "Download report" button that opens a small menu (Text .txt / Spreadsheet .csv). The report preview wraps instead of scrolling sideways. Web tests pass and the web build was regenerated; not seen on a phone yet.**

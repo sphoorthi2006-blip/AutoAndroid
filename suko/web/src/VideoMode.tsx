@@ -178,6 +178,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
   const [resId, setResId] = useState("1080p");   // step 24: export size
   const [textColor, setTextColor] = useState("#111111");
   const [patrickFonts, setPatrickFonts] = useState<TextFonts | null>(null);   // step 8: ALL lettering the editor writes (headings, subscribe, labels, captions) is Patrick Hand, locked
+  const [repMenu, setRepMenu] = useState(false);   // the single "Download report" button opens a small menu (.txt or .csv)
   const [bgColor, setBgColor] = useState("#ffffff");   // the video background: white by default, whatever colour the pictures had
   const [kinds, setKinds] = useState<Record<number, KindOverride>>({});   // step 3: the owner's choice per image number
   const [clips, setClips] = useState<Clip[]>([]);   // step 4: scene videos
@@ -581,12 +582,15 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
         {(() => {
           const reps: ReportRow[] = rows.map(r => ({ n: r.slide.n, start: r.start, end: r.end, heading: r.heading, status: r.slide.status, elements: r.spec?.elements, captions: r.spec?.captions, plan: r.plan, note: r.note, parts: r.parts, kind: r.scene ? "scene" : r.textKind ?? "picture", last: r.scene ? r.scene.cues[r.scene.cues.length - 1] : undefined, label: r.scene ? r.scene.clip.name : r.words }));
           return (<>
-            <div className="row">
-              <button className="ghost" disabled={!rows.length} onClick={() => download("timing-report.txt", new Blob([reportText(reps)], { type: "text/plain" }))}>Download report (.txt)</button>
-              <button className="ghost" disabled={!rows.length} onClick={() => download("timing-report.csv", new Blob(["\ufeff" + reportCsv(reps)], { type: "text/csv" }))}>Download (.csv)</button>
+            <div className="se-dl">
+              <button className="go se-dl-main" disabled={!rows.length} aria-expanded={repMenu} onClick={() => setRepMenu(v => !v)}><Icon n="clock" size={18} /><span>Download report</span><span className="se-dl-caret">{repMenu ? "▴" : "▾"}</span></button>
+              {repMenu && <div className="se-dl-menu">
+                <button className="ghost" onClick={() => { download("timing-report.txt", new Blob([reportText(reps)], { type: "text/plain" })); setRepMenu(false); }}><b>Text</b><small>.txt, easy to read</small></button>
+                <button className="ghost" onClick={() => { download("timing-report.csv", new Blob(["\ufeff" + reportCsv(reps)], { type: "text/csv" })); setRepMenu(false); }}><b>Spreadsheet</b><small>.csv, opens in Excel</small></button>
+              </div>}
             </div>
             {reps[cur] && <pre className="report">{slideReportText(reps[cur])}</pre>}
-            {rows[cur]?.svg && !rows[cur].textKind && !rows[cur].scene && (<div className="row">
+            {rows[cur]?.svg && !rows[cur].textKind && !rows[cur].scene && (<div className="row wrap">
               <button className="ghost" onClick={async () => {
                 const r = rows[cur]; const key = r.slide.key;
                 setQuality(q => ({ ...q, [key]: "Checking..." }));

@@ -1,0 +1,41 @@
+root HTTP 200
+href="opencv-contrib-python-headless/"
+href="opencv-contrib-python/"
+href="opencv-python-headless/"
+href="opencv-python/"
+== opencv-python-headless
+HTTP 200
+== opencv-python
+HTTP 200
+== opencv_python_headless
+HTTP 404
+== opencv
+HTTP 404
+== numpy
+HTTP 200
+"numpy-1.23.3-0-cp311-cp311-android_21_arm64_v8a.whl"
+"numpy-1.23.3-0-cp311-cp311-android_21_armeabi_v7a.whl"
+"numpy-1.23.3-0-cp311-cp311-android_21_x86.whl"
+"numpy-1.23.3-0-cp311-cp311-android_21_x86_64.whl"
+"numpy-1.26.2-0-cp311-cp311-android_21_arm64_v8a.whl"
+"numpy-1.26.2-0-cp311-cp311-android_21_armeabi_v7a.whl"
+"numpy-1.26.2-0-cp311-cp311-android_21_x86.whl"
+"numpy-1.26.2-0-cp311-cp311-android_21_x86_64.whl"
+== pillow
+HTTP 200
+"Pillow-9.2.0-0-cp311-cp311-android_21_arm64_v8a.whl"
+"Pillow-9.2.0-0-cp311-cp311-android_21_armeabi_v7a.whl"
+"Pillow-9.2.0-0-cp311-cp311-android_21_x86.whl"
+"Pillow-9.2.0-0-cp311-cp311-android_21_x86_64.whl"
+"pillow-11.0.0-0-cp311-cp311-android_24_arm64_v8a.whl"
+"pillow-11.0.0-0-cp311-cp311-android_24_armeabi_v7a.whl"
+"pillow-11.0.0-0-cp311-cp311-android_24_x86.whl"
+"pillow-11.0.0-0-cp311-cp311-android_24_x86_64.whl"
+##### ALL opencv-python-headless
+"opencv_python_headless-4.1.2.30-1-cp38-cp38-android_21_arm64_v8a.whl"
+"opencv_python_headless-4.5.1.48-2-cp38-cp38-android_21_arm64_v8a.whl"
+"opencv_python_headless-4.5.1.48-2-cp310-cp310-android_24_arm64_v8a.whl"
+##### ALL opencv-python
+"opencv_python-4.1.2.30-1-cp38-cp38-android_21_arm64_v8a.whl"
+"opencv_python-4.5.1.48-1-cp38-cp38-android_21_arm64_v8a.whl"
+"opencv_python-4.5.1.48-2-cp310-cp310-android_24_arm64_v8a.whl"

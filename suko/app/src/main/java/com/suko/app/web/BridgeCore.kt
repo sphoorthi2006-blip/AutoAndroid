@@ -5,6 +5,11 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.Base64
 
+/** A flag the page can raise while a long native job runs (it is set from a thread that does NOT wait in the job queue). */
+object WorkControl {
+    @Volatile var cancelled = false
+}
+
 /** The native methods a page may call. Each takes the page's text payload and returns a JSON object as text. */
 typealias NativeMethod = (payload: String) -> String
 

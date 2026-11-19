@@ -62,6 +62,9 @@ class SukoBridge(
 
     @JavascriptInterface fun back() = onBack()
 
+    /** Asks the running native job (the AI upscale) to stop. Runs at once on the WebView thread, NOT through [pool], which is busy with that job. */
+    @JavascriptInterface fun cancelWork() { WorkControl.cancelled = true }
+
     fun close() {
         pool.shutdownNow()
         saves.abortAll()

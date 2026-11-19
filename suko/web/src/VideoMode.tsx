@@ -9,7 +9,7 @@ import { ResolutionPicker } from "./ResolutionPicker";
 import { DEFAULT_SKETCH, type Dir, type DrawStyle, type Entrance, type LinesMode, type Project, type SketchSettings } from "./types";
 import { checkFinalFrame, mp4Supported, renderMp4Timeline } from "./video";
 import { qualityVerdict } from "./quality";
-import { hasHost, keepAlive, nativeCall, toBase64 } from "./bridge";
+import { cancelNative, hasHost, keepAlive, nativeCall, toBase64 } from "./bridge";
 
 const FPS = 30;
 
@@ -337,6 +337,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         try {
           const s = todo[i];
           const r = await nativeCall<any>("upscale", await toBase64(s.file));
+          if (r?.error === "cancelled") throw new Error("Export cancelled.");
           if (r?.error || !r?.png) throw new Error(r?.detail ?? "upscale failed");
           const bin = atob(r.png), bytes = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
           const up = new File([bytes], s.name.replace(/\.[^.]+$/, "") + "_x2.png", { type: "image/png" });
@@ -344,6 +345,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           setSlide(s.key, { file: up, upscaled: true, project: p, units: buildUnits(p), found, panelNote: found?.panels.length ? "" : panelsStatus || "no panels were found in this picture" });
         } catch { failedUp++; }
       }
+      if (cancel.current) throw new Error("Export cancelled.");
       if (todo.length) await new Promise(r => setTimeout(r, 150));   // let the page rebuild its rows from the sharper pictures
       if (failedUp) onError(`${failedUp} picture${failedUp > 1 ? "s" : ""} could not be made sharper and ${failedUp > 1 ? "were" : "was"} used as it is.`);
       const R = rowsRef.current;
@@ -551,7 +553,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           <div>
             <div className="bar"><div style={{ width: `${pct}%` }} /></div>
             <p className="hint small">{exporting.phase ? `${exporting.phase}` : "Making the video"}: {pct}%. Keep this window open.</p>
-            <button className="ghost" onClick={() => { cancel.current = true; }}>Cancel</button>
+            <button className="ghost" onClick={() => { cancel.current = true; cancelNative(); }}>Cancel</button>
           </div>
         )}
         {!mp4Supported() && <p className="hint small">This browser cannot make MP4. Use Chrome or Edge.</p>}

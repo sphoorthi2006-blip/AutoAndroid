@@ -115,10 +115,13 @@ jobs:
         run: |
           mkdir /tmp/out
           touch /tmp/build.log
-          { grep -E "^e: |^w: |FAILED|Exception|Error|What went wrong|expected|but was" /tmp/build.log | head -150; echo ----; tail -60 /tmp/build.log; } > /tmp/out/log.txt
+          { grep -E "^e: |^w: |FAILED|Exception|Error|What went wrong|expected|but was" /tmp/build.log | head -150; echo ----; grep -B70 'PythonRequirements FAILED' /tmp/build.log | cut -c1-300 | head -120; echo ----; tail -60 /tmp/build.log; } > /tmp/out/log.txt
+          for pk in numpy opencv-python-headless pillow; do
+            echo "== $pk"; curl -fsSL "https://chaquo.com/pypi-13.1/$pk/" | grep -o 'href="[^"]*"' | grep -i 'cp311.*arm64\|cp311.*aarch64' | sed 's/href=//' | head -20
+          done > /tmp/out/wheels.txt 2>&1 || true
           cd /tmp/out
           git init -q
           git checkout -q -b buildlog-suko
-          git add log.txt
+          git add log.txt wheels.txt
           git -c user.name=ci -c user.email=ci@example.com commit -q -m "log"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" buildlog-suko

@@ -1,0 +1,27 @@
+name: Probe Chaquopy wheels
+on:
+  push:
+    branches: [ bezalel-big-session ]
+    paths: [ '.github/probe/**', '.github/workflows/probe-chaquopy.yml' ]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List Chaquopy package index
+        run: |
+          mkdir /tmp/out; cd /tmp/out
+          for base in pypi-13.1; do
+            curl -sS -o root.html -w "root HTTP %{http_code}\n" "https://chaquo.com/$base/" > out.txt 2>&1 || true
+            grep -io 'href="[^"]*opencv[^"]*"' root.html | head >> out.txt || true
+            for pk in opencv-python-headless opencv-python opencv_python_headless opencv numpy pillow; do
+              echo "== $pk" >> out.txt
+              curl -sS -w "HTTP %{http_code}\n" "https://chaquo.com/$base/$pk/" -o idx.html >> out.txt 2>&1 || true
+              grep -o 'href="[^"]*"' idx.html | sed 's/href=//' | grep -i "cp311\|py3-none" | head -40 >> out.txt || true
+            done
+          done
+          python3 -m pip download --no-deps --only-binary :all: --platform android_21_arm64_v8a --python-version 3.11 --implementation cp --abi cp311 --extra-index-url https://chaquo.com/pypi-13.1 opencv-python-headless -d /tmp/dl >> out.txt 2>&1 || true
+          git init -q; git checkout -q -b buildlog-probe; git add out.txt
+          git -c user.name=ci -c user.email=ci@example.com commit -q -m probe
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" buildlog-probe

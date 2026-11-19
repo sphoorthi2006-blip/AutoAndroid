@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { detectPanels, panelsStatus, processImage } from "./api";
+import { analyseImage } from "./api";
 import { countNote, matchPanels, panelCheck, panelLayers, type FoundPanels } from "./panelmatch";
 import { composeSvg, download, rasterizeIfSvg } from "./compose";
-import { buildUnits, layerTimes, panelParts, parseSlidesFileChecked, planSlide, planTexts, readClips, readPics, clipNotes, sceneSpans, sceneTimes, reportCsv, reportText, slideReportText, type Clip, type Pic, type ReportPart, type ReportRow, type SlidePlan, type SlideSpec, type TextFonts, type Unit, matchNotes } from "./slides";
+import { buildUnits, layerTimes, panelParts, parseSlidesFileChecked, planSlide, planTexts, readClips, readPics, clipRange, clipNotes, sceneSpans, sceneTimes, reportCsv, reportText, slideReportText, type Clip, type Pic, type ReportPart, type ReportRow, type SlidePlan, type SlideSpec, type TextFonts, type Unit, matchNotes } from "./slides";
 import { findFont, loadFont, MATH_URL } from "./textanim";
 import { buildTextSlide, resolveTextSlide, type KindChoice, type KindOverride, type TextSlideKind } from "./textslide";
 import { ResolutionPicker } from "./ResolutionPicker";
@@ -10,6 +10,7 @@ import { DEFAULT_SKETCH, type Dir, type DrawStyle, type Entrance, type LinesMode
 import { checkFinalFrame, mp4Supported, renderMp4Timeline } from "./video";
 import { qualityVerdict } from "./quality";
 import { cancelNative, goBack, hasHost, keepAlive, nativeCall, toBase64 } from "./bridge";
+import { clearProject, deleteAssets, getAsset, getMeta, listAssetIds, putAsset, putMeta, storeAvailable, type ProjectMeta } from "./projectStore";
 import "./VideoMode.css";
 
 const FPS = 30;
@@ -22,6 +23,9 @@ interface Row { slide: Slide; spec?: SlideSpec; start: number; end: number; svg:
   textKind?: TextSlideKind; words?: string;
   /** New workflow step 5: a scene row. The clip replaces the pictures of `cues`; it stays a video (no SVG). */
   scene?: { clip: Clip; cues: number[] } }
+
+/** The moments the click sound plays: at the start of every heading / subscribe / scene row and at every drawn unit of a picture. Used by the preview and by the export, so they agree. */
+const clickEvents = (R: Row[], on: boolean): { time: number }[] => on ? R.flatMap(r => r.textKind || r.scene ? [{ time: r.start }] : (r.plan?.items ?? []).filter(item => item.dur > 0).map(item => ({ time: r.start + item.begin }))) : [];
 
 const fmt = (t: number) => { const s = Math.max(0, t), m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`; };
 const ENTRANCES: { id: Entrance; label: string }[] = [{ id: "draw", label: "Draw (hand-drawn)" }, { id: "fade", label: "Fade in" }, { id: "pop", label: "Pop in (bounce)" }, { id: "slide", label: "Move in" }, { id: "none", label: "Appear at once" }];
@@ -66,8 +70,9 @@ function SceneVideo({ file, lt, playing }: { file: File; lt: number; playing: bo
     style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000", display: "block" }} />;
 }
 
-function Player({ rows, total, seekReq, onIndex }: { rows: Row[]; total: number; seekReq: { t: number; id: number } | null; onIndex: (i: number) => void }) {
+function Player({ rows, total, seekReq, onIndex, audio, clicks }: { rows: Row[]; total: number; seekReq: { t: number; id: number } | null; onIndex: (i: number) => void; audio: AudioBuffer | null; clicks: number[] }) {
   const [t, setT] = useState(0);
+  const [seekVer, setSeekVer] = useState(0);   // bumps on every jump of the playhead, so the sound restarts from the new place
   const [playing, setPlaying] = useState(false);
   const tRef = useRef(0);
   const host = useRef<HTMLDivElement>(null);
@@ -78,9 +83,38 @@ function Player({ rows, total, seekReq, onIndex }: { rows: Row[]; total: number;
   const row = rows[idx];
   useEffect(() => { onIndex(idx); }, [idx]);
 
-  const seek = (x: number) => { const v = Math.min(total, Math.max(0, x)); tRef.current = v; setT(v); };
+  const seek = (x: number) => { const v = Math.min(total, Math.max(0, x)); tRef.current = v; setT(v); setSeekVer(n => n + 1); };
   useEffect(() => { if (seekReq) seek(seekReq.t); }, [seekReq?.id]);
   useEffect(() => { if (tRef.current > total) seek(total); }, [total]);
+
+  // sound in the preview: the voice-over and the click sounds play from the playhead while it runs (before this, audio was only used by the MP4 export)
+  const ctxRef = useRef<AudioContext | null>(null);
+  const clickBuf = useRef<AudioBuffer | null>(null);
+  const clicksRef = useRef<number[]>(clicks); clicksRef.current = clicks;   // read when playing starts; a changing list must not restart the voice
+  useEffect(() => () => { void ctxRef.current?.close().catch(() => { /* already closed */ }); ctxRef.current = null; }, []);
+  useEffect(() => {
+    if (!playing) return;
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    if (!ctxRef.current) { try { ctxRef.current = new Ctx(); } catch { return; } }
+    const ctx = ctxRef.current!;
+    let live = true;
+    const nodes: AudioBufferSourceNode[] = [];
+    const play = (buf: AudioBuffer, when: number, offset = 0) => { const n = ctx.createBufferSource(); n.buffer = buf; n.connect(ctx.destination); n.start(when, offset); nodes.push(n); };
+    (async () => {
+      try { await ctx.resume(); } catch { /* the page may not be allowed to start sound yet */ }
+      if (!live || ctx.state !== "running") return;
+      let at = tRef.current;                           // where the picture is NOW (resuming can take a moment), so voice and picture start together
+      if (audio && at < audio.duration) play(audio, ctx.currentTime, at);
+      if (clicksRef.current.length) {
+        if (!clickBuf.current) { try { const r = await fetch(`${import.meta.env.BASE_URL}click.wav`); clickBuf.current = await ctx.decodeAudioData(await r.arrayBuffer()); } catch { return; } }
+        if (!live || !clickBuf.current) return;
+        at = tRef.current; const now = ctx.currentTime;
+        for (const c of clicksRef.current) if (c >= at) play(clickBuf.current, now + (c - at));
+      }
+    })();
+    return () => { live = false; nodes.forEach(n => { try { n.stop(); } catch { /* not started */ } }); };
+  }, [playing, audio, seekVer]);
 
   // the clock
   useEffect(() => {
@@ -174,7 +208,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
   const [pen, setPen] = useState(0.5);   // share of each piece's time spent on the pen outline (the rest is colour)
   const [writeAll, setWriteAll] = useState(false);
   const [maxIdle, setMaxIdle] = useState(5);
-  const [replaceText, setReplaceText] = useState(true);   // write headings and captions with handwriting (font replacement)
+  const [replaceText, setReplaceText] = useState(false);   // OFF by default: the labels and captions stay exactly as the picture has them. ON = redraw them in Patrick Hand (Style tab)
   const [resId, setResId] = useState("1080p");   // step 24: export size
   const [textColor, setTextColor] = useState("#111111");
   const [patrickFonts, setPatrickFonts] = useState<TextFonts | null>(null);   // step 8: ALL lettering the editor writes (headings, subscribe, labels, captions) is Patrick Hand, locked
@@ -205,6 +239,11 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
   const [saved, setSaved] = useState("");
   const tabsRef = useRef<HTMLDivElement>(null);
   const report = (m: string) => { setErr(m); onError?.(m); };
+  const specTextRef = useRef<string | null>(null);   // the timing file's own text, kept so the project can be saved and rebuilt
+  const savedBlobs = useRef(new Map<string, Blob>());   // file id -> the file last written to the saved project (to write only what changed)
+  const [loaded, setLoaded] = useState(false);   // the saved project has been looked for; auto-save never runs before this (it would wipe the saved one)
+  const [saveInfo, setSaveInfo] = useState<{ state: "idle" | "saving" | "saved" | "error" | "off"; at?: number; msg?: string }>({ state: "idle" });
+  const [restoredNote, setRestoredNote] = useState("");
 
   useEffect(() => {
     let live = true;
@@ -222,15 +261,149 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
       setSlide(s.key, { status: "busy" });
       try {
         const ready = await rasterizeIfSvg(s.file);
-        const p = await processImage(ready);
-        const found = await detectPanels(ready);   // v2: the panels, matched to the file's panels by order (null with an older backend)
+        const a = await analyseImage(ready);   // panels first; the slow full separation only runs when the picture has no panels (see api.ts)
         if (run.current !== id) return;
-        setSlide(s.key, { status: "ok", project: p, units: buildUnits(p), found, panelNote: found?.panels.length ? "" : panelsStatus || "no panels were found in this picture" });
+        setSlide(s.key, { status: "ok", project: a.project, units: buildUnits(a.project), found: a.found, panelNote: a.panelNote });
       } catch (e: any) {
         if (run.current !== id) return;
         setSlide(s.key, { status: "error", error: e?.message ?? "Could not read this image." });
       }
     }
+  }
+
+
+  /* ------------------------------------------------------------------ save progress (auto-save + the Save progress button) ------------------------------------------------------------------ */
+
+  async function loadAudioFile(file: File) {
+    setAudioLoading(true);
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) throw new Error("Audio decoding is not available in this browser.");
+      const ctx = new Ctx();
+      try { const decoded = await ctx.decodeAudioData(await file.arrayBuffer()); setAudioFile(file); setAudioBuffer(decoded); }
+      finally { await ctx.close(); }
+    } catch (err: any) { report(`Could not read ${file.name}: ${err?.message ?? "unsupported audio format"}`); }
+    finally { setAudioLoading(false); }
+  }
+
+  const settingsNow = () => ({ defSec, entrance, style, lines, pen, writeAll, maxIdle, replaceText, resId, textColor, bgColor, upscale, elementSounds });
+  const saving = useRef(false), saveAgain = useRef(false);
+  const saveRef = useRef<(manual?: boolean) => Promise<void>>(async () => { /* set below */ });
+
+  /** Writes the project to the phone: only files that changed since the last save, then the small settings record, then removes files the project no longer uses. */
+  async function saveNow(manual = false) {
+    if (saving.current) { saveAgain.current = true; return; }
+    saving.current = true;
+    try {
+      if (!slides.length && !specs && !clips.length && !audioFile) { if (manual) setSaveInfo({ state: "saved", at: Date.now(), msg: "Nothing to save yet: add pictures first." }); return; }
+      setSaveInfo(i => ({ ...i, state: "saving" }));
+      const files = new Map<string, File>();
+      slides.forEach(x => files.set("pic:" + x.key, x.file));
+      clips.forEach(c => files.set("clip:" + c.name, c.file));
+      if (audioFile) files.set("audio", audioFile);
+      let ok = true;
+      for (const [id, f] of files) {
+        if (savedBlobs.current.get(id) === f) continue;
+        if (await putAsset(id, { blob: f, name: f.name, type: f.type })) savedBlobs.current.set(id, f); else { ok = false; break; }
+      }
+      if (ok) {
+        const meta: ProjectMeta = {
+          v: 1, savedAt: Date.now(), settings: settingsNow(), specText: specTextRef.current, specName, kinds: kinds as Record<string, unknown>, unnamedClips, cur,
+          pics: slides.map(x => ({ id: "pic:" + x.key, key: x.key, n: x.n, name: x.name, upscaled: !!x.upscaled })),
+          clips: clips.map(c => ({ id: "clip:" + c.name, name: c.name })),
+          audio: audioFile ? { id: "audio", name: audioFile.name } : null,
+        };
+        ok = await putMeta(meta);
+        if (ok) { const stale = (await listAssetIds()).filter(i => !files.has(i)); await deleteAssets(stale); stale.forEach(i => savedBlobs.current.delete(i)); }
+      }
+      setSaveInfo(ok ? { state: "saved", at: Date.now() } : { state: "error", msg: "Could not save your progress. The phone may be out of space." });
+    } catch { setSaveInfo({ state: "error", msg: "Could not save your progress." }); }
+    finally { saving.current = false; if (saveAgain.current) { saveAgain.current = false; void saveRef.current(); } }
+  }
+  saveRef.current = saveNow;
+
+  /** The saved project comes back by itself when the screen opens, so a closed app does not mean starting again. Pictures are analysed again (about a second or two each). */
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        if (!(await storeAvailable())) { if (live) setSaveInfo({ state: "off" }); return; }
+        const meta = await getMeta();
+        if (!meta || !live) return;
+        const st = (meta.settings ?? {}) as Record<string, any>;
+        const secs = typeof st.defSec === "number" && st.defSec >= 1 ? st.defSec : 10;
+        setDefSec(secs);
+        if (typeof st.entrance === "string") setEntrance(st.entrance as Entrance);
+        if (typeof st.style === "string") setStyle(st.style as DrawStyle);
+        if (typeof st.lines === "string") setLines(st.lines as LinesMode);
+        if (typeof st.pen === "number") setPen(st.pen);
+        if (typeof st.writeAll === "boolean") setWriteAll(st.writeAll);
+        if (typeof st.maxIdle === "number") setMaxIdle(st.maxIdle);
+        if (typeof st.replaceText === "boolean") setReplaceText(st.replaceText);
+        if (typeof st.resId === "string") setResId(st.resId);
+        if (typeof st.textColor === "string") setTextColor(st.textColor);
+        if (typeof st.bgColor === "string") setBgColor(st.bgColor);
+        if (typeof st.upscale === "boolean") setUpscale(st.upscale);
+        if (typeof st.elementSounds === "boolean") setElementSounds(st.elementSounds);
+
+        const list: Slide[] = [];
+        for (const pc of meta.pics) {
+          const a = await getAsset(pc.id); if (!a) continue;
+          const f = new File([a.blob], a.name || pc.name, { type: a.type });
+          savedBlobs.current.set(pc.id, f);
+          list.push({ key: pc.key, n: pc.n, name: pc.name, file: f, thumb: URL.createObjectURL(f), status: "wait", upscaled: pc.upscaled });
+        }
+        const cl: Clip[] = [];
+        for (const c of meta.clips) {
+          const a = await getAsset(c.id), r = clipRange(c.name); if (!a || !r) continue;
+          const f = new File([a.blob], c.name, { type: a.type }); savedBlobs.current.set(c.id, f);
+          cl.push({ name: c.name, first: r.first, last: r.last, file: f });
+        }
+        if (!live) return;
+        if (meta.specText) {
+          try { const r = parseSlidesFileChecked(meta.specText, secs); specTextRef.current = meta.specText; setSpecs(r.specs); setSpecNotes(r.notes); setSpecName(meta.specName || "timing.json"); } catch { /* a damaged timing record is skipped */ }
+        }
+        setKinds((meta.kinds ?? {}) as Record<number, KindOverride>);
+        setUnnamedClips(meta.unnamedClips ?? []);
+        setClips(cl);
+        coveredRef.current = new Set(sceneSpans(cl).flatMap(sp => sp.cues));
+        setSlides(list);
+        setSeekReq({ t: 0, id: Date.now() });
+        if (meta.audio) { const a = await getAsset(meta.audio.id); if (a && live) { const f = new File([a.blob], a.name || meta.audio.name, { type: a.type }); savedBlobs.current.set(meta.audio.id, f); void loadAudioFile(f); } }
+        if (list.length || meta.specText || cl.length) {
+          const t = new Date(meta.savedAt);
+          setRestoredNote(`Your last project is back: ${list.length} picture${list.length === 1 ? "" : "s"}${meta.specText ? ", timing file" : ""}${cl.length ? `, ${cl.length} scene video${cl.length === 1 ? "" : "s"}` : ""}${meta.audio ? ", audio" : ""} (saved ${t.toLocaleDateString()} ${t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}).`);
+          setSaveInfo({ state: "saved", at: meta.savedAt });
+        }
+        if (list.length) void processAll(list);
+      } catch (e: any) { if (live) report("Could not open your saved project: " + (e?.message ?? "unknown problem")); }
+      finally { if (live) setLoaded(true); }
+    })();
+    return () => { live = false; };
+  }, []);
+
+  /** Auto-save: a moment after anything that matters changes, and at once when the app goes to the background. */
+  const saveSig = useMemo(() => JSON.stringify([slides.map(x => [x.key, x.n, x.upscaled ? 1 : 0]), settingsNow(), specName, kinds, clips.map(c => c.name), unnamedClips, audioFile?.name, audioFile?.size]),
+    [slides, defSec, entrance, style, lines, pen, writeAll, maxIdle, replaceText, resId, textColor, bgColor, upscale, elementSounds, specName, kinds, clips, unnamedClips, audioFile]);
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setTimeout(() => void saveRef.current(), 1500);
+    return () => clearTimeout(t);
+  }, [saveSig, specs, loaded]);
+  useEffect(() => {
+    const hide = () => { if (loaded && document.visibilityState !== "visible") void saveRef.current(); };
+    document.addEventListener("visibilitychange", hide); window.addEventListener("pagehide", hide);
+    return () => { document.removeEventListener("visibilitychange", hide); window.removeEventListener("pagehide", hide); };
+  }, [loaded]);
+
+  async function startNew() {
+    if (!window.confirm("Start a new project? The saved project on this phone will be deleted.")) return;
+    run.current++;   // stops any analysis still running
+    slides.forEach(x => URL.revokeObjectURL(x.thumb));
+    setSlides([]); setSpecs(null); setSpecNotes([]); setSpecName(""); specTextRef.current = null; setKinds({}); setClips([]); setUnnamedClips([]);
+    setAudioFile(null); setAudioBuffer(null); setCur(0); setRestoredNote(""); coveredRef.current = new Set(); savedBlobs.current.clear();
+    await clearProject();
+    setSaveInfo({ state: "idle" });
   }
 
   /** Files dropped from Explorer: loose files, ZIPs, and whole folders (read folder by folder). */
@@ -257,7 +430,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
     const pics = files.filter(f => !timing.includes(f));
     let gotClips = false;
     try {
-      for (const f of timing) { { const r = parseSlidesFileChecked(await f.text(), defSec); setSpecs(r.specs); setSpecNotes(r.notes); } setSpecName(f.name); }
+      for (const f of timing) { { const text = await f.text(); const r = parseSlidesFileChecked(text, defSec); specTextRef.current = text; setSpecs(r.specs); setSpecNotes(r.notes); } setSpecName(f.name); }
       if (pics.length) {
         const cl = await readClips(pics);   // step 4: scene videos (loose, in a ZIP or in a folder); the clip name gives the cues it covers
         if (cl.clips.length || cl.unnamed.length) { setClips(cl.clips); setUnnamedClips(cl.unnamed); gotClips = true; coveredRef.current = new Set(sceneSpans(cl.clips).flatMap(sp => sp.cues)); }
@@ -344,6 +517,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
   }, [slides, specs, defSec, writeAll, maxIdle, sk, bgColor, replaceText, textColor, patrickFonts, kinds, spans, covered]);
 
   rowsRef.current = rows;
+  const clickTimes = useMemo(() => clickEvents(rows, elementSounds).map(e => e.time), [rows, elementSounds]);
   const total = rows.length ? rows[rows.length - 1].end : 0;
   const procSlides = slides.filter(s => !covered.has(s.n));   // pictures under a scene clip are not processed, so they are not waited for
   const done = procSlides.filter(s => s.status === "ok" || s.status === "error").length;
@@ -371,17 +545,15 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
           if (r?.error || !r?.png) throw new Error(r?.detail ?? "upscale failed");
           const bin = atob(r.png), bytes = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
           const up = new File([bytes], s.name.replace(/\.[^.]+$/, "") + "_x2.png", { type: "image/png" });
-          const p = await processImage(up), found = await detectPanels(up);
-          setSlide(s.key, { file: up, upscaled: true, project: p, units: buildUnits(p), found, panelNote: found?.panels.length ? "" : panelsStatus || "no panels were found in this picture" });
+          const a = await analyseImage(up);
+          setSlide(s.key, { file: up, upscaled: true, project: a.project, units: buildUnits(a.project), found: a.found, panelNote: a.panelNote });
         } catch { failedUp++; }
       }
       if (cancel.current) throw new Error("Export cancelled.");
       if (todo.length) await new Promise(r => setTimeout(r, 150));   // let the page rebuild its rows from the sharper pictures
       if (failedUp) report(`${failedUp} picture${failedUp > 1 ? "s" : ""} could not be made sharper and ${failedUp > 1 ? "were" : "was"} used as it is.`);
       const R = rowsRef.current;
-      const soundEvents = elementSounds ? R.flatMap(r => r.textKind || r.scene ? [{ time: r.start }] : (r.plan?.items ?? [])
-        .filter(item => item.dur > 0)
-        .map(item => ({ time: r.start + item.begin }))) : [];
+      const soundEvents = clickEvents(R, elementSounds);
       let clickSound: AudioBuffer | null = null;
       if (soundEvents.length) {
         const Ctx = window.AudioContext || (window as any).webkitAudioContext;
@@ -425,6 +597,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
         <div className="se-bar">
           <button className="se-back" onClick={goBack} aria-label="Back"><Icon n="back" /></button>
           <div className="se-title"><h1>SVG Editor</h1><span>{sub}</span></div>
+          <button className={"se-save" + (saveInfo.state === "saved" ? " ok" : saveInfo.state === "error" ? " bad" : "")} disabled={saveInfo.state === "saving" || saveInfo.state === "off"} onClick={() => void saveNow(true)} aria-label="Save progress">{saveInfo.state === "saving" ? "Saving…" : saveInfo.state === "saved" ? "Saved" : "Save"}</button>
           <button className="se-cta" onClick={openExport}>Export</button>
         </div>
       )}
@@ -433,7 +606,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
       <div className="se-main">
         <section className="se-stage" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void dropFiles(e.dataTransfer); }}>
           {rows.length > 0
-            ? <Player rows={rows} total={total} seekReq={seekReq} onIndex={setCur} />
+            ? <Player rows={rows} total={total} seekReq={seekReq} onIndex={setCur} audio={audioBuffer} clicks={clickTimes} />
             : (
               <div className="se-empty" onClick={() => picRef.current?.click()}>
                 <div className="orb"><Icon n="image" size={26} /></div>
@@ -451,6 +624,7 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
           <section className="se-card">
             {tab === "import" && (<>
               <h2>Import <small>pictures, timing and scene videos</small></h2>
+              {restoredNote && <p className="hint small se-restored">{restoredNote}</p>}
               <div className="se-tiles">
                 <button className={"se-tile" + (slides.length ? " done" : "")} disabled={!!exporting} onClick={() => picRef.current?.click()}><Icon n="image" /><span>{slides.length ? "Change images" : "Images (ZIP)"}</span><small>{slides.length ? `${slides.length} added` : "pictures or ZIP"}</small></button>
                 <button className="se-tile" disabled={!!exporting} onClick={() => dirRef.current?.click()}><Icon n="folder" /><span>Images (folder)</span><small>a whole folder</small></button>
@@ -462,6 +636,16 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
                 {busy && <span>Finding elements: {done} of {procSlides.length}</span>}
                 {failed > 0 && <span className="bad">{failed} could not be read</span>}
               </div>
+              <div className="se-saverow">
+                <button className="ghost" disabled={!!exporting || saveInfo.state === "saving" || saveInfo.state === "off"} onClick={() => void saveNow(true)}>Save progress</button>
+                <button className="ghost" disabled={!!exporting || (!slides.length && !specs && !clips.length && !audioFile)} onClick={() => void startNew()}>Start a new project</button>
+              </div>
+              <p className={"hint small" + (saveInfo.state === "error" || saveInfo.state === "off" ? " se-warn" : "")}>{
+                saveInfo.state === "off" ? "Saving is not available on this phone, so the project is lost when the app closes."
+                : saveInfo.state === "error" ? saveInfo.msg
+                : saveInfo.state === "saving" ? "Saving…"
+                : saveInfo.state === "saved" ? `${saveInfo.msg ? saveInfo.msg + " " : ""}Saved at ${new Date(saveInfo.at ?? Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Your work is also saved automatically.`
+                : "Your work is saved automatically a moment after every change."}</p>
         {specs && specNotes.length + batchNotes.length > 0 && (
           <div className="hint small se-warn">
             <b>Timing file notes:</b>
@@ -492,8 +676,8 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
           {entrance === "draw" && <label>Lines then colour <select value={lines} onChange={e => setLines(e.target.value as LinesMode)}><option value="auto">Auto (panels one by one, other pictures all lines first)</option><option value="each">One piece at a time: its lines, then its colour</option><option value="all">All lines first, then all colour</option><option value="off">Off (outline and colour together)</option></select></label>}
           {entrance === "draw" && <label>{lines !== "off" ? "Lines share" : "Pen share"} <span className="inl"><input type="range" min="10" max="90" step="5" style={{ ["--fill" as string]: `${((Math.round(pen * 100) - 10) / 80) * 100}%` }} value={Math.round(pen * 100)} onChange={e => setPen(+e.target.value / 100)} /> {Math.round(pen * 100)}% pen, {100 - Math.round(pen * 100)}% colour</span></label>}
           <label>Longest idle <span className="inl"><input className="num" type="number" min="1" max="30" style={{ width: 56 }} value={maxIdle} onChange={e => setMaxIdle(Math.min(30, Math.max(1, +e.target.value || 5)))} /> s</span></label>
-          <label className="chk"><input type="checkbox" checked={replaceText} onChange={e => setReplaceText(e.target.checked)} /> Write headings and captions with handwriting</label>
-          {replaceText && <p className="hint small">Font: Patrick Hand (locked, built in). Headings, subscribe, labels and captions all use it.</p>}
+          <label className="chk"><input type="checkbox" checked={replaceText} onChange={e => setReplaceText(e.target.checked)} /> Rewrite the picture's labels and captions in Patrick Hand</label>
+          <p className="hint small">{replaceText ? "The labels and captions are taken out of the picture and written again in Patrick Hand, in the same place and box, in the colour below. Heading and subscribe slides are always Patrick Hand." : "Off: the labels and captions stay exactly as they are in the picture. Heading and subscribe slides are still written in Patrick Hand."}</p>
           {replaceText && <label className="inl">Text colour <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} /></label>}
           <label className="chk"><input type="checkbox" checked={writeAll} onChange={e => setWriteAll(e.target.checked)} /> Write the heading again on every image</label>
         </div>
@@ -505,19 +689,8 @@ export default function VideoMode({ onError, standalone = false }: { onError?: (
           <button className="ghost" disabled={!!exporting || audioLoading} onClick={() => audioRef.current?.click()}>{audioFile ? "Change audio" : "Add audio"}</button>
           {audioFile && <button className="ghost" disabled={!!exporting || audioLoading} onClick={() => { setAudioFile(null); setAudioBuffer(null); }}>Remove audio</button>}
         </div>
-        <input ref={audioRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden onChange={async e => {
-          const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
-          setAudioLoading(true);
-          try {
-            const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-            if (!Ctx) throw new Error("Audio decoding is not available in this browser.");
-            const ctx = new Ctx();
-            try { const decoded = await ctx.decodeAudioData(await file.arrayBuffer()); setAudioFile(file); setAudioBuffer(decoded); }
-            finally { await ctx.close(); }
-          } catch (err: any) { report(`Could not read ${file.name}: ${err?.message ?? "unsupported audio format"}`); }
-          finally { setAudioLoading(false); }
-        }} />
-        <p className="hint small">{audioLoading ? "Reading audio…" : audioFile ? `${audioFile.name} — audio will be synchronized to the video, trimmed if longer, or padded with silence if shorter.` : "Add a voice-over, music track, or other audio file. Common formats are supported when your device can decode them."}</p>
+        <input ref={audioRef} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void loadAudioFile(file); }} />
+        <p className="hint small">{audioLoading ? "Reading audio…" : audioFile ? `${audioFile.name} — audio will be synchronized to the video, trimmed if longer, or padded with silence if shorter.` : "Add a voice-over, music track, or other audio file. It plays in the preview and in the exported video. Common formats are supported when your device can decode them."}</p>
         <label className="chk"><input type="checkbox" checked={elementSounds} disabled={!!exporting} onChange={e => setElementSounds(e.target.checked)} /> Use the bundled click.wav for every element (headings, arrows and illustrations)</label>
             </>)}
 

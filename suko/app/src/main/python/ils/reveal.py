@@ -108,27 +108,42 @@ def _order_outline(lines, sk, bh):
             xb = max(24.0, cw_ / 12.0); rk = lambda p, xb=xb: (int(p[0] // xb), p[1])
         else:                 # tall or square piece: draw top to bottom
             rk = lambda p: (int(p[1] // band), p[0])
+        # Speed: the choices below are the same rules as before (same order of ties), but every "look at all the remaining strokes" scan is ONE numpy operation
+        # on the start / end points instead of a Python loop (the loop was O(n^2) with ~20 million hypot calls per picture and was most of the analysis time).
+        S = np.array([pl[0] for pl in rest], np.float64)       # first point of every stroke
+        E = np.array([pl[-1] for pl in rest], np.float64)      # last point of every stroke
+        alive = np.ones(len(rest), bool)
+        idx = np.arange(len(rest))
+        wide = cw_ > 1.2 * ch_
         stroke, cur = None, None
-        while rest:
-            cand = []
+        for _ in range(len(rest)):
+            j, rev = -1, False
             if cur is not None:                       # strokes that continue exactly where the pen is
-                for i, pl in enumerate(rest):
-                    for rev in (False, True):
-                        a = pl[-1] if rev else pl[0]
-                        if math.hypot(a[0] - cur[0], a[1] - cur[1]) <= 3.5:
-                            cand.append((i, rev))
-            if cand:   # keep going, preferring to move right and down
-                i, rev = max(cand, key=lambda t: (lambda o: (o[0] - cur[0]) + 0.6 * (o[1] - cur[1]))(rest[t[0]][0] if t[1] else rest[t[0]][-1]))
-                pl = rest.pop(i)
-                if rev: pl = pl[::-1]
-                stroke.extend(pl[1:])
-            else:      # lift the pen: first stroke of a piece in reading order; after that the nearest free end, so the pen travels smoothly
+                cx, cy = cur
+                nearS = alive & ((S[:, 0] - cx) ** 2 + (S[:, 1] - cy) ** 2 <= 12.25)   # rev=False: the pen is at the stroke's first point
+                nearE = alive & ((E[:, 0] - cx) ** 2 + (E[:, 1] - cy) ** 2 <= 12.25)   # rev=True: the pen is at its last point
+                if nearS.any() or nearE.any():        # keep going, preferring to move right and down (ties: lowest index, then not reversed)
+                    sc = np.full((len(rest), 2), -np.inf)
+                    sc[nearS, 0] = (E[nearS, 0] - cx) + 0.6 * (E[nearS, 1] - cy)
+                    sc[nearE, 1] = (S[nearE, 0] - cx) + 0.6 * (S[nearE, 1] - cy)
+                    k = int(np.argmax(sc))
+                    j, rev = k // 2, bool(k % 2)
+                    alive[j] = False
+                    pl = rest[j][::-1] if rev else rest[j]
+                    stroke.extend(pl[1:])
+            if j < 0:      # lift the pen: first stroke of a piece in reading order; after that the nearest free end, so the pen travels smoothly
+                a = idx[alive]
+                i2 = np.concatenate([a, a]); r2 = np.concatenate([np.zeros(len(a), int), np.ones(len(a), int)])   # (stroke, rev) pairs
+                P = np.concatenate([S[a], E[a]])      # the point the pen would start from for each pair
                 if cur is None:
-                    _, i, rev = min((rk(pl[-1] if rev else pl[0]), i, rev) for i, pl in enumerate(rest) for rev in (False, True))
+                    if wide: k1, k2 = np.floor_divide(P[:, 0], xb), P[:, 1]
+                    else:    k1, k2 = np.floor_divide(P[:, 1], band), P[:, 0]
+                    o = int(np.lexsort((r2, i2, k2, k1))[0])
                 else:
-                    _, i, rev = min((math.hypot((pl[-1] if rev else pl[0])[0] - cur[0], (pl[-1] if rev else pl[0])[1] - cur[1]), i, rev) for i, pl in enumerate(rest) for rev in (False, True))
-                pl = rest.pop(i)
-                if rev: pl = pl[::-1]
+                    o = int(np.lexsort((r2, i2, np.hypot(P[:, 0] - cur[0], P[:, 1] - cur[1])))[0])
+                j, rev = int(i2[o]), bool(r2[o])
+                alive[j] = False
+                pl = rest[j][::-1] if rev else rest[j]
                 if stroke is not None: out.append(stroke)
                 stroke = list(pl)
             cur = pl[-1]

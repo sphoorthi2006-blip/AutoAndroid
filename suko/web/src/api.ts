@@ -22,6 +22,21 @@ export async function processImage(file: File): Promise<Project> {
   return { ...data, layers: data.layers.map((l: any) => ({ ...l, visible: true, tx: 0, ty: 0, scale: 1, rot: 0, anim: { ...DEFAULT_ANIM } })) };
 }
 
+/** Everything the video screen needs to know about one picture, found as cheaply as possible.
+ *  Panels are looked for FIRST. When the picture has panels (with their original-pixel crops), every panel is ONE unit and the pieces of the full separation
+ *  (`processImage`: segment + trace + pen plan for every little element) are never used, so that slow step is skipped and only the size is kept.
+ *  Only a picture with no panels (or panels without crops) goes through the full separation, exactly as before. */
+export async function analyseImage(file: File): Promise<{ project: Project; found: FoundPanels | null; panelNote: string }> {
+  const found = await detectPanels(file);
+  const note = panelsStatus;
+  if (found?.panels.length && found.panels.every(p => p.raster)) {
+    const project: Project = { width: found.width, height: found.height, backgroundColor: "#ffffff", layers: [] };
+    return { project, found, panelNote: "" };
+  }
+  const project = await processImage(file);
+  return { project, found, panelNote: found?.panels.length ? "" : note || "no panels were found in this picture" };
+}
+
 /** Which backend is answering? Returns its version ("" for a backend older than 0.10) or null when nothing answers. */
 export async function backendVersion(): Promise<string | null> {
   if (hasHost()) { try { await nativeCall("health"); return BACKEND_VERSION; } catch { return null; } }

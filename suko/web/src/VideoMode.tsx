@@ -2,25 +2,49 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { detectPanels, panelsStatus, processImage } from "./api";
 import { countNote, matchPanels, panelCheck, panelLayers, type FoundPanels } from "./panelmatch";
 import { composeSvg, download, rasterizeIfSvg } from "./compose";
-import { buildUnits, layerTimes, panelParts, parseSlidesFileChecked, planSlide, planTexts, readPics, reportCsv, reportText, slideReportText, type Pic, type ReportPart, type ReportRow, type SlidePlan, type SlideSpec, type TextFonts, type Unit, matchNotes } from "./slides";
+import { buildUnits, layerTimes, panelParts, parseSlidesFileChecked, planSlide, planTexts, readClips, readPics, clipNotes, sceneSpans, sceneTimes, reportCsv, reportText, slideReportText, type Clip, type Pic, type ReportPart, type ReportRow, type SlidePlan, type SlideSpec, type TextFonts, type Unit, matchNotes } from "./slides";
 import { findFont, loadFont, MATH_URL } from "./textanim";
-import { FontPicker } from "./FontPicker";
+import { buildTextSlide, resolveTextSlide, type KindChoice, type KindOverride, type TextSlideKind } from "./textslide";
 import { ResolutionPicker } from "./ResolutionPicker";
 import { DEFAULT_SKETCH, type Dir, type DrawStyle, type Entrance, type LinesMode, type Project, type SketchSettings } from "./types";
 import { checkFinalFrame, mp4Supported, renderMp4Timeline } from "./video";
 import { qualityVerdict } from "./quality";
+import { hasHost, keepAlive, nativeCall, toBase64 } from "./bridge";
 
 const FPS = 30;
 
 /** 0.15.3: the black frame (cut from the upload) is on the canvas from the start; it is not one of the animated units. */
 const frameMarkup = (fr: { href: string; box: number[] }) => `<image href="${fr.href}" x="${fr.box[0]}" y="${fr.box[1]}" width="${fr.box[2]}" height="${fr.box[3]}" preserveAspectRatio="none"/>`;
-interface Slide { key: string; n: number; name: string; file: File; thumb: string; status: "wait" | "busy" | "ok" | "error"; error?: string; panelNote?: string; project?: Project; units?: Unit[]; found?: FoundPanels | null }
-interface Row { slide: Slide; spec?: SlideSpec; start: number; end: number; svg: string | null; width: number; height: number; plan?: SlidePlan; note: string; heading?: string; marks: number[]; parts?: ReportPart[] }
+interface Slide { key: string; n: number; name: string; file: File; thumb: string; status: "wait" | "busy" | "ok" | "error"; error?: string; panelNote?: string; upscaled?: boolean; project?: Project; units?: Unit[]; found?: FoundPanels | null }
+interface Row { slide: Slide; spec?: SlideSpec; start: number; end: number; svg: string | null; width: number; height: number; plan?: SlidePlan; note: string; heading?: string; marks: number[]; parts?: ReportPart[];
+  /** New workflow: a heading or subscribe slide is a white screen with handwritten black Patrick Hand words (no picture, no zoom). */
+  textKind?: TextSlideKind; words?: string;
+  /** New workflow step 5: a scene row. The clip replaces the pictures of `cues`; it stays a video (no SVG). */
+  scene?: { clip: Clip; cues: number[] } }
 
 const fmt = (t: number) => { const s = Math.max(0, t), m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`; };
 const ENTRANCES: { id: Entrance; label: string }[] = [{ id: "draw", label: "Draw (hand-drawn)" }, { id: "fade", label: "Fade in" }, { id: "pop", label: "Pop in (bounce)" }, { id: "slide", label: "Move in" }, { id: "none", label: "Appear at once" }];
 
 /* ------------------------------------------------------------------ the player: picture, play / pause, playhead ------------------------------------------------------------------ */
+
+/** New workflow step 6: the scene clip plays muted inside the preview, letterboxed (the whole clip is visible, black bars), in step with the playhead.
+ *  `lt` is the time inside the slot (playhead minus the row's start). Past the end of the clip the last frame stays; a clip longer than its slot is simply cut. */
+function SceneVideo({ file, lt, playing }: { file: File; lt: number; playing: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  useEffect(() => {
+    const v = ref.current; if (!v) return;
+    if (playing) { void v.play().catch(() => { /* the browser may refuse; the picture still follows the playhead */ }); } else v.pause();
+  }, [playing, url]);
+  useEffect(() => {
+    const v = ref.current; if (!v) return;
+    const d = Number.isFinite(v.duration) ? v.duration : Infinity, target = Math.max(0, Math.min(lt, d - 0.04));
+    if (playing ? Math.abs(v.currentTime - target) > 0.3 : Math.abs(v.currentTime - target) > 0.02) { try { v.currentTime = target; } catch { /* not ready yet */ } }
+  }, [lt, playing, url]);
+  return <video ref={ref} src={url} muted playsInline preload="auto" onLoadedMetadata={e => { try { (e.currentTarget).currentTime = Math.max(0, lt); } catch { /* ignore */ } }}
+    style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000", display: "block" }} />;
+}
 
 function Player({ rows, total, seekReq, onIndex }: { rows: Row[]; total: number; seekReq: { t: number; id: number } | null; onIndex: (i: number) => void }) {
   const [t, setT] = useState(0);
@@ -87,9 +111,11 @@ function Player({ rows, total, seekReq, onIndex }: { rows: Row[]; total: number;
   return (
     <>
       <div className="vview">
-        {row && (row.svg
+        {row && (row.scene
+          ? <div className="vscene"><SceneVideo file={row.scene.clip.file} lt={t - row.start} playing={playing} /></div>
+          : row.svg
           ? <div ref={host} className="vscene" dangerouslySetInnerHTML={{ __html: row.svg }} />
-          : <div className="vscene"><img src={row.slide.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", opacity: .55 }} /><p className="busy">{row.slide.status === "error" ? "This image could not be read" : "Finding the elements…"}</p></div>)}
+          : <div className="vscene"><img src={row.slide.thumb} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", opacity: .55 }} /><p className="busy">{row.slide.status === "error" ? "This image could not be read" : row.slide.thumb ? "Finding the elements…" : "No picture for this image"}</p></div>)}
       </div>
       <div className="vbar">
         <button className="icon big" title="Previous image" aria-label="Previous image" onClick={() => goSlide(-1)}>⏮</button>
@@ -125,14 +151,18 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   const [writeAll, setWriteAll] = useState(false);
   const [maxIdle, setMaxIdle] = useState(5);
   const [replaceText, setReplaceText] = useState(true);   // write headings and captions with handwriting (font replacement)
-  const [fontId, setFontId] = useState("patrick");
   const [resId, setResId] = useState("1080p");   // step 24: export size
   const [textColor, setTextColor] = useState("#111111");
-  const [fonts, setFonts] = useState<TextFonts | null>(null);
+  const [patrickFonts, setPatrickFonts] = useState<TextFonts | null>(null);   // step 8: ALL lettering the editor writes (headings, subscribe, labels, captions) is Patrick Hand, locked
   const [bgColor, setBgColor] = useState("#ffffff");   // the video background: white by default, whatever colour the pictures had
+  const [kinds, setKinds] = useState<Record<number, KindOverride>>({});   // step 3: the owner's choice per image number
+  const [clips, setClips] = useState<Clip[]>([]);   // step 4: scene videos
+  const [unnamedClips, setUnnamedClips] = useState<string[]>([]);
   const [cur, setCur] = useState(0);
   const [seekReq, setSeekReq] = useState<{ t: number; id: number } | null>(null);
-  const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
+  const [exporting, setExporting] = useState<{ done: number; total: number; phase?: string } | null>(null);
+  const [upscale, setUpscale] = useState(true);   // step 29: inside the app, make every picture sharper (AI 2x) at Export, before the video is drawn
+  const rowsRef = useRef<Row[]>([]);
   const [quality, setQuality] = useState<Record<string, string>>({});   // step 9: result of the last-frame check, by slide key
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
@@ -141,22 +171,23 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
   const audioRef = useRef<HTMLInputElement>(null);
   const cancel = useRef(false);
   const run = useRef(0);
+  const coveredRef = useRef<Set<number>>(new Set());
   const picRef = useRef<HTMLInputElement>(null);
   const dirRef = useRef<HTMLInputElement>(null);
   const specRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let live = true;
-    const f = findFont(fontId);
-    Promise.all([loadFont(f.url), loadFont(MATH_URL)]).then(([main, math]) => { if (live) setFonts({ main, math }); }).catch(() => { if (live) setFonts(null); });
+    Promise.all([loadFont(findFont("patrick").url), loadFont(MATH_URL)]).then(([main, math]) => { if (live) setPatrickFonts({ main, math }); }).catch(() => { if (live) setPatrickFonts(null); });
     return () => { live = false; };
-  }, [fontId]);
+  }, []);
 
   const setSlide = (key: string, patch: Partial<Slide>) => setSlides(s => s.map(x => (x.key === key ? { ...x, ...patch } : x)));
 
   async function processAll(list: Slide[]) {
     const id = ++run.current;
     for (const s of list) {
+      if (coveredRef.current.has(s.n)) continue;   // step 5: a scene clip takes this cue; its picture is never turned into SVG
       if (run.current !== id) return;
       setSlide(s.key, { status: "busy" });
       try {
@@ -194,11 +225,15 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
     onError("");
     const timing = files.filter(f => /\.(json|txt)$/i.test(f.name));
     const pics = files.filter(f => !timing.includes(f));
+    let gotClips = false;
     try {
       for (const f of timing) { { const r = parseSlidesFileChecked(await f.text(), defSec); setSpecs(r.specs); setSpecNotes(r.notes); } setSpecName(f.name); }
       if (pics.length) {
+        const cl = await readClips(pics);   // step 4: scene videos (loose, in a ZIP or in a folder); the clip name gives the cues it covers
+        if (cl.clips.length || cl.unnamed.length) { setClips(cl.clips); setUnnamedClips(cl.unnamed); gotClips = true; coveredRef.current = new Set(sceneSpans(cl.clips).flatMap(sp => sp.cues)); }
         const found: Pic[] = await readPics(pics);
-        if (!found.length) throw new Error("No pictures found. Use a ZIP of PNG, JPG or WebP files, or pick the pictures themselves.");
+        if (!found.length && gotClips) return;   // only videos were added: the pictures stay as they are
+        if (!found.length) throw new Error("No pictures or scene videos found. Use a ZIP of PNG, JPG or WebP files, scene videos named like 53.mp4 or 12-14.mp4, or pick the files themselves.");
         slides.forEach(s => URL.revokeObjectURL(s.thumb));
         const list: Slide[] = found.map((p, i) => ({ key: `${Date.now()}-${i}`, n: p.n ?? i + 1, name: p.name, file: p.file, thumb: URL.createObjectURL(p.file), status: "wait" }));
         setSlides(list); setCur(0); setSeekReq({ t: 0, id: Date.now() });
@@ -207,15 +242,34 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
     } catch (e: any) { onError(e?.message ?? "Could not open these files."); }
   }
 
+  const spans = useMemo(() => sceneSpans(clips), [clips]);
+  const covered = useMemo(() => new Set(spans.flatMap(sp => sp.cues)), [spans]);
+  coveredRef.current = covered;   // cues shown as scene videos: their pictures are not processed
+
   const sk: SketchSettings = useMemo(() => ({ ...DEFAULT_SKETCH, entrance, style, pen, lines, dir: "left" as Dir, enterTime: 0.6, min: 0.02, max: 600, fit: false, target: 0 }), [entrance, style, pen, lines]);
 
   // batches: pictures and timing file are matched by number; say what does not line up (for example pictures 1-20 with a file for 21-40)
-  const batchNotes = useMemo(() => (specs ? matchNotes(slides.map(s => s.n), specs) : []), [slides, specs]);
+  const batchNotes = useMemo(() => (specs ? matchNotes([...slides.map(s => s.n), ...specs.filter(sp => resolveTextSlide(sp, kinds[sp.n])).map(sp => sp.n), ...covered], specs) : []), [slides, specs, kinds, covered]);
 
   const rows: Row[] = useMemo(() => {
     const out: Row[] = [];
     let prevEnd = 0;
-    for (const s of slides) {
+    // headings and subscribe slides come from the timing file, not from pictures: when no picture has their number they still get a row (white screen, handwriting)
+    const have = new Set(slides.map(x => x.n));
+    const pics = slides.filter(x => !covered.has(x.n));   // step 5: cues under a scene clip have no picture row
+    const textOnly: Slide[] = (specs ?? []).filter(sp => !have.has(sp.n) && !covered.has(sp.n) && (resolveTextSlide(sp) || resolveTextSlide(sp, kinds[sp.n]))).map(sp => ({ key: `text-${sp.n}`, n: sp.n, name: "", file: new File([], "text"), thumb: "", status: "ok" as const }));
+    const forced: Slide[] = Object.entries(kinds).map(([n, ov]) => ({ n: +n, ov })).filter(x => !have.has(x.n) && !covered.has(x.n) && !(specs ?? []).some(sp => sp.n === x.n) && (x.ov.kind === "heading" || x.ov.kind === "subscribe")).map(x => ({ key: `text-${x.n}`, n: x.n, name: "", file: new File([], "text"), thumb: "", status: "ok" as const }));
+    const sceneSlides: Slide[] = spans.map(sp => ({ key: `scene-${sp.clip.name}`, n: sp.cues[0], name: sp.clip.name, file: sp.clip.file, thumb: "", status: "ok" as const }));
+    const all = [...pics, ...textOnly, ...forced, ...sceneSlides].sort((a, b) => a.n - b.n);
+    for (const s of all) {
+      const sc = s.key.startsWith("scene-") ? spans.find(x => `scene-${x.clip.name}` === s.key) : undefined;
+      if (sc) {
+        // new workflow step 5: a scene row. Start and end come from the timing file (first to last covered cue); the clip stays a video.
+        const tm = sceneTimes(sc.cues, specs, prevEnd, defSec);
+        prevEnd = tm.end;
+        out.push({ slide: s, start: tm.start, end: tm.end, svg: null, width: 1920, height: 1080, note: tm.fromFile ? "" : `No timing in the file for cue ${sc.cues[0]}${sc.cues.length > 1 ? `-${sc.cues[sc.cues.length - 1]}` : ""}, ${defSec * sc.cues.length} s used.`, marks: [tm.start], scene: { clip: sc.clip, cues: sc.cues } });
+        continue;
+      }
       const spec = specs?.find(x => x.n === s.n);
       const start = spec ? spec.start : prevEnd;
       const end = spec ? spec.end : start + defSec;
@@ -225,7 +279,14 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
       let svg: string | null = null, plan: SlidePlan | undefined, note = "", marks: number[] = [], parts: ReportPart[] | undefined;
       let width = 1920, height = 1080;
       if (specs && !spec) note = `No timing for image ${s.n} in the file, ${defSec} s used.`;
-      if (s.status === "ok" && s.project && s.units) {
+      const tinfo = resolveTextSlide(spec, kinds[s.n]);
+      let textKind: TextSlideKind | undefined, words: string | undefined;
+      if (tinfo) {
+        // new workflow step 2: heading / subscribe = white screen + handwritten black words, whatever the AI picture looks like. No zoom, no fade.
+        textKind = tinfo.kind; words = tinfo.words; marks = [start];
+        if (patrickFonts) { const t = buildTextSlide(tinfo.words, end - start, patrickFonts); svg = t.svg; width = t.width; height = t.height; }
+        else note = "Loading the Patrick Hand font…";
+      } else if (s.status === "ok" && s.project && s.units) {
         // v2 step 10: with panels found (and their raster crops) every panel is ONE unit; otherwise the old element logic (units from processImage) is used
         const pmatch = s.found?.panels.length ? matchPanels(s.found, spec?.panels) : null;
         const pl = s.found && pmatch ? panelLayers(s.found, pmatch) : null;
@@ -236,7 +297,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         plan = planSlide(units, p.width, p.height, end - start, local, { writeHeading, maxIdle });
         const times = layerTimes(plan, p);
         if (pl) parts = panelParts(plan, p, times, spec?.panels, start);
-        const tx = replaceText && fonts ? planTexts(plan, p, times, spec ? { heading: pl ? undefined : spec.heading, captions: spec.captions, panels: pl ? (spec.panels ?? spec.captions?.map(c => ({ label: c, start: 0 }))) : undefined } : undefined, end - start, fonts, textColor, "write") : null;
+        const tx = replaceText && patrickFonts ? planTexts(plan, p, times, spec ? { heading: pl ? undefined : spec.heading, captions: spec.captions, panels: pl ? (spec.panels ?? spec.captions?.map(c => ({ label: c, start: 0 }))) : undefined } : undefined, end - start, patrickFonts, textColor, "write") : null;
         svg = composeSvg(p, { kind: "color", color: bgColor }, { sketch: sk, times, skip: tx?.skip, extra: (tx?.markup ?? "") + (pl && s.found?.frameRaster ? frameMarkup(s.found.frameRaster) : "") });
         marks = plan.items.filter(i => i.unit.kind === "item").map(i => start + i.begin);
         const want = spec?.elements.length || spec?.expected;
@@ -244,24 +305,49 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         const cnt = pm ? pm.notes.join(" ") : countNote(plan.main, want);
         if (cnt) note = cnt;
       }
-      if (s.status === "ok" && s.panelNote) note = `Panels not used: ${s.panelNote}. The old element path is used instead.`;
-      if (s.status === "error") note = s.error ?? "";
-      out.push({ slide: s, spec, start, end, svg, width, height, plan, note, heading, marks, parts });
+      if (!tinfo && s.key.startsWith("text-")) note = "No picture for this image. Choose Heading or Subscribe (and type the words), or add the picture.";
+      if (!tinfo && s.status === "ok" && s.panelNote) note = `Panels not used: ${s.panelNote}. The old element path is used instead.`;
+      if (s.status === "error" && !tinfo) note = s.error ?? "";
+      out.push({ slide: s, spec, start, end, svg, width, height, plan, note, heading, marks, parts, textKind, words });
     }
     return out;
-  }, [slides, specs, defSec, writeAll, maxIdle, sk, bgColor, replaceText, fonts, textColor]);
+  }, [slides, specs, defSec, writeAll, maxIdle, sk, bgColor, replaceText, textColor, patrickFonts, kinds, spans, covered]);
 
+  rowsRef.current = rows;
   const total = rows.length ? rows[rows.length - 1].end : 0;
-  const done = slides.filter(s => s.status === "ok" || s.status === "error").length;
-  const failed = slides.filter(s => s.status === "error").length;
-  const ready = slides.length > 0 && done === slides.length && failed === 0;
+  const procSlides = slides.filter(s => !covered.has(s.n));   // pictures under a scene clip are not processed, so they are not waited for
+  const done = procSlides.filter(s => s.status === "ok" || s.status === "error").length;
+  const failed = procSlides.filter(s => s.status === "error").length;
+  
 
   async function exportMp4() {
     onError(""); cancel.current = false;
     const frames = Math.round(total * FPS);
     setExporting({ done: 0, total: frames });
+    void keepAlive(true);
     try {
-      const soundEvents = elementSounds ? rows.flatMap(r => (r.plan?.items ?? [])
+      // New workflow step 29: ONE progress bar for two phases. Phase 1 (inside the app only): every picture is upscaled by the phone's AI upscaler, then analysed again
+      // (so the pen plan is the same and the original-pixel crops are cut from the sharper picture). A picture that fails keeps its normal version. Phase 2: the video.
+      const todo = hasHost() && upscale ? rowsRef.current.filter(r => !r.textKind && !r.scene && r.slide.status === "ok" && !r.slide.upscaled).map(r => r.slide) : [];
+      const W_UP = todo.length ? Math.max(todo.length, Math.round(frames * 0.5)) : 0;   // upscaling gets a third of the bar
+      let failedUp = 0;
+      for (let i = 0; i < todo.length; i++) {
+        if (cancel.current) throw new Error("Export cancelled.");
+        setExporting({ done: Math.round((i / todo.length) * W_UP), total: frames + W_UP, phase: `Making picture ${i + 1} of ${todo.length} sharper` });
+        try {
+          const s = todo[i];
+          const r = await nativeCall<any>("upscale", await toBase64(s.file));
+          if (r?.error || !r?.png) throw new Error(r?.detail ?? "upscale failed");
+          const bin = atob(r.png), bytes = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+          const up = new File([bytes], s.name.replace(/\.[^.]+$/, "") + "_x2.png", { type: "image/png" });
+          const p = await processImage(up), found = await detectPanels(up);
+          setSlide(s.key, { file: up, upscaled: true, project: p, units: buildUnits(p), found, panelNote: found?.panels.length ? "" : panelsStatus || "no panels were found in this picture" });
+        } catch { failedUp++; }
+      }
+      if (todo.length) await new Promise(r => setTimeout(r, 150));   // let the page rebuild its rows from the sharper pictures
+      if (failedUp) onError(`${failedUp} picture${failedUp > 1 ? "s" : ""} could not be made sharper and ${failedUp > 1 ? "were" : "was"} used as it is.`);
+      const R = rowsRef.current;
+      const soundEvents = elementSounds ? R.flatMap(r => r.textKind || r.scene ? [{ time: r.start }] : (r.plan?.items ?? [])
         .filter(item => item.dur > 0)
         .map(item => ({ time: r.start + item.begin }))) : [];
       let clickSound: AudioBuffer | null = null;
@@ -277,19 +363,23 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
       }
       const blob = await renderMp4Timeline({
         resolution: resId,
-        slides: rows.map(r => ({ svg: r.svg!, width: r.width, height: r.height, start: r.start, end: r.end })),
+        slides: R.map(r => ({ svg: r.svg ?? "", width: r.width, height: r.height, start: r.start, end: r.end, video: r.scene?.clip.file })),   // step 7: a scene row is drawn from its clip
         audio: audioBuffer,
         clickSound,
         soundEvents,
-        onProgress: (d, t) => setExporting({ done: d, total: t }), cancelled: () => cancel.current,
+        onProgress: (d, t) => setExporting({ done: W_UP + d, total: W_UP + t, phase: todo.length ? "Drawing the video" : undefined }), cancelled: () => cancel.current,
       });
       download(`video-${resId}-${Math.round(total)}s.mp4`, blob);
     } catch (e: any) { if (!cancel.current) onError(e?.message ?? "MP4 export failed."); }
+    void keepAlive(false);
     setExporting(null);
   }
 
   const pct = exporting ? Math.round((exporting.done / Math.max(1, exporting.total)) * 100) : 0;
-  const busy = slides.length > 0 && done < slides.length;
+  const busy = procSlides.length > 0 && done < procSlides.length;
+  // a heading or subscribe slide never needs its picture, so a picture that could not be read does not block the export
+  // a heading, subscribe or scene row never needs a picture; every other row needs its analysed picture
+  const ready = rows.length > 0 && rows.every(r => r.scene || (!!r.svg && (r.textKind || r.slide.status === "ok")));
 
   return (
     <main className="vmain">
@@ -298,7 +388,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           ? <Player rows={rows} total={total} seekReq={seekReq} onIndex={setCur} />
           : (
             <div className="vview"><div className="empty vempty" onClick={() => picRef.current?.click()}>
-              <p>Drop the images (ZIP, a folder, or the pictures) and the timing JSON here</p>
+              <p>Drop the images (ZIP, a folder, or the pictures), scene videos and the timing JSON here</p>
               <span>{specs ? `Timing loaded (${specs.length} images). Now add the images.` : "Or use the two buttons on the right"}</span>
             </div></div>
           )}
@@ -311,12 +401,12 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           <button className="ghost" disabled={!!exporting} onClick={() => dirRef.current?.click()}>Images (folder)</button>
           <button className="ghost" disabled={!!exporting} onClick={() => specRef.current?.click()}>{specs ? "Change JSON" : "Timing (JSON)"}</button>
         </div>
-        <input ref={picRef} type="file" multiple accept=".zip,image/*,.svg" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+        <input ref={picRef} type="file" multiple accept=".zip,image/*,.svg,video/*,.mp4,.mov,.webm,.m4v" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <input ref={dirRef} type="file" hidden {...({ webkitdirectory: "", directory: "" } as any)} onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <input ref={specRef} type="file" accept=".json,.txt" hidden onChange={e => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <p className="hint small">
-          {slides.length ? `${slides.length} images` : "No images yet"}{specs ? `, timing for ${specs.length} images (${specName})` : ", no timing file"}
-          {busy ? ` . Finding elements: ${done} of ${slides.length}` : ""}{failed ? ` . ${failed} could not be read` : ""}
+          {slides.length ? `${slides.length} images${covered.size ? ` (${slides.filter(s => covered.has(s.n)).length} replaced by scene videos)` : ""}` : "No images yet"}{specs ? `, timing for ${specs.length} images (${specName})` : ", no timing file"}
+          {busy ? ` . Finding elements: ${done} of ${procSlides.length}` : ""}{failed ? ` . ${failed} could not be read` : ""}
         </p>
         {specs && specNotes.length + batchNotes.length > 0 && (
           <div className="hint small" style={{ color: "#b45309" }}>
@@ -327,6 +417,16 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         {!specs && slides.length > 0 && (
           <div className="row"><label className="inl">Seconds per image <input className="num" type="number" min="1" max="300" style={{ width: 70 }} value={defSec} onChange={e => setDefSec(Math.min(300, Math.max(1, +e.target.value || 10)))} /></label></div>
         )}
+
+        {(clips.length > 0 || unnamedClips.length > 0) && (<>
+          <h2>Scene videos <small>{clips.length} clip{clips.length === 1 ? "" : "s"}</small></h2>
+          <ul className="vlist">
+            {clips.map(c => <li key={c.name}><span className="meta"><b>{c.name}</b><small>{c.first === c.last ? `replaces cue ${c.first}` : `replaces cues ${c.first} to ${c.last}`}</small></span></li>)}
+          </ul>
+          {unnamedClips.length > 0 && <p className="hint small" style={{ color: "#b45309" }}>No number in the name, so not used: {unnamedClips.join(", ")}. Rename like 53.mp4 or 12-14.mp4.</p>}
+          {clipNotes(clips, specs?.map(sp => sp.n)).map((n, i) => <p key={i} className="hint small" style={{ color: "#b45309" }}>{n}</p>)}
+          <p className="hint small">A scene stays a video (it is never turned into SVG). Each scene is a row on the timeline (times from the JSON) and plays muted in the preview. Its pictures are skipped. The MP4 draws each scene frame by frame (muted, black bars, one click at its start).</p>
+        </>)}
 
         <h2>Audio</h2>
         <div className="row wrap">
@@ -358,7 +458,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
           {entrance === "draw" && <label>{lines !== "off" ? "Lines share" : "Pen share"} <span className="inl"><input type="range" min="10" max="90" step="5" value={Math.round(pen * 100)} onChange={e => setPen(+e.target.value / 100)} /> {Math.round(pen * 100)}% pen, {100 - Math.round(pen * 100)}% colour</span></label>}
           <label>Longest idle <span className="inl"><input className="num" type="number" min="1" max="30" style={{ width: 56 }} value={maxIdle} onChange={e => setMaxIdle(Math.min(30, Math.max(1, +e.target.value || 5)))} /> s</span></label>
           <label className="chk"><input type="checkbox" checked={replaceText} onChange={e => setReplaceText(e.target.checked)} /> Write headings and captions with handwriting</label>
-          {replaceText && <FontPicker value={fontId} onChange={setFontId} disabled={!!exporting} />}
+          {replaceText && <p className="hint small">Font: Patrick Hand (locked, built in). Headings, subscribe, labels and captions all use it.</p>}
           {replaceText && <label className="inl">Text colour <input type="color" value={textColor} onChange={e => setTextColor(e.target.value)} style={{ width: 44, height: 26, padding: 0, border: "1px solid #bbb" }} /></label>}
           <label className="chk"><input type="checkbox" checked={writeAll} onChange={e => setWriteAll(e.target.checked)} /> Write the heading again on every image</label>
         </div>
@@ -367,15 +467,27 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         <ul className="vlist">
           {rows.map((r, i) => (
             <li key={r.slide.key} className={(i === cur ? "sel " : "") + r.slide.status} onClick={() => setSeekReq({ t: r.start, id: Date.now() })}>
-              <img className="thumb" src={r.slide.thumb} alt="" />
+              {r.scene ? <span className="thumb" style={{ background: "#000", color: "#fff", display: "grid", placeItems: "center" }}>▶</span> : r.slide.thumb ? <img className="thumb" src={r.slide.thumb} alt="" /> : <span className="thumb" style={{ background: "#fff", border: "1px solid #bbb" }} />}
               <span className="meta">
-                <b>Image {r.slide.n} <small>{fmt(r.start)} to {fmt(r.end)}</small></b>
-                <small>{r.heading ?? r.slide.name}</small>
+                <b>{r.scene ? (r.scene.cues.length > 1 ? `Scene ${r.scene.cues[0]}-${r.scene.cues[r.scene.cues.length - 1]}` : `Scene ${r.scene.cues[0]}`) : `Image ${r.slide.n}`} <small>{fmt(r.start)} to {fmt(r.end)}</small></b>
+                <small>{r.scene ? `Video: ${r.scene.clip.name} (muted, kept as a video)` : r.textKind === "subscribe" ? `Subscribe slide: "${r.words}"` : r.textKind === "heading" ? `Heading slide: "${r.words}"` : (r.heading ?? r.slide.name)}</small>
+                {r.textKind && <small>white screen, handwritten, no zoom</small>}
+                {!r.scene && <span className="kindbox" onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                  <select aria-label={`What image ${r.slide.n} is`} value={kinds[r.slide.n]?.kind ?? "auto"} disabled={!!exporting}
+                    onChange={e => { const kind = e.target.value as KindChoice; setKinds(k => { const n = { ...k }; if (kind === "auto" && !k[r.slide.n]?.words) delete n[r.slide.n]; else n[r.slide.n] = { ...k[r.slide.n], kind }; return n; }); }}>
+                    <option value="auto">Auto</option><option value="picture">Picture</option><option value="heading">Heading</option><option value="subscribe">Subscribe</option>
+                  </select>
+                  {(r.textKind || (kinds[r.slide.n] && kinds[r.slide.n].kind !== "picture" && kinds[r.slide.n].kind !== "auto")) && (
+                    <input type="text" aria-label={`Words for image ${r.slide.n}`} placeholder={r.words ?? "type the words"} value={kinds[r.slide.n]?.words ?? ""} disabled={!!exporting}
+                      onChange={e => { const words = e.target.value; setKinds(k => ({ ...k, [r.slide.n]: { kind: k[r.slide.n]?.kind ?? "auto", words } })); }} style={{ width: 150 }} />
+                  )}
+                </span>}
+                {(kinds[r.slide.n]?.kind === "heading" || kinds[r.slide.n]?.kind === "subscribe") && !r.textKind && <small className="warnline">Type the words to write.</small>}
                 {r.spec?.text && <small title={r.spec.text} style={{ opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>{r.spec.text}</small>}
                 {r.spec?.layout && <small>{r.spec.system ? r.spec.system + " " : ""}{r.spec.layout}{r.spec.panels ? `, ${r.spec.panels.length} panels` : ""}</small>}
-                {r.slide.status === "busy" && <small>finding elements…</small>}
-                {r.slide.status === "wait" && <small>waiting</small>}
-                {r.slide.status === "ok" && r.plan && <small>{r.plan.main} elements{r.plan.fromJson ? ", times from the file" : ", spread evenly"}</small>}
+                {!r.scene && r.slide.status === "busy" && <small>finding elements…</small>}
+                {!r.scene && r.slide.status === "wait" && <small>waiting</small>}
+                {!r.textKind && r.slide.status === "ok" && r.plan && <small>{r.plan.main} elements{r.plan.fromJson ? ", times from the file" : ", spread evenly"}</small>}
                 {r.note && <small className="warnline">{r.note}</small>}
               </span>
             </li>
@@ -384,7 +496,7 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
 
         {(() => {   // v2 step 13: numbered outlines over the upload, layout name, panels found vs in the file
           const r = rows[cur];
-          if (!r?.slide.found?.panels.length) return null;
+          if (!r || r.scene || r.textKind || !r.slide.found?.panels.length) return null;   // step 9: only picture rows have a Panel check
           const chk = panelCheck(r.slide.found, matchPanels(r.slide.found, r.spec?.panels), r.spec);
           const col = (o: { listed: boolean; mismatch: boolean }) => o.mismatch ? "#d97706" : o.listed ? "#16a34a" : "#dc2626";
           const fs = Math.max(chk.width, chk.height) / 28;
@@ -409,14 +521,14 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
 
         <h2>Report <small>order and times per image</small></h2>
         {(() => {
-          const reps: ReportRow[] = rows.map(r => ({ n: r.slide.n, start: r.start, end: r.end, heading: r.heading, status: r.slide.status, elements: r.spec?.elements, captions: r.spec?.captions, plan: r.plan, note: r.note, parts: r.parts }));
+          const reps: ReportRow[] = rows.map(r => ({ n: r.slide.n, start: r.start, end: r.end, heading: r.heading, status: r.slide.status, elements: r.spec?.elements, captions: r.spec?.captions, plan: r.plan, note: r.note, parts: r.parts, kind: r.scene ? "scene" : r.textKind ?? "picture", last: r.scene ? r.scene.cues[r.scene.cues.length - 1] : undefined, label: r.scene ? r.scene.clip.name : r.words }));
           return (<>
             <div className="row">
               <button className="ghost" disabled={!rows.length} onClick={() => download("timing-report.txt", new Blob([reportText(reps)], { type: "text/plain" }))}>Download report (.txt)</button>
               <button className="ghost" disabled={!rows.length} onClick={() => download("timing-report.csv", new Blob(["\ufeff" + reportCsv(reps)], { type: "text/csv" }))}>Download (.csv)</button>
             </div>
             {reps[cur] && <pre className="report">{slideReportText(reps[cur])}</pre>}
-            {rows[cur]?.svg && (<div className="row">
+            {rows[cur]?.svg && !rows[cur].textKind && !rows[cur].scene && (<div className="row">
               <button className="ghost" onClick={async () => {
                 const r = rows[cur]; const key = r.slide.key;
                 setQuality(q => ({ ...q, [key]: "Checking..." }));
@@ -432,12 +544,13 @@ export default function VideoMode({ onError }: { onError: (m: string) => void })
         })()}
 
         <h2>Export</h2>
+        {hasHost() && !exporting && <label className="chk"><input type="checkbox" checked={upscale} onChange={e => setUpscale(e.target.checked)} /> Make every picture sharper (AI upscale) when exporting. Takes longer; the preview stays on the normal pictures.</label>}
         {!exporting && <ResolutionPicker value={resId} onChange={setResId} fps={FPS} seconds={total} />}
         {!exporting && <button style={{ marginTop: 8 }} onClick={exportMp4} disabled={!mp4Supported() || !ready || !rows.length || audioLoading}>Export {resId === "1080p" ? "1080p" : resId.toUpperCase()} MP4 ({fmt(total)})</button>}
         {exporting && (
           <div>
             <div className="bar"><div style={{ width: `${pct}%` }} /></div>
-            <p className="hint small">Making the video: frame {exporting.done} of {exporting.total} ({pct}%). Keep this window open.</p>
+            <p className="hint small">{exporting.phase ? `${exporting.phase}` : "Making the video"}: {pct}%. Keep this window open.</p>
             <button className="ghost" onClick={() => { cancel.current = true; }}>Cancel</button>
           </div>
         )}

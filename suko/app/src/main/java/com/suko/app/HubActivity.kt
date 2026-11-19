@@ -50,7 +50,7 @@ class HubActivity : ComponentActivity() {
                             startActivity(Intent(this, UpscaleImagesActivity::class.java))
                         },
                         onOpenSvgEditor = {
-                            startActivity(Intent(this, SvgEditorActivity::class.java))
+                            openWeb(SVG_EDITOR_PAGE, "SVG Editor")   // new workflow: the Video screen of the web editor, inside the app (offline)
                         },
                         onOpenTextEditor = { openWeb(TEXT_EDITOR_PAGE, "Text Editor") },
                     )
@@ -62,6 +62,9 @@ class HubActivity : ComponentActivity() {
 
 /** Step 19: the Text Editor is the Layer Studio's Text tab, opened inside the app (offline web view) with the other tabs hidden. */
 const val TEXT_EDITOR_PAGE = "web/studio/index.html?app=text"
+
+/** New workflow: the SVG Editor is the web editor's Video screen (headings, subscribe, scenes, timeline), opened inside the app with the other tabs hidden. */
+const val SVG_EDITOR_PAGE = "web/studio/index.html?app=video"
 
 /** Steps 16-18: opens a page from the app's own web assets. [sample] hands the page one small file so the smoke test can read it. */
 private fun android.app.Activity.openWeb(page: String, title: String, sample: Boolean = false) {

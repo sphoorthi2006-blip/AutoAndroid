@@ -13,7 +13,9 @@ object NativeMethods {
      * Steps 17-18: only the host itself. Picture separation ("process") and panel detection ("panels") are the Kotlin
      * vision ports of steps 26-28; until then they answer "not ready" so the Studio shows a clear reason instead of failing silently.
      */
-    fun defaults(): Map<String, NativeMethod> = mapOf(
+    fun defaults(extra: Map<String, NativeMethod> = emptyMap()): Map<String, NativeMethod> = base() + extra
+
+    private fun base(): Map<String, NativeMethod> = mapOf(
         "health" to { _ -> """{"engine":"${WebConfig.ENGINE}","ready":false}""" },
         "size" to { p -> """{"chars":${p.length}}""" },     // test helper: proves big payloads arrive whole
         "process" to { _ -> NOT_READY },

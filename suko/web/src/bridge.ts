@@ -104,3 +104,9 @@ export function goBack(): void {
   const h = host();
   if (h?.back) h.back(); else history.back();
 }
+
+/** Step 30: while a long export runs, ask the app to keep running with the screen off (a foreground service with a notification). Does nothing in a normal browser; never throws. */
+export async function keepAlive(on: boolean): Promise<void> {
+  if (!hasHost()) return;
+  try { await nativeCall("keepalive", on ? "1" : "0"); } catch { /* the export still works, only without the screen-off protection */ }
+}

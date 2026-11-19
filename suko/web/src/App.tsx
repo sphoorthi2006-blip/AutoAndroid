@@ -56,6 +56,8 @@ function Studio() {
   const [project, setProject] = useState<Project | null>(null);
   // Inside the Bezalel app the Text Editor card opens this page as ...index.html?app=text: text mode only, no Image/Video tabs.
   const textOnly = useMemo(() => { try { return new URLSearchParams(window.location.search).get("app") === "text"; } catch { return false; } }, []);
+  // Inside the Bezalel app the SVG Editor card opens this page as ...index.html?app=video: the Video screen only (VideoMode), no Image/Text tabs.
+  const videoOnly = useMemo(() => { try { return new URLSearchParams(window.location.search).get("app") === "video"; } catch { return false; } }, []);
   const [mode, setModeRaw] = useState<"image" | "text" | "video">(textOnly ? "text" : "video");
   const setMode = setModeRaw;
   const [imgBg, setImgBg] = useState<Background>({ kind: "color", color: "#ffffff" });
@@ -180,8 +182,8 @@ function Studio() {
   return (
     <div className="app">
       <header>
-        <h1>{textOnly ? "Text Editor" : "Image Layer Studio"}</h1>
-        {!textOnly && <div className="tabs">
+        <h1>{textOnly ? "Text Editor" : videoOnly ? "SVG Editor" : "Image Layer Studio"}</h1>
+        {!textOnly && !videoOnly && <div className="tabs">
           <button className={mode === "image" ? "tab on" : "tab"} disabled={busyAny} onClick={() => setMode("image")}>Image</button>
           <button className={mode === "text" ? "tab on" : "tab"} disabled={busyAny} onClick={() => setMode("text")}>Text</button>
           <button className={mode === "video" ? "tab on" : "tab"} disabled={busyAny} onClick={() => setMode("video")}>Video</button>

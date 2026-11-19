@@ -66,6 +66,11 @@ jobs:
           npm ci --no-audit --no-fund
           npm test
           npx tsc --noEmit
+      - name: Check the picture analyser (desktop Python code) on the real reference pictures
+        run: |
+          set -o pipefail
+          python3 -m pip install --quiet numpy opencv-python-headless pillow
+          python3 -I app/src/test/python/check_engine.py app/src/main/python docs/reference
       - name: Build the web screens into the app (Studio and Text Editor)
         run: |
           set -o pipefail

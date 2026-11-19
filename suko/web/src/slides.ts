@@ -498,7 +498,11 @@ export function layerTimes(plan: SlidePlan, p: Project): Map<string, { begin: nu
 /** What the report needs to know about one image. All times are seconds on the video clock. */
 /** v2 step 12: one label / caption box of a panel, with its own time on the video clock (report rows for panel parts). */
 export interface ReportPart { k: number; role: "label" | "caption"; begin: number; end: number; text: string; kept: boolean }
-export interface ReportRow { n: number; start: number; end: number; heading?: string; status: string; elements?: number[]; captions?: string[]; plan?: SlidePlan; note?: string; parts?: ReportPart[] }
+/** New workflow step 9: what a row is. A picture is drawn by hand; a heading or subscribe slide is handwritten words on white; a scene is a video clip. `last` is the last cue a scene covers; `label` the words or the clip name. */
+export type RowKind = "picture" | "heading" | "subscribe" | "scene";
+export interface ReportRow { n: number; start: number; end: number; heading?: string; status: string; elements?: number[]; captions?: string[]; plan?: SlidePlan; note?: string; parts?: ReportPart[]; kind?: RowKind; last?: number; label?: string }
+const rowName = (r: ReportRow): string => (r.last !== undefined && r.last > r.n ? `${r.n}-${r.last}` : String(r.n));
+const kindTag = (r: ReportRow): string => (r.kind && r.kind !== "picture" ? ` (${r.kind})` : "");
 
 /** The label and caption box of every panel unit of a plan, with times (absolute: `start` + local) and whether their words come from the file (`kept` = the picture's own lettering stays). */
 export function panelParts(plan: SlidePlan, p: Project, times: Map<string, { begin: number; dur: number; pause: number }>, panels: PanelSpec[] | undefined, start: number): ReportPart[] {
@@ -523,6 +527,10 @@ const r2 = (v: number) => (Math.round(v * 100) / 100).toFixed(2);
  *  an element that starts later than its script time, two units that overlap, or a unit that ends after the image does. */
 export function slideLines(r: ReportRow): { lines: ReportLine[]; problems: string[] } {
   const lines: ReportLine[] = [], problems: string[] = [];
+  if (r.kind && r.kind !== "picture") {   // step 9: no pictures to analyse; one line says what the row is
+    lines.push({ slide: r.n, step: r.kind === "scene" ? "V" : r.kind === "subscribe" ? "S" : "H", kind: r.kind, begin: r.start, end: r.end, script: null, diff: null, text: r.label ?? "", flag: "" });
+    return { lines, problems };
+  }
   if (!r.plan) { if (r.status !== "ok") problems.push(`not analysed (${r.status})`); return { lines, problems }; }
   let k = 0, prevEnd = r.start;
   r.plan.items.forEach((it, i) => {
@@ -556,12 +564,12 @@ export function slideLines(r: ReportRow): { lines: ReportLine[]; problems: strin
 /** Plain-text report of one image. */
 export function slideReportText(r: ReportRow): string {
   const { lines, problems } = slideLines(r);
-  const out = [`IMAGE ${r.n}   ${r2(r.start)} to ${r2(r.end)} s   (${r2(r.end - r.start)} s)${r.heading ? `   heading: "${r.heading}"` : ""}`];
+  const out = [`IMAGE ${rowName(r)}${kindTag(r)}   ${r2(r.start)} to ${r2(r.end)} s   (${r2(r.end - r.start)} s)${r.heading ? `   heading: "${r.heading}"` : ""}`];
   if (!lines.length) out.push("  " + (problems[0] ?? "nothing to draw"));
   else {
     out.push("  step  kind     begin    end   script   diff  text");
     for (const l of lines) out.push(`  ${l.step.padEnd(4)}  ${l.kind.padEnd(7)} ${r2(l.begin).padStart(6)} ${r2(l.end).padStart(6)} ${(l.script === null ? "-" : r2(l.script)).padStart(7)} ${(l.diff === null ? "-" : (l.diff >= 0 ? "+" : "") + r2(l.diff)).padStart(6)}  ${l.text}${l.flag ? `   <-- ${l.flag}` : ""}`);
-    out.push(problems.length ? `  CHECK: ${problems.length} thing${problems.length > 1 ? "s" : ""} to look at` : "  OK: every element starts at its script time, nothing overlaps");
+    out.push(problems.length ? `  CHECK: ${problems.length} thing${problems.length > 1 ? "s" : ""} to look at` : (r.kind && r.kind !== "picture" ? "  OK: not a drawn picture, nothing to check" : "  OK: every element starts at its script time, nothing overlaps"));
   }
   return out.join("\n");
 }
@@ -569,16 +577,16 @@ export function slideReportText(r: ReportRow): string {
 /** Plain-text report of all images, with a one-line summary per image on top. */
 export function reportText(rows: ReportRow[]): string {
   const all = rows.map(r => ({ r, p: slideLines(r).problems }));
-  const head = [`Timing report: ${rows.length} images, ${all.filter(a => a.p.length).length} to look at`, ...all.map(a => `  Image ${a.r.n}: ${a.p.length ? "CHECK, " + a.p[0] + (a.p.length > 1 ? ` (+${a.p.length - 1} more)` : "") : "OK"}`), ""];
+  const head = [`Timing report: ${rows.length} images, ${all.filter(a => a.p.length).length} to look at`, ...all.map(a => `  Image ${rowName(a.r)}${kindTag(a.r)}: ${a.p.length ? "CHECK, " + a.p[0] + (a.p.length > 1 ? ` (+${a.p.length - 1} more)` : "") : "OK"}`), ""];
   return head.join("\n") + "\n" + rows.map(slideReportText).join("\n\n") + "\n";
 }
 
 /** One CSV row per drawn unit (open it in a spreadsheet and set it beside the canvases). */
 export function reportCsv(rows: ReportRow[]): string {
   const q = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const out = ["image,image_start,image_end,step,kind,begin,end,script_time,diff,text,flag"];
+  const out = ["image,image_start,image_end,image_kind,step,kind,begin,end,script_time,diff,text,flag"];
   for (const r of rows) for (const l of slideLines(r).lines)
-    out.push([r.n, r2(r.start), r2(r.end), l.step, l.kind, r2(l.begin), r2(l.end), l.script === null ? "" : r2(l.script), l.diff === null ? "" : r2(l.diff), q(l.text), q(l.flag)].join(","));
+    out.push([rowName(r), r2(r.start), r2(r.end), r.kind ?? "picture", l.step, l.kind, r2(l.begin), r2(l.end), l.script === null ? "" : r2(l.script), l.diff === null ? "" : r2(l.diff), q(l.text), q(l.flag)].join(","));
   return out.join("\r\n") + "\r\n";
 }
 
@@ -669,4 +677,71 @@ export function planPanelTexts(plan: SlidePlan, p: Project, times: Map<string, {
     }
   }
   return res;
+}
+
+/* ------------------------------------------------------------------ scene clips (videos) ------------------------------------------------------------------ */
+
+/** A scene clip: a video that replaces the pictures of cues `first` to `last` (same naming rule as the Auto Editor's CueNames.clipRange). */
+export interface Clip { name: string; first: number; last: number; file: File }
+const VID = /\.(mp4|mov|mkv|webm|m4v|avi)$/i;
+const VMIME: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime", mkv: "video/x-matroska", webm: "video/webm", m4v: "video/mp4", avi: "video/x-msvideo" };
+export const isVideoName = (name: string): boolean => VID.test(name);
+
+/** "53.mp4", "n53.mp4", "scene_53.mp4" -> 53..53; "12-14.mp4" -> 12..14. With several numbers the LAST number or range wins. Leading zeros are ignored.
+ *  null when the name has no number, or the range runs backwards (14-12). */
+export function clipRange(fileName: string): { first: number; last: number } | null {
+  const stem = (fileName.split(/[\\/]/).pop() ?? fileName).replace(/\.[^.]+$/, "");
+  const all = [...stem.matchAll(/(\d+)(?:\s*[-\u2013]\s*(\d+))?/g)];
+  const m = all[all.length - 1];
+  if (!m) return null;
+  const a = parseInt(m[1], 10), b = m[2] === undefined ? a : parseInt(m[2], 10);
+  return Number.isFinite(a) && Number.isFinite(b) && b >= a ? { first: a, last: b } : null;
+}
+
+/** Loose videos and videos inside ZIPs. Videos whose name has no readable number are returned in `unnamed` (shown to the owner, never guessed). macOS junk and hidden files are skipped. */
+export async function readClips(files: File[]): Promise<{ clips: Clip[]; unnamed: string[] }> {
+  const found: { name: string; file: File }[] = [];
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name) || f.type === "application/zip" || f.type === "application/x-zip-compressed") {
+      const zip = await JSZip.loadAsync(f);
+      for (const [path, entry] of Object.entries(zip.files)) {
+        if (entry.dir || /(^|\/)(__MACOSX|\.)/.test(path) || !VID.test(path)) continue;
+        const base = path.split("/").pop()!, ext = base.split(".").pop()!.toLowerCase();
+        found.push({ name: base, file: new File([await entry.async("blob")], base, { type: VMIME[ext] ?? "video/mp4" }) });
+      }
+    } else if (VID.test(f.name) || f.type.startsWith("video/")) found.push({ name: f.name, file: f });
+  }
+  const clips: Clip[] = [], unnamed: string[] = [];
+  for (const { name, file } of found) { const r = clipRange(name); if (r) clips.push({ name, ...r, file }); else unnamed.push(name); }
+  clips.sort((a, b) => a.first - b.first || a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return { clips, unnamed };
+}
+
+/** Plain-language notes about the clips: overlapping ranges, and clips that cover a number the timing file does not have. */
+export function clipNotes(clips: Clip[], specNs?: number[]): string[] {
+  const notes: string[] = [];
+  const list = [...clips].sort((a, b) => a.first - b.first);
+  list.forEach((c, i) => { const p = list[i - 1]; if (p && c.first <= p.last) notes.push(`${p.name} (cues ${p.first}-${p.last}) and ${c.name} (cues ${c.first}-${c.last}) cover the same cue. The first one is used.`); });
+  if (specNs?.length) { const have = new Set(specNs); for (const c of list) { const miss: number[] = []; for (let n = c.first; n <= c.last; n++) if (!have.has(n)) miss.push(n); if (miss.length) notes.push(`${c.name}: the timing file has no image ${ranges(miss)}.`); } }
+  return notes;
+}
+
+/** New workflow step 5: which cues each scene clip takes. A cue belongs to the FIRST clip that names it (clips overlapping an earlier clip lose the shared cues;
+ *  a clip left with no cue is dropped). Those cues are shown as the video, so their pictures are never processed. */
+export interface SceneSpan { clip: Clip; cues: number[] }
+export function sceneSpans(clips: Clip[]): SceneSpan[] {
+  const taken = new Set<number>(), out: SceneSpan[] = [];
+  for (const clip of [...clips].sort((a, b) => a.first - b.first || a.name.localeCompare(b.name, undefined, { numeric: true }))) {
+    const cues: number[] = [];
+    for (let n = clip.first; n <= Math.min(clip.last, clip.first + 5000); n++) if (!taken.has(n)) { taken.add(n); cues.push(n); }
+    if (cues.length) out.push({ clip, cues });
+  }
+  return out;
+}
+
+/** Start and end (seconds) of a scene row: from the timing file (first covered cue's start to last covered cue's end); with no timing entry the row follows the one before it, `defSec` per cue. */
+export function sceneTimes(cues: number[], specs: { n: number; start: number; end: number }[] | null | undefined, prevEnd: number, defSec: number): { start: number; end: number; fromFile: boolean } {
+  const hit = (specs ?? []).filter(sp => cues.includes(sp.n));
+  if (!hit.length) return { start: prevEnd, end: prevEnd + defSec * cues.length, fromFile: false };
+  return { start: Math.min(...hit.map(h => h.start)), end: Math.max(...hit.map(h => h.end)), fromFile: true };
 }

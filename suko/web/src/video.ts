@@ -81,9 +81,26 @@ function loadSvg(text: string): Promise<HTMLImageElement> {
 
 export interface Mp4Options { svg: string; width: number; height: number; seconds: number; fps?: number; resolution?: string; onProgress?: (done: number, total: number) => void; cancelled?: () => boolean }
 /** One image of a longer video: its animated drawing and where it sits on the video clock. */
-export interface TimelineSlide { svg: string; width: number; height: number; start: number; end: number }
+/** `video` (new workflow step 7): a scene clip. It is drawn frame by frame (seek, then copy the frame), muted, letterboxed with black bars, in place of the SVG. */
+export interface TimelineSlide { svg: string; width: number; height: number; start: number; end: number; video?: Blob }
+/** One opened scene clip: `seek` moves to a time (seconds into the clip) and resolves when the frame is ready; `draw` copies that frame into a box. */
+export interface SceneSource { duration: number; width: number; height: number; seek(t: number): Promise<void>; draw(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void; close(): void }
+export type SceneOpener = (clip: Blob) => Promise<SceneSource>
+
+/** The real opener: a hidden <video> element of the web view (muted; nothing is played, every frame is a seek). A seek that never answers is given up after 3 s so an export cannot hang. */
+export const openSceneDom: SceneOpener = async clip => {
+  const url = URL.createObjectURL(clip), v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+  await new Promise<void>((ok, no) => { v.onloadeddata = () => ok(); v.onerror = () => no(new Error("This phone's web view could not read a scene video. Try an MP4 (H.264) clip.")); });
+  return {
+    duration: Number.isFinite(v.duration) ? v.duration : 0, width: v.videoWidth || 1920, height: v.videoHeight || 1080,
+    seek: t => new Promise<void>(ok => { if (Math.abs(v.currentTime - t) < 0.0005) return ok(); const done = () => { v.onseeked = null; clearTimeout(h); ok(); }; const h = setTimeout(done, 3000); v.onseeked = done; v.currentTime = t; }),
+    draw: (c, x, y, w, h) => c.drawImage(v, x, y, w, h),
+    close: () => { v.removeAttribute("src"); v.load(); URL.revokeObjectURL(url); },
+  };
+};
 export interface SoundEvent { time: number }
-export interface TimelineOptions { slides: TimelineSlide[]; fps?: number; resolution?: string; audio?: AudioBuffer | null; clickSound?: AudioBuffer | null; soundEvents?: SoundEvent[]; onProgress?: (done: number, total: number) => void; cancelled?: () => boolean }
+export interface TimelineOptions { slides: TimelineSlide[]; fps?: number; resolution?: string; audio?: AudioBuffer | null; clickSound?: AudioBuffer | null; soundEvents?: SoundEvent[]; onProgress?: (done: number, total: number) => void; cancelled?: () => boolean; openScene?: SceneOpener }
 
 export const mp4Supported = () => typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined";
 
@@ -263,16 +280,26 @@ export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d", { alpha: false })!;
-  let si = -1, scrub: Scrubber | null = null, lastSvg = "";
+  let si = -1, scrub: Scrubber | null = null, lastSvg = "", scene: SceneSource | null = null;
 
   for (let i = 0; i < total; i++) {
-    if (o.cancelled?.()) { enc.close(); throw new Error("Export cancelled."); }
+    if (o.cancelled?.()) { scene?.close(); enc.close(); throw new Error("Export cancelled."); }
     if (encErr) throw encErr;
     const t = i / fps;
     let j = si < 0 ? 0 : si;
     while (j + 1 < slides.length && t >= slides[j].end - 1e-9) j++;
-    if (j !== si) { si = j; scrub = new Scrubber(slides[j].svg); lastSvg = ""; }
+    if (j !== si) {
+      si = j; lastSvg = ""; scene?.close(); scene = null;
+      scrub = slides[j].video ? null : new Scrubber(slides[j].svg);
+      if (slides[j].video) scene = await (o.openScene ?? openSceneDom)(slides[j].video!);
+    }
     const sl = slides[si];
+    if (scene) {   // new workflow step 7: a scene clip: seek to this frame's moment (the last frame is held if the slot is longer than the clip), black bars around it
+      await scene.seek(Math.min(Math.max(0, t - sl.start), Math.max(0, scene.duration - 0.04)));
+      ctx.fillStyle = "#000000"; ctx.fillRect(0, 0, W, H);
+      const fit = fitInto(scene.width, scene.height, W, H);
+      scene.draw(ctx, fit.x, fit.y, fit.w, fit.h);
+    } else {
     const svg = scrub!.at(Math.max(0, t - sl.start));
     if (svg !== lastSvg) {            // a frame that looks like the one before is not drawn again (pauses and holds are fast)
       const img = await loadSvg(svg);
@@ -281,12 +308,14 @@ export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
       ctx.drawImage(img, fit.x, fit.y, fit.w, fit.h);
       lastSvg = svg;
     }
+    }
     const frame = new VideoFrame(canvas, { timestamp: plan.stamp(i), duration: plan.duration });
     enc.encode(frame, { keyFrame: i % plan.keyEvery === 0 });
     frame.close();
     while (enc.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 5));   // do not pile up frames in memory
     if (i % 5 === 0) { o.onProgress?.(i + 1, total); await new Promise(r => setTimeout(r, 0)); }
   }
+  scene?.close();
   await enc.flush();
   enc.close();
   if (encErr) throw encErr;

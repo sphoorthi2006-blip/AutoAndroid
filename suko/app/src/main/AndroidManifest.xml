@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -44,6 +48,9 @@
             android:label="Web"
             android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
+
+        <!-- Step 30: keeps long exports running with the screen off -->
+        <service android:name="com.suko.app.web.ExportKeepAliveService" android:exported="false" android:foregroundServiceType="dataSync" />
 
         <!-- Intake test (step 8) -->
         <activity

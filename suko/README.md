@@ -1,4 +1,4 @@
-# Bezalel Android app (formerly "Suko"; folder and package are still `suko` / `com.suko.app` on purpose) (main roadmap: steps 1-24; step 21 skipped; steps 25-30 pending)
+# Bezalel Android app (formerly "Suko"; folder and package are still `suko` / `com.suko.app` on purpose) (old roadmap 1-24 done; 25-30 reopened 2026-11-19 and worked in the same session: 26-30 + 7 all DONE IN SOURCE, NOT YET BUILT ON GITHUB; see "WHERE WE ARE" below)
 
 One Android app with three tools. Everything runs inside the app: no website, no server, no internet.
 
@@ -16,9 +16,17 @@ One Android app with three tools. Everything runs inside the app: no website, no
 3. Run each test suite once at the end. Say plainly what was verified and what was NOT (the sandbox has no Android toolchain, so the APK is built by GitHub Actions. Pure-Kotlin logic CAN be compiled and run in the sandbox: download `kotlin-compiler-2.0.21.zip` from the JetBrains GitHub release, and use a tiny stand-in for JUnit, because Maven is not reachable).
 4. **At the end of every step:** update the PROGRESS table and "Last finished step", then give the owner the full source ZIP (no `build/`, no `.gradle/`) and a short test list for that step.
 5. Short replies: what changed, what passed, what is next.
+6. **README IS THE HANDOVER (owner rule, 2026-11-19):** after EVERY finished step, before replying, update this file so the next Claude session (a different model with no memory of this chat) can continue from it alone: the step's row (DONE / part done / todo, with test counts), the "Done / Next" lines, "WHAT IS TO BE DONE", what was verified and what was NOT, and any decision or blocker the owner made or still owes. Never leave the README behind the code.
+
+## WHERE WE ARE (read this first; updated 2026-11-19, end of the big session)
+**The picture-to-animation converter (old steps 26-28) is now IN THE APP SOURCE, but has never been built or run on Android.** Method (decided to save credits and avoid a risky rewrite): the desktop Image Layer Studio v0.15.7 Python code (`panels.py`, `raster.py`, `reveal.py`, `ink.py`, `segment.py`, `vectorize.py`) is copied unchanged into `app/src/main/python/ils/` and runs inside the app through **Chaquopy** (Python 3.11 + numpy + opencv-python-headless + pillow). `ils/engine.py` = the desktop's `/api/process` and `/api/panels` as plain functions (FastAPI removed) with one entry point `run(method, base64, raster)`; `web/PhoneEngine.kt` calls it for the bridge methods `process` and `panels` (they no longer answer NOT_READY in the app; the JVM test still checks the NOT_READY default). `vtracer` (Rust) is NOT available on Android: `vectorize.py` returns EMPTY traced groups without it. That is fine for the app because it always asks with raster=1 (the picture is drawn from the ORIGINAL-pixel crops, the traced groups are not used). Never call `process` with raster=0 in the app.
+- **Verified in the sandbox (desktop Python, same files):** `app/src/test/python/check_engine.py` = 14 checks on the four REAL reference pictures (`docs/reference/`, ref4 = garden/bread layout with no frame and no arrows, added 2026-11-19): ref1 6/6 panels, ref2 5/5, ref3 5/5 with 3/3 arrows each, ref4 5/5 with 0 arrows, every panel has its raster crop and pen plan, `process` gives layers with crops, a broken file gives a clear "unreadable" answer. Speed on the sandbox CPU: 3-8 s per picture (a phone will be slower).
+- **NOT verified (needs the GitHub build and a phone):** that Chaquopy 16.0.0 works with AGP 8.5.2 here, that the numpy/opencv wheels exist for Python 3.11 arm64 (Chaquopy's pip repo; if the build fails on a missing wheel, pin another version or Python in `chaquopy { defaultConfig { ... } }` in `app/build.gradle.kts`), the `PhoneEngine.kt` Kotlin (never compiled), real speed and memory on a phone, APK size (Python + OpenCV add roughly 60-100 MB).
+- **Changes you must know:** (1) the app is now **arm64-v8a only** (`abiFilters`), dropped `armeabi-v7a` (Chaquopy wheels; modern phones are arm64). (2) New CI step "Check the picture analyser" runs `check_engine.py` with pip numpy/opencv. (3) `docs/reference/` (the 4 real pictures) is now in this repo. (4) `settings.gradle.kts` adds the `https://chaquo.com/maven` repository.
+- **Still NOT done:** **A4** (phone test of speed/memory), the signed release APK needs the owner's keystore (see step 30 row), and everything here must first be built by GitHub. Steps 29 and 30 code exists but was never run.
 
 ## PROGRESS  <-- update at the end of every step
-Last finished step: **23 of 30** (1-20, 22, 23 done; **21 skipped on purpose**, see below). Also done out of order: **24**. Next: **25** (SVG Editor 2: rough preview with Panel check). The Layer Studio source (v0.15.7) is now in `web/`; the Python vision code (`panels.py`, `raster.py`, `reveal.py`, `ink.py`, `segment.py`) is read from the Image Layer Studio zip when steps 26-28 come.
+OLD ROADMAP: steps 1-24 DONE (21 skipped on purpose). **Steps 25-30 are OPEN AGAIN (owner decision 2026-11-19).** The owner had closed them believing the picture-to-animation converter was finished; it is NOT (see KNOWN GAP above). Steps 26-28 ARE the converter (= plan A1-A3 in the NEW WORKFLOW section); do them, then 25, 29 and 30. The Layer Studio source (v0.15.7) is in `web/`; the Python vision code (`panels.py`, `raster.py`, `reveal.py`, `ink.py`, `segment.py`) must be read from the Image Layer Studio zip, which the owner still has to send.
 
 | # | Step | Status | Where |
 |---|---|---|---|
@@ -47,15 +55,56 @@ Last finished step: **23 of 30** (1-20, 22, 23 done; **21 skipped on purpose**, 
 | 23 | Text Editor 5: export 1080p at 30/60 fps | DONE for the WebCodecs path (24 export checks pass with a fake encoder); real phone speed NOT measured; native GL fallback NOT built | `web/src/video.ts`, `App.tsx` |
 | 24 | Export sizes 1080p / 2K / 4K and font upload | DONE in the web source; CI rebuilds the web bundle (`npm run build:suko`). 4K speed and memory NOT measured on a phone | `web/src/video.ts`, `FontPicker.tsx`, `fontStore.ts`, `ResolutionPicker.tsx` |
 | 24 | SVG Editor 1: intake (images + JSON) using the shared intake | DONE (rules: 5 tests pass; screen never compiled) | `VideoMode.tsx` |
-| 25 | SVG Editor 2: rough preview with Panel check (panels found vs JSON) | todo | `panelmatch.ts` |
-| 26 | Vision 1: port `panels.py` to Kotlin + OpenCV Android, check against `docs/reference` | todo | `vision/` |
-| 27 | Vision 2: port `raster.py` and `reveal.py` | todo | `vision/` |
-| 28 | Vision 3: port `ink.py` and `segment.py` (decide about `vtracer` fallback) | todo | `vision/` |
-| 29 | SVG Editor 3: export: upscale, then render, one progress bar | todo | `web/`, `vision/` |
-| 30 | Polish: one theme, background service while exporting, icon, release APK | todo |  |
+| 25 | SVG Editor 2: rough preview with Panel check (panels found vs JSON) | DONE in source (the Video screen's Panel check uses the analyser now; NOT seen on a phone) | `panelmatch.ts`, `VideoMode.tsx` |
+| 26 | Vision 1: port `panels.py` to Kotlin + OpenCV Android, check against `docs/reference` | DONE in source via the desktop Python through Chaquopy (A1; 11 sandbox checks on the real reference pictures pass; Android build NOT run) | `app/src/main/python/ils/panels.py`, `engine.py`, `PhoneEngine.kt` |
+| 27 | Vision 2: port `raster.py` and `reveal.py` | DONE in source (A2): `raster.py` + `reveal.py` run the same way | `app/src/main/python/ils/` |
+| 28 | Vision 3: port `ink.py` and `segment.py` (decide about `vtracer` fallback) | DONE in source (A3): `ink.py` + `segment.py` run the same way; `vtracer` is not on Android, traced groups are empty, the app uses raster crops (decided) | `app/src/main/python/ils/` |
+| 29 | SVG Editor 3: export: upscale, then render, one progress bar | DONE in source, NEVER RUN: at Export inside the app (checkbox, default ON) every picture goes through the AI upscaler (`upscale` bridge method, `PhoneEngine.kt`), is analysed again, then the MP4 is drawn; ONE bar (upscale = first third); a picture that fails keeps its normal version. NOT done: cache of upscaled pictures between exports (a second export upscales again), the Auto Editor's `Upscaler` cancel mid-picture | `VideoMode.tsx` `exportMp4`, `PhoneEngine.kt` |
+| 30 | Polish: one theme, background service while exporting, icon, release APK | DONE in source (never built): background service while exporting (`web/ExportKeepAliveService.kt`: foreground service + wake lock, started/stopped by the page via bridge method `keepalive`, used by the Video and Text editors' exports; manifest permissions added), release signing from environment variables (`BEZALEL_KEYSTORE`, `BEZALEL_STORE_PASSWORD`, `BEZALEL_KEY_ALIAS`, `BEZALEL_KEY_PASSWORD`; without them release falls back to the debug key). The icon and the one dark theme (`Theme.Bezalel`) already existed; no new icon was designed. The CI still builds the DEBUG apk; a signed release needs the owner's keystore as GitHub secrets and a release step (not added) | `ExportKeepAliveService.kt`, `PhoneEngine.kt`, `bridge.ts`, `build.gradle.kts` |
 
 (The owner may ask for several steps in one session; then do them in order and test once at the end.)
+(This README lives INSIDE the source ZIP at `Bezalel/suko/README.md`; always update it there and ship the whole ZIP. Never hand over a separate README.)
 (The old 13-step plan was split into 30 smaller steps in session 3. Steps 1-2 are unchanged.)
+
+## NEW WORKFLOW: flexible SVG Editor (scenes + headings, like the Auto Editor)  <-- update at the end of every step
+Started 2026-11-19. Goal: the SVG Editor (`web/src/VideoMode.tsx`) works like the Auto Editor. Scenes are videos and stay videos (never turned into SVG). Heading and subscribe slides are NOT AI pictures: they are a plain white screen with black Patrick Hand words **written by hand** (the Text Editor's pen engine `textParts`). **No zoom, no fade, no box, no colour.** All lettering is Patrick Hand.
+Done in source: **1-9** and **10 part 1** (7 added in the big session). Left: 10 part 2 check, then the phone tests.
+
+**WHAT IS TO BE DONE (updated 2026-11-19, end of the big session):**
+1. **Push to GitHub and read the Actions result.** The Chaquopy/Python/Kotlin parts were never built. If red, paste the red text to Claude; most likely causes: Chaquopy wheels (numpy/opencv for Python 3.11 arm64), AGP/Chaquopy version match, `PhoneEngine.kt` compile errors.
+2. **Phone test list** (below): picture slides analysed in the app, scene video preview and export, upscale at export.
+3. **Release APK:** add the owner's keystore as GitHub secrets (BEZALEL_KEYSTORE etc.) and a release step in the workflow when a signed APK is wanted. Step 30's other parts are done in source.
+4. **A4:** measure analysis speed and memory on a real phone; decide whether to lower MAX_SIDE (1600 in `engine.py`) or analyse one picture at a time with a warning.
+5. Optional later: the Android intake handoff for the SVG Editor (see step 10).
+
+| # | Step | Status | Where |
+|---|---|---|---|
+| 1 | Detect heading and subscribe canvases from the timing JSON (svg-bh heading canvas = one parchment panel, empty label, verse; subscribe = mentions "subscribe"; numbered line; `system: "heading"`). Verse canvases with a label, scenes and normal canvases stay pictures | DONE (10 detection tests pass) | `web/src/textslide.ts` `classifyTextSlide` |
+| 2 | Handwritten white slide: 1920x1080 white, black Patrick Hand, pen follows the letter strokes (borrowed from the Text Editor), no zoom, no fade; used in the preview, the image list and the MP4 export; one click at its start; its AI picture is not needed for export | DONE (12 slide tests pass; NOT yet seen on a phone) | `web/src/textslide.ts` `buildTextSlide`, `VideoMode.tsx` |
+| 3 | Manual control per row: choose Auto / Picture / Heading / Subscribe and edit the words (when the JSON is missing or wrong). Works with no timing entry and no picture | DONE (8 override tests pass; not seen on a phone) | `textslide.ts` `resolveTextSlide`, `VideoMode.tsx` |
+| 4 | Intake accepts scene videos (mp4, mov, mkv, webm, m4v, avi; loose, in a ZIP or a folder); the clip name gives the cue range (`53.mp4`, `12-14.mp4`, last number wins, like `CueNames.clipRange`). Listed in the sidebar with notes for overlaps and missing cues. NOT yet on the timeline (step 5) | DONE (12 name tests pass; Android intake screen is step 10) | `slides.ts` `clipRange`/`readClips`/`clipNotes`, `VideoMode.tsx` |
+| 5 | Scene rows on the timeline: a clip replaces the images of its range, those images are NOT processed into SVG (saves the backend), start/end come from the JSON (first covered cue start to last covered cue end; no entry: follows the row before, default seconds per cue). A cue belongs to the first clip that names it. Export is OFF while a scene is in the project (until step 7) | DONE (9 scene tests pass; not seen on a phone) | `slides.ts` `sceneSpans`/`sceneTimes`, `VideoMode.tsx` |
+| 6 | Preview plays the scene video in step with the playhead (muted, letterboxed with black bars; last frame held if the slot is longer than the clip; clip cut if longer than the slot) | DONE (browser video code, NOT tested: no real video or phone here) | `VideoMode.tsx` `SceneVideo`, Player |
+| 7 | MP4 export draws scene frames (seek per frame, letterbox, muted); clicks follow the clip-aware plan | DONE (6 export checks with a fake encoder pass: seek + draw per frame, last frame held, cancel closes the clip; the real <video> seek path NOT tested)  | `video.ts` |
+| 8 | Labels and captions: Patrick Hand locked in the Video tab (font picker removed there; the Text tab keeps it); verse/parchment text unchanged | DONE | `VideoMode.tsx` |
+| 9 | Timing report and CSV show the kind of every row (picture, heading, subscribe, scene); Panel check and the last-frame check skip non-picture rows. CSV has a new column `image_kind` after `image_end`; a scene row's image is e.g. `3-5` | DONE (6 report tests pass) | `slides.ts` `RowKind`, `VideoMode.tsx` |
+| 10 | Wire the same flow into the Android SVG Editor screen (part 1 DONE: the SVG Editor card opens the web editor's Video screen INSIDE the app, `?app=video`, like the Text Editor card; never compiled), full test run, README, source ZIP | part 1 done; the web screen has the whole flow now. NOT checked: whether the native shared-intake files (`inputFiles()`) reach it (it has its own file buttons) | `SvgEditorActivity.kt`, tests |
+
+IMPORTANT: inside the app the picture engine (`process`, `panels` in `BridgeCore.kt`) still answers NOT_READY, so normal PICTURE slides cannot be analysed on the phone yet. Headings, subscribe slides and scene videos do not need it. Owner decided: build the analyser (see DECIDED below).
+
+### DECIDED by the owner on 2026-11-19: build the picture analyser for the phone (option 2). DONE IN SOURCE (see WHERE WE ARE)
+Normal picture slides get the same hand-drawn panel animation as the desktop. Plan A1-A3 (= old steps 26-28) were done in one go by running the desktop Python through Chaquopy instead of porting it to Kotlin + OpenCV Android. A4 (phone check: speed, memory, cancel) is still todo and needs the phone.
+
+Verified (sandbox, end of the big session): `npm test` = 290 checks pass (re-run after step 30) (units, bridge, text, export incl. 6 scene-clip checks, text slides, clips, scenes/report), `tsc --noEmit` clean, web bundle rebuilt (`npm run build:suko`); `python3 -I app/src/test/python/check_engine.py app/src/main/python docs/reference` = 14 checks pass (desktop Python on the 4 real reference pictures). NOT verified: the Android build (CI is the compiler: Chaquopy, numpy/opencv wheels, `PhoneEngine.kt`, `upscale` Kotlin), anything on a phone (analysis speed and memory, scene video preview and export, the AI upscale at export, the look), a real `<video>` seek during export.
+
+### Phone test list for the big session (steps 25-29, 7)
+1. GitHub Actions is green. Watch: "Check the picture analyser" step, the Gradle step that downloads Python wheels, APK size. If red, paste the red text.
+2. Home -> SVG Editor. Add a ZIP with comic-style pictures + the timing JSON. Each picture should say "finding elements..." then show elements (first one may take 20-60 s while Python starts). Note the time per picture and whether any fails with "memory".
+3. A picture slide plays with the hand-drawn panel animation in the preview; the Panel check shows numbered outlines; the Report shows picture rows.
+4. Add a scene video named like `12-14.mp4`: the row says Scene, the preview plays it muted with black bars, scrubbing works.
+5. Export with "Make every picture sharper" ON: one bar "Making picture n of m sharper" then "Drawing the video"; the MP4 shows pictures animated, headings handwritten, scene videos playing. Then OFF: faster, no sharpening. Cancel works.
+6. Start a long export, lock the screen for a minute: the notification "Making your video" shows and the export keeps going (step 30).
+7. Note memory problems or phone heating and tell Claude (A4).
 
 ## How to build the APK (GitHub Actions)
 1. The repository is already configured; do not upload a second copy or create another workflow.

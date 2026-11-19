@@ -4,6 +4,7 @@ import { goBack } from "./bridge";
 import { allFonts, buildTextSvg, DEFAULT_TEXT, findFont, FONT_EXTENSIONS, SHAPES, type TextScene, type TextSettings } from "./textanim";
 import { restoreFonts, uploadFont } from "./fontStore";
 import type { Background, Project } from "./types";
+import { keepAlive } from "./bridge";
 import { estimateBytes, exportPlan, FPS_CHOICES, fpsFor, mp4Supported, renderMp4, RESOLUTIONS, safeRes, Scrubber, supportedResolutions } from "./video";
 import "./TextEditor.css";
 
@@ -188,13 +189,14 @@ export default function TextEditor() {
 
   async function exportMp4() {
     if (!scene) return;
-    setError(""); setSaved(""); cancel.current = false; setExporting({ done: 0, total: exportPlan(seconds, fpsFor(resId, fps), resId).total });
+    setError(""); setSaved(""); cancel.current = false; setExporting({ done: 0, total: exportPlan(seconds, fpsFor(resId, fps), resId).total }); void keepAlive(true);
     try {
       const blob = await renderMp4({ svg: scene.svg, width: scene.width, height: scene.height, seconds, fps: fpsFor(resId, fps), resolution: resId, onProgress: (done, total) => setExporting({ done, total }), cancelled: () => cancel.current });
       const name = `text-${resId}-${fpsFor(resId, fps)}fps-${Math.round(seconds * 10) / 10}s.mp4`;
       download(name, blob);
       setSaved(name);
     } catch (e: any) { if (!cancel.current) setError(e.message ?? "MP4 export failed."); }
+    void keepAlive(false);
     setExporting(null);
   }
 

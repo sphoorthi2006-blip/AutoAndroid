@@ -56,7 +56,7 @@ class WebHostActivity : ComponentActivity() {
         val page = intent.getStringExtra(EXTRA_PAGE) ?: "web/studio/index.html"
         if (WebRules.route("${WebConfig.ORIGIN}/$page") !is Route.Asset) { finish(); return }
 
-        core = BridgeCore(NativeMethods.defaults(), File(cacheDir, "bridge"))
+        core = BridgeCore(NativeMethods.defaults(PhoneEngine.methods(applicationContext)), File(cacheDir, "bridge"))
         core.cleanLeftovers()
         val inputs = InputRegistry(WebInputs.files)
         val saves = SaveRegistry { name, mime -> MediaStoreSaver.open(this, name, mime) }

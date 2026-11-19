@@ -94,4 +94,18 @@ for (const [id, W, H] of [["2k", 2560, 1440], ["4k", 3840, 2160], ["1080p", 1920
   ok(/4K/.test(m4) && /smaller size/.test(m4), "step 24: an unsupported size gives a clear message (" + m4 + ")");
   globalThis.VideoEncoder.isConfigSupported = keepSupport;
 }
+// ---- new workflow step 7: a scene clip in the timeline
+{
+  Object.assign(calls, { configs: [], encoded: [], flushed: 0, drawn: 0 }); globalThis.__chunks = 0;
+  const log = { opened: 0, seeks: [], draws: 0, closed: 0 };
+  const opener = async () => { log.opened++; return { duration: 1.0, width: 1280, height: 720, seek: async t => { log.seeks.push(+t.toFixed(3)); }, draw: () => { log.draws++; }, close: () => { log.closed++; } }; };
+  const blob = await mod.renderMp4Timeline({ slides: [{ svg, width: 1920, height: 1080, start: 0, end: 1 }, { svg: "", width: 1920, height: 1080, start: 1, end: 3, video: new Blob(["x"]) }], fps: 30, openScene: opener });
+  ok(calls.encoded.length === 90 && blob.type === "video/mp4", "step 7: a 1 s picture + a 2 s scene = 90 frames");
+  ok(log.opened === 1 && log.closed === 1, "step 7: the clip is opened once and closed at the end");
+  ok(log.draws === 60 && log.seeks.length === 60, "step 7: every scene frame is a seek plus a draw (60)");
+  ok(log.seeks[0] === 0 && log.seeks[1] === 0.033, "step 7: the first scene frame is at 0 s of the clip, the next 1/30 s later");
+  ok(Math.max(...log.seeks) <= 0.96 + 1e-9 && log.seeks[log.seeks.length - 1] === 0.96, "step 7: a slot longer than the clip holds the last frame (never seeks past the end)");
+  let n2 = 0, closed2 = 0, m2 = ""; try { await mod.renderMp4Timeline({ slides: [{ svg: "", width: 1920, height: 1080, start: 0, end: 5, video: new Blob(["x"]) }], fps: 30, openScene: async () => ({ duration: 5, width: 1920, height: 1080, seek: async () => {}, draw() {}, close: () => closed2++ }), cancelled: () => ++n2 > 10 }); } catch (e) { m2 = e.message; }
+  ok(/cancel/i.test(m2) && closed2 === 1, "step 7: cancel during a scene closes the clip");
+}
 console.log(fails ? `${fails} FAILED` : "all passed"); process.exit(fails ? 1 : 0);

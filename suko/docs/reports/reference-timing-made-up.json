@@ -1,0 +1,173 @@
+{
+ "format": "ils-slides",
+ "version": 2,
+ "title": "reference check",
+ "timing_source": "made up",
+ "slides": [
+  {
+   "n": 1,
+   "start": 0.0,
+   "end": 24.0,
+   "system": "rows",
+   "text": "lost son",
+   "panels": [
+    {
+     "shape": "circle",
+     "label": "LOST SON",
+     "start": 0.0,
+     "cue": "lost son"
+    },
+    {
+     "shape": "circle",
+     "label": "REAL HERO",
+     "start": 4.2,
+     "cue": "real hero",
+     "caption": "LOOK CLOSELY"
+    },
+    {
+     "shape": "rectangle",
+     "label": "LEAVES HOME",
+     "start": 8.0,
+     "cue": "leaves home"
+    },
+    {
+     "shape": "rectangle",
+     "label": "LOSES EVERYTHING",
+     "start": 9.9,
+     "cue": "loses everything"
+    },
+    {
+     "shape": "rectangle",
+     "label": "RETURNS",
+     "start": 10.65,
+     "cue": "returns"
+    },
+    {
+     "shape": "rectangle",
+     "label": "WATCHING THE ROAD",
+     "start": 14.0,
+     "cue": "watching the road"
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "start": 24.0,
+   "end": 44.0,
+   "system": "rows",
+   "text": "david",
+   "panels": [
+    {
+     "shape": "circle",
+     "label": "SHEPHERD BOY",
+     "start": 24.0,
+     "cue": "shepherd boy"
+    },
+    {
+     "shape": "circle",
+     "label": "GIANT DEFEATED",
+     "start": 29.0,
+     "cue": "giant defeated"
+    },
+    {
+     "shape": "rectangle",
+     "label": "BEFORE THE FIGHT",
+     "start": 33.0,
+     "cue": "before the fight",
+     "caption": "BEFORE THE FIGHT"
+    },
+    {
+     "shape": "rectangle",
+     "label": "THE STONE",
+     "start": 37.5,
+     "cue": "the stone"
+    },
+    {
+     "shape": "rectangle",
+     "label": "VICTORY",
+     "start": 38.25,
+     "cue": "victory"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "start": 44.0,
+   "end": 64.0,
+   "system": "rows",
+   "text": "david margin",
+   "panels": [
+    {
+     "shape": "circle",
+     "label": "SHEPHERD BOY",
+     "start": 44.0,
+     "cue": "shepherd boy"
+    },
+    {
+     "shape": "circle",
+     "label": "GIANT DEFEATED",
+     "start": 48.0,
+     "cue": "giant defeated"
+    },
+    {
+     "shape": "rectangle",
+     "label": "BEFORE THE FIGHT",
+     "start": 52.0,
+     "cue": "before the fight",
+     "caption": "BEFORE THE FIGHT"
+    },
+    {
+     "shape": "rectangle",
+     "label": "THE STONE",
+     "start": 57.0,
+     "cue": "the stone"
+    },
+    {
+     "shape": "rectangle",
+     "label": "VICTORY",
+     "start": 61.0,
+     "cue": "victory"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "start": 64.0,
+   "end": 84.0,
+   "system": "rows",
+   "text": "garden",
+   "panels": [
+    {
+     "shape": "rectangle",
+     "label": "ASTONISHING GIFT",
+     "start": 64.0,
+     "cue": "astonishing gift"
+    },
+    {
+     "shape": "rectangle",
+     "label": "STILL CREATURES",
+     "start": 68.5,
+     "cue": "still creatures"
+    },
+    {
+     "shape": "rectangle",
+     "label": "DIGNITY AND LIMITS",
+     "start": 72.0,
+     "cue": "dignity and limits"
+    },
+    {
+     "shape": "rectangle",
+     "label": "ENTRUSTED STEWARDS",
+     "start": 72.75,
+     "cue": "entrusted stewards"
+    },
+    {
+     "shape": "rectangle",
+     "label": "REFLECTING GOODNESS",
+     "start": 78.0,
+     "cue": "reflecting goodness"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,243 @@
+
+SLIDE 1  (34.54 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  FORMLESS EARTH     0.00   0.10    0.10    2.60    4.51      11%        
+ 2  DARK HORIZON       4.51   4.61    0.10    7.11    8.08      16%        
+ 3  ANCIENT SCROLL     8.08   8.28    0.20   10.48   11.11      14%        LATE
+ 4  THE BEGINNING     11.11  11.51    0.40   14.01   15.14       8%        LATE
+ 5  PEACEFUL ORDER    15.14  15.24    0.10   18.04   20.80      23%        
+ 6  GOOD CREATION     20.80  20.90    0.10   23.10   25.83      13%        
+ 7  READING CLOSELY   25.83  26.23    0.40   28.33   29.03      16%        LATE
+ 8  GOD AND HUMANITY  29.03  29.13    0.10   31.63   34.54      14%        
+
+SLIDE 3  (30.63 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  CREATION BY WORD   0.00   0.10    0.10    2.40    5.41       6%        
+ 2  COMMAND FULFILLED  5.41   5.51    0.10    7.61    9.39       7%        
+ 3  NO RIVAL POWER     9.39   9.49    0.10   11.89   15.61      17%        
+ 4  LIGHT AND LAND    15.61  16.21    0.60   18.11   19.32       9%        LATE
+ 5  LIGHTS AND LIFE   19.32  19.42    0.10   22.02   24.05      17%        
+ 6  CREATION RESPONDS 24.05  24.25    0.20   26.35   30.63       9%        LATE
+
+SLIDE 4  (29.96 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  CHAOTIC STORM      0.00   0.10    0.10    2.20    2.84       9%        
+ 2  FEAR OF DISORDER   2.84   2.94    0.10    5.24    6.18      10%        
+ 3  OVERWHELMED        6.18   6.28    0.10    8.58   10.18      12%        
+ 4  SOLID FOUNDATION  10.18  10.28    0.10   11.78   12.20      15%        
+ 5  PURPOSEFUL DESIGN 12.20  12.30    0.10   14.90   16.20      12%        
+ 6  SCRIPTURE         16.20  16.40    0.20   18.60   20.58      10%        LATE
+ 7  GUIDING WORD      20.58  20.68    0.10   22.98   27.54      10%        
+ 8  COMFORTING WORD   27.54  27.64    0.10   29.34   29.96      13%        
+
+SLIDE 5  (20.66 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  MORE THAN WORDS    0.00   0.10    0.10    2.90    3.84      11%        
+ 2  NOT HELPLESS       3.84   3.94    0.10    6.54    8.14      23%        
+ 3  ACCOMPLISHED WILL  8.14   8.54    0.40    9.64   10.24      15%        LATE
+ 4  LIFE AND STRUCTUR 10.24  10.54    0.30   12.64   13.72      37%        LATE
+ 5  TRUSTING PURPOSE  13.72  13.82    0.10   16.42   20.66      15%        
+
+SLIDE 7  (29.02 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  ORDERED BOUNDARIE  0.00   0.20    0.20    2.60    3.54      26%        LATE
+ 2  LIGHT AND DARKNES  3.54   4.14    0.60    5.44    6.02      13%        LATE
+ 3  WATERS DIVIDED     6.02   6.32    0.30    8.32    8.98      12%        LATE
+ 4  DRY LAND APPEARS   8.98   9.08    0.10   11.78   12.72      21%        
+ 5  DAY AND NIGHT     12.72  12.82    0.10   14.92   15.52      10%        
+ 6  HARMONIOUS ORDER  15.52  15.62    0.10   18.02   19.52      10%        
+ 7  LIFE FLOURISHING  19.52  19.62    0.10   22.02   22.85      18%        
+ 8  GIFT OF RHYTHM    22.85  22.95    0.10   25.35   29.02      16%        
+
+SLIDE 8  (26.56 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  FEELING RESTRICTE  0.00   0.10    0.10    2.70    4.74       8%        
+ 2  PROTECTED GARDEN   4.74   4.84    0.10    7.44    8.90      37%        
+ 3  NOURISHING RIVER   8.90   9.00    0.10   11.30   12.06      14%        
+ 4  WORK AND REST     12.06  12.16    0.10   14.66   15.54      12%        
+ 5  LIVING CONDITIONS 15.54  15.64    0.10   18.24   19.79      14%        
+ 6  WISE ORDER        19.79  19.89    0.10   22.49   26.56      16%        
+
+SLIDE 9  (27.12 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  SUBJECT TO CREATO  0.00   1.10    1.10    2.70    5.16      15%        LATE
+ 2  PLACED IN DESIGN   5.16   5.26    0.10    7.96    8.86      14%        
+ 3  ANCIENT MYTHS      8.86   8.96    0.10   11.66   15.28      22%        
+ 4  ONE SOVEREIGN GOD 15.28  15.58    0.30   17.88   20.83      13%        LATE
+ 5  UNSHAKEN AUTHORIT 20.83  21.03    0.20   23.33   24.70      11%        LATE
+ 6  SOVEREIGN CARE    24.70  24.80    0.10   26.60   27.12      16%        
+
+SLIDE 12  (23.58 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  LIVING CREATURES   0.00   0.10    0.10    2.00    4.48      11%        
+ 2  SEA AND SKY        4.48   4.58    0.10    6.48    9.60       9%        
+ 3  HUMANITY BLESSED   9.60   9.70    0.10   11.60   14.15       9%        
+ 4  GIVEN A FUTURE    14.15  14.25    0.10   16.15   17.92      11%        
+ 5  ABUNDANT LIFE     17.92  18.12    0.20   20.32   23.58      32%        LATE
+
+SLIDE 13  (35.76 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  SCRIPTURE          0.00   0.10    0.10    2.40    4.32      19%        
+ 2  COMMAND TO HUMANI  4.32   4.42    0.10    6.82    8.10      10%        
+ 3  SHARED CREATION    8.10   8.20    0.10   10.60   11.70      13%        
+ 4  SHARED BLESSING   11.70  11.90    0.20   14.50   16.18      21%        LATE
+ 5  DISTINCTIVE CALLI 16.18  16.28    0.10   18.68   19.38      11%        
+ 6  CARE FOR EARTH    19.38  19.48    0.10   21.88   25.20      12%        
+ 7  NOT DISPOSABLE    25.20  25.30    0.10   29.50   35.76      10%        
+
+SLIDE 14  (20.46 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  PSALM OF PRAISE    0.00   0.50    0.50    2.50    3.76      10%        LATE
+ 2  UNDER HUMAN CARE   3.76   3.86    0.10    6.26    7.64      21%        
+ 3  HONOR AND DUTY     7.64   7.74    0.10   10.14   11.88      23%        
+ 4  GOD'S WORLD       11.88  11.98    0.10   13.78   14.41      25%        
+ 5  FAITHFUL STEWARDS 14.41  14.51    0.10   17.01   20.46      30%        
+
+SLIDE 15  (20.94 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  STEWARDSHIP UNDER  0.00   0.10    0.10    2.20    3.26      16%        
+ 2  DAILY FAITHFULNES  3.26   3.36    0.10    6.36   10.06      25%        
+ 3  HONORING THE BLES 10.06  10.16    0.10   13.06   16.10      16%        
+ 4  HUMBLE CARE       16.10  16.20    0.10   18.50   20.94      30%        
+
+SLIDE 17  (26.24 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  CREATED IN IMAGE   0.00   0.20    0.20    2.50    4.05      14%        LATE
+ 2  OUR LIKENESS       4.05   4.15    0.10    6.55    7.32      21%        
+ 3  NOT EARNED         7.32   7.42    0.10   10.12   11.63      14%        
+ 4  BEYOND STATUS     11.63  11.73    0.10   13.93   14.56      21%        
+ 5  GIVEN DIGNITY     14.56  14.76    0.20   17.06   19.92      10%        LATE
+ 6  MALE AND FEMALE   19.92  20.02    0.10   22.42   26.24      11%        
+
+SLIDE 18  (21.80 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  SIMILITUDE OF GOD  0.00   0.10    0.10    2.70    3.84      23%        
+ 2  GUARDING THE TONG  3.84   3.94    0.10    6.54    7.38      43%        
+ 3  PRACTICAL TRUTH    7.38   7.48    0.10    9.28    9.86      24%        
+ 4  NO CONTEMPT        9.86   9.96    0.10   12.36   13.59      16%        
+ 5  DIGNITY MATTERS   13.59  13.69    0.10   16.09   17.00      14%        
+ 6  SPEECH AND ACTION 17.00  17.10    0.10   19.50   21.80      17%        
+
+SLIDE 19  (16.81 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  FOR ALL PEOPLE     0.00   0.10    0.10    3.30    3.61      17%        
+ 2  WHOLE HUMANITY     3.61   3.71    0.10    5.51    6.11      18%        
+ 3  OLD AND YOUNG      6.11   6.21    0.10    8.21    8.79      17%        
+ 4  EVERYONE INCLUDED  8.79   8.89    0.10   11.39   13.92      10%        
+ 5  HUMBLE VIEW       13.92  14.32    0.40   15.82   16.81      19%        LATE
+
+SLIDE 20  (18.86 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  ASTONISHING GIFT   0.00   0.10    0.10    2.90    3.18      18%        
+ 2  WE REMAIN CREATUR  3.18   3.28    0.10    5.68    6.35      10%        
+ 3  DIGNITY AND LIMIT  6.35   6.45    0.10    8.35    8.81      11%        
+ 4  ENTRUSTED CARE     8.81   8.91    0.10   11.11   14.04      25%        
+ 5  REFLECTING GOODNE 14.04  14.14    0.10   17.24   18.86       8%        
+
+SLIDE 22  (23.68 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  DIVINE VERDICT     0.00   0.20    0.20    2.60    5.60      11%        LATE
+ 2  REPEATED REFRAIN   5.60   5.70    0.10    8.20   10.02      18%        
+ 3  MORE THAN FEELING 10.02  10.12    0.10   12.42   12.98      10%        
+ 4  GOD'S ASSESSMENT  12.98  13.08    0.10   15.08   15.64      25%        
+ 5  ELEMENTS AFFIRMED 15.64  15.74    0.10   18.34   19.07      12%        
+ 6  WHOLE ARRANGEMENT 19.07  19.27    0.20   21.57   23.68      22%        LATE
+
+SLIDE 23  (28.48 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  VERY GOOD          0.00   1.30    1.30    2.50    6.34      28%        LATE
+ 2  NOT A MISTAKE      6.34   6.44    0.10    8.54   13.58      12%        
+ 3  PHYSICAL GIFTS    13.58  13.68    0.10   15.88   19.68      16%        
+ 4  LATER BROKENNESS  19.68  19.78    0.10   21.68   24.46      23%        
+ 5  ORIGINAL VERDICT  24.46  24.56    0.10   26.46   28.48      10%        
+
+SLIDE 24  (23.91 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  BEAUTIFUL IN TIME  0.00   0.10    0.10    2.60    4.52      13%        
+ 2  REAL GRIEF         4.52   4.62    0.10    7.02    9.76      16%        
+ 3  PURPOSE AND BEAUT  9.76   9.96    0.20   12.26   14.48      10%        LATE
+ 4  BEFORE THE FALL   14.48  14.88    0.40   17.18   19.44      22%        LATE
+ 5  GRIEF AND BEAUTY  19.44  19.74    0.30   22.14   23.91      20%        LATE
+
+SLIDE 25  (21.47 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  QUIET HOPE         0.00   0.10    0.10    1.60    2.05      18%        
+ 2  WOUNDED WORLD      2.05   2.15    0.10    4.25    7.55       9%        
+ 3  GOD'S INTENTION    7.55   7.65    0.10    9.65   11.31      11%        
+ 4  HOPE OF RESTORATI 11.31  11.41    0.10   13.51   15.56      13%        
+ 5  ALL THINGS NEW    15.56  15.76    0.20   18.96   21.47      19%        LATE
+
+SLIDE 27  (27.16 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  HEAVENLY LIGHTS    0.00   0.50    0.50    2.50    3.27      11%        LATE
+ 2  DAY AND NIGHT      3.27   3.67    0.40    6.07    9.66       8%        LATE
+ 3  SIGNS AND SEASONS  9.66   9.76    0.10   12.26   14.18      10%        
+ 4  ANCIENT WORSHIP   14.18  14.28    0.10   16.68   18.98      22%        
+ 5  CREATED FUNCTION  18.98  19.08    0.10   21.48   23.70      19%        
+ 6  SERVANTS OF GOD   23.70  23.80    0.10   26.20   27.16      12%        
+
+SLIDE 28  (19.46 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  CAREFUL WORDING    0.00   0.10    0.10    3.30    3.87      10%        
+ 2  NOT DIVINE         3.87   3.97    0.10    7.07    9.28      18%        
+ 3  ASSIGNED ROLES     9.28   9.58    0.30   12.28   14.89      10%        LATE
+ 4  PART OF ORDER     14.89  15.59    0.70   18.19   19.46      10%        LATE
+
+SLIDE 29  (18.47 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  WARNING TO ISRAEL  0.00   0.10    0.10    2.60    4.76      23%        
+ 2  HOST OF HEAVEN     4.76   5.16    0.40    6.66    7.14      13%        LATE
+ 3  GENESIS WORLDVIEW  7.14   7.34    0.20    9.84   11.14      13%        LATE
+ 4  POINTING BEYOND   11.14  11.24    0.10   13.84   15.96       9%        
+ 5  SIGNS OF POWER    15.96  16.16    0.20   17.66   18.47      12%        LATE
+
+SLIDE 30  (20.76 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  WONDER WITHOUT FE  0.00   0.10    0.10    2.70    5.34      14%        
+ 2  VAST STARS         5.34   5.44    0.10    7.94    9.16      12%        
+ 3  SEEN BY GOD        9.16   9.36    0.20   11.86   12.93      13%        LATE
+ 4  HEAVENS DECLARE   12.93  13.23    0.30   15.33   16.10      11%        LATE
+ 5  WITNESS TO CREATO 16.10  16.20    0.10   18.80   20.76      16%        
+
+SLIDE 32  (21.65 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  IN THE BEGINNING   0.00   0.20    0.20    2.80    6.14      14%        LATE
+ 2  BEYOND TIME        6.14   6.24    0.10    8.44   10.90      11%        
+ 3  THE ONE WHO ACTS  10.90  11.00    0.10   12.50   14.02      13%        
+ 4  ETERNAL SOURCE    14.02  14.12    0.10   16.02   17.65      13%        
+ 5  TRUE FOUNDATION   17.65  17.75    0.10   19.75   21.65      10%        
+
+SLIDE 33  (23.13 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  LET THERE BE LIGH  0.00   0.60    0.60    1.30    1.71      16%        LATE
+ 2  BEFORE SUN AND MO  1.71   2.91    1.20    4.61    8.11       8%        LATE
+ 3  CAREFUL READING    8.11   8.21    0.10   10.61   13.85      13%        
+ 4  NOT A DIAGRAM     13.85  13.95    0.10   16.65   18.11      13%        
+ 5  DEPENDENT ON GOD  18.11  18.21    0.10   20.91   23.13      13%        
+
+SLIDE 34  (27.52 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  GOSPEL OF JOHN     0.00   0.10    0.10    2.60    3.70      17%        
+ 2  ETERNAL WORD       3.70   3.90    0.20    6.30    8.92       9%        LATE
+ 3  POINTING TO CHRIS  8.92   9.02    0.10   11.52   15.80      16%        
+ 4  LIFE AND LIGHT    15.80  15.90    0.10   18.60   20.14      19%        
+ 5  BIBLICAL THEME    20.14  20.34    0.20   22.94   24.98       9%        LATE
+ 6  PROMISE FULFILLED 24.98  25.18    0.20   26.78   27.52      12%        LATE
+
+SLIDE 35  (20.80 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  DARK SEASON        0.00   1.00    1.00    1.70    2.66      16%        LATE
+ 2  STILL WAITING      2.66   2.86    0.20    4.76    7.24      11%        LATE
+ 3  NOT THE CREATOR    7.24   7.34    0.10    9.34   12.86      11%        
+ 4  LIGHT BREAKS IN   12.86  12.96    0.10   14.16   14.79      15%        
+ 5  FAITHFUL CREATOR  14.79  15.09    0.30   18.19   20.80      10%        LATE
+
+SLIDE 36  (29.98 s, sampled at 10 fps)
+ k  label               cue   visible@  lag    95%done@  next   biggest step   flags
+ 1  ORDERED AND GOOD   0.00   0.10    0.10    3.20    5.92      16%        
+ 2  DIGNITY AND DUTY   5.92   6.02    0.10    8.92   11.48      18%        
+ 3  NOT FORGOTTEN     11.48  11.68    0.20   13.88   17.98      15%        LATE
+ 4  WORTHY OF TRUST   17.98  18.08    0.10   20.88   23.94      11%        
+ 5  FOUNDATION OF HOP 23.94  24.44    0.50   27.14   29.98       7%        LATE
+
+47 flags

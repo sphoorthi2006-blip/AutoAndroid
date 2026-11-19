@@ -30,7 +30,7 @@ No internet permission. arm64-v8a only. Everything runs on the phone.
 ## Build and release (GitHub Actions only)
 There is no Android toolchain in the sandbox. The APK is built by `.github/workflows/build-suko.yml`:
 1. Fetch prebuilt ncnn (Vulkan) and the Real-ESRGAN models.
-2. Web tests, `tsc`, picture-analyser check (`check_engine.py`, 14 checks), Kotlin unit tests.
+2. Web tests, `tsc`, picture-analyser check (`check_engine.py`, all pass), Kotlin unit tests.
 3. Build the web UI into the app, then `assembleDebug` (NDK r28+, CMake 3.22.1).
 4. Verify the native library has no `libomp.so` dependency.
 5. Optional signed release APK (only on `main` and only when the repo secrets `BEZALEL_KEYSTORE_B64`, `BEZALEL_STORE_PASSWORD`, `BEZALEL_KEY_ALIAS`, `BEZALEL_KEY_PASSWORD` exist).

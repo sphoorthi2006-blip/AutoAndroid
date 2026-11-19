@@ -86,13 +86,19 @@ export const sketchReady = (p: Project, s: SketchSettings = DEFAULT_SKETCH) =>
   p.layers.every(l => !l.visible || effEntrance(l, s) !== "draw" || effStyle(l, s) === "reveal" || l.reveal?.v === 2 || !!l.rasterHref);
 
 const f2 = (x: number) => +x.toFixed(2);
+const f4 = (x: number) => +x.toFixed(4);
 /** Invisible strokes that grow one after another, like the hand following VideoScribe's transparent paths. Time is shared by stroke length. */
 function strokeSet(paths: Stroke[], width: number, begin: number, dur: number): { svg: string; end: number } {
   const total = paths.reduce((s, q) => s + q.len, 0) || 1;
+  // FIX PLAN step 6: every stroke gets a tiny minimum time, but ALL strokes together take exactly `dur` (before, 100+ strokes of 0.01 s each could run
+  // past the end of a short window and into the next panel's cue)
+  const floor = Math.min(0.01, dur / (2 * Math.max(1, paths.length)));
   let t = begin;
   const svg = paths.map(q => {
-    const d = Math.max(0.01, (q.len / total) * dur);
-    const out = `<path d="${q.d}" fill="none" stroke="#fff" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1 2" stroke-dashoffset="1.02"><animate attributeName="stroke-dashoffset" from="1.02" to="0" begin="${f2(t)}s" dur="${f2(d)}s" fill="freeze"/></path>`;
+    const d = Math.max(0.0001, floor + (dur - floor * paths.length) * (q.len / total));
+    // FIX PLAN step 9: begin and dur need 4 decimals. With f2 a stroke shorter than 5 ms was written as dur="0s", which SMIL ignores, so it NEVER animated
+    // (84% of the strokes of a 1000-stroke panel) and its line art only appeared at the pass-end pop.
+    const out = `<path d="${q.d}" fill="none" stroke="#fff" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1 2" stroke-dashoffset="1.02"><animate attributeName="stroke-dashoffset" from="1.02" to="0" begin="${f4(t)}s" dur="${f4(d)}s" fill="freeze"/></path>`;
     t += d;
     return out;
   }).join("");
@@ -137,21 +143,43 @@ export const plainArt = (l: Layer) => (l.rasterHref ? rasterArt(l) : l.group);
 
 /** 0.16 "lines first, then colour": every element's LINES are drawn first (the first `pf` share of the span T0..T1, in the same order and with the same
  *  proportions as before), then the colour of every element is filled in (the rest of the span). Elements with no line art (painted panels) are drawn in the colour pass only. */
+/** FIX PLAN step 4: the colour sweeps of an element. The backend gives none when the element is nearly all dark line art or has no colour of its own
+ *  (`cpaths` empty); the colour pass then had NO strokes and the whole element appeared in ONE 0.05 s step (`popRect`) at the end of its colour slot.
+ *  Such an element now gets the same back-and-forth sweeps the REVEAL style uses (made from its box), so the colour is always a visible wipe over the whole slot. */
+function colourSweepsOf(l: Layer, rv: Reveal): { w: number; paths: Stroke[] } {
+  return rv.cpaths && rv.cpaths.length ? { w: rv.cw ?? 14, paths: rv.cpaths } : revealStrokes(l);
+}
 export function linesColourGroup(l: Layer, p: Project, begin: number, dur: number, T0: number, T1: number, pf: number): string {
   const f = clampN(pf, 0.1, 0.9), span = T1 - T0;
   const lb = T0 + (begin - T0) * f, ld = dur * f;
   const cb = T0 + f * span + (begin - T0) * (1 - f), cd = dur * (1 - f);
-  if (!l.inkRasterHref) return revealGroup(l, p, cb, cd, 0.3);
+  if (!l.inkRasterHref) {
+    // FIX PLAN step 3: a painted panel (no real line art) has no lines pass, so before it sat blank for the whole lines share (`ld`) and only began at `cb`.
+    // Now its OUTLINE strokes (the panel's own edge) are drawn in the lines slot (starting exactly at `lb`, the panel's cue), then the colour sweeps in the colour slot.
+    const rv = l.reveal!, box = boxOf(l, rv);
+    const edge = strokeSet(rv.paths, rv.w, lb, ld);
+    const cs = colourSweepsOf(l, rv);
+    const col = strokeSet(cs.paths, cs.w, cb, cd);
+    return maskOf(`rvi-${l.id}`, box, edge.svg + col.svg + popRect(box, col.end)) + `<g mask="url(#rvi-${l.id})">${plainArt(l)}</g>`;
+  }
   const rv = l.reveal!, box = boxOf(l, rv), b = l.rasterBox ?? [l.bbox.x, l.bbox.y, l.bbox.w, l.bbox.h];
   const lines = strokeSet(rv.paths, rv.w, lb, ld);
-  const sweeps = rv.cpaths ?? [];
-  const col = sweeps.length ? strokeSet(sweeps, rv.cw ?? 14, cb, cd) : { svg: "", end: cb + cd };
+  const cs = colourSweepsOf(l, rv);
+  // FIX PLAN step 9b (D1): a panel with very little line art (2-3% of the picture) showed almost nothing during the lines share (50% of its window), so its first
+  // visible mark came up to 1.2 s after the cue. Its colour wipe now starts earlier, the sparser the line art: line art at or above INK_FULL (10%) is unchanged (k = 1),
+  // below it the start moves toward the cue with the square of the ratio (2.7% -> about 7% of the usual lines share). The wipe still ends where it ended before, so it is
+  // always inside the panel's own window and the panels still come one after another.
+  const dens = rv.ink == null ? 1 : clampN(rv.ink / INK_FULL, 0, 1), k = dens * dens;
+  const cbS = T0 + f * span * k + (begin - T0) * (1 - f), cdS = dur * (1 - f) + f * span * (1 - k);
+  const col = strokeSet(cs.paths, cs.w, cbS, cdS);
   const ink = `<image href="${l.inkRasterHref}" x="${n(b[0])}" y="${n(b[1])}" width="${n(b[2])}" height="${n(b[3])}" preserveAspectRatio="none"/>`;
   return maskOf(`lnk-${l.id}`, box, lines.svg + popRect(box, lines.end)) + maskOf(`col-${l.id}`, box, col.svg + popRect(box, col.end))
     + `<g mask="url(#col-${l.id})">${rasterArt(l)}</g><g mask="url(#lnk-${l.id})">${ink}</g>`;
 }
 
 const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** Line art share (of the panel) at or above which a panel is drawn "lines first, then colour" with the full lines share (FIX PLAN step 9b). Measured on Genesis 1: late panels median 2.7%, good ones 10.6%. */
+const INK_FULL = 0.10;
 
 /** REVEAL draw style (VideoScribe): the artwork is uncovered top to bottom by slanted back-and-forth strokes.
  *  No stroke plan from the backend is needed, the strokes come from the element's box. Every pass is a straight slanted line, all passes are

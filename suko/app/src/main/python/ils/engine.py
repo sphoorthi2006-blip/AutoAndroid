@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from .segment import segment
 from .panels import analyze
-from .raster import panel_raster, box_raster, frame_cutout
+from .raster import panel_raster, box_raster, label_raster, frame_cutout
 from .vectorize import element_to_svg_group, element_layers
 from .reveal import reveal_paths
 
@@ -128,21 +128,41 @@ def panels(data, raster=1, pen=1):
                     "inset": p["inset"], "parent": None if p["parent"] is None else p["parent"] + 1, "polygon": poly,
                     "label": {"bbox": list(ex["labels"][i]["bbox"])} if i in ex["labels"] else None,
                     "caption": {"bbox": list(ex["captions"][i]["bbox"]), "corner": ex["captions"][i]["corner"]} if i in ex["captions"] else None})
+        # step 5 (real frames): the panel's own label / caption box often overlaps the panel (a label on its bottom edge, a caption in its corner), so its printed
+        # pixels were part of the panel crop and were drawn with the picture, BEFORE the label's own turn. The panel is cut without them; the label / caption crop brings them later.
+        pm = p["mask"].copy()
+        for ex_k in ("labels", "captions"):
+            if i in ex[ex_k]: pm &= ~ex[ex_k][i]["mask"]
+        if not pm.any(): pm = p["mask"]
         if raster:
-            out[-1]["raster"] = panel_raster(src, p["mask"], p["bbox"], k)
-            if out[-1]["label"]: out[-1]["label"]["raster"] = box_raster(src, out[-1]["label"]["bbox"], k)
-            if out[-1]["caption"]: out[-1]["caption"]["raster"] = box_raster(src, out[-1]["caption"]["bbox"], k)
+            out[-1]["raster"] = panel_raster(src, pm, p["bbox"], k)
+            if out[-1]["label"]:                                     # step 7: cut with the label's own mask, never reaching into another panel
+                others = np.zeros(img.shape[:2], bool)
+                for j, q in enumerate(r["panels"], start=1):
+                    if j != i: others |= q["mask"]
+                out[-1]["label"]["raster"] = label_raster(src, ex["labels"][i]["mask"], out[-1]["label"]["bbox"], k, others)
+            if out[-1]["caption"]:                                   # step 8: same for the caption box (it may stick out over a circle's corner)
+                others = np.zeros(img.shape[:2], bool)
+                for j, q in enumerate(r["panels"], start=1):
+                    if j != i: others |= q["mask"]
+                out[-1]["caption"]["raster"] = label_raster(src, ex["captions"][i]["mask"], out[-1]["caption"]["bbox"], k, others)
         if raster and pen:                                           # 0.16: pen-stroke plan (outline strokes + colour sweeps) so the ORIGINAL pixels are drawn by a pen, not a plain sweep
-            out[-1]["reveal"] = _pen(img, p["mask"], p["bbox"])
-            ir = panel_raster(src, p["mask"], p["bbox"], k, ink=True)
-            if ir: out[-1]["inkRaster"] = ir
-    arrows = []                                                      # step 10: an arrow is cropped from the original too (opaque box), so it can be revealed as a unit
+            out[-1]["reveal"] = _pen(img, pm, p["bbox"])
+            ir = panel_raster(src, pm, p["bbox"], k, ink=True)
+            if ir:
+                out[-1]["inkRaster"] = ir
+                if isinstance(out[-1].get("reveal"), dict): out[-1]["reveal"]["ink"] = ir.get("share")   # FIX PLAN step 9b
+    allp = np.zeros(img.shape[:2], bool)                             # step 8: every panel, so no arrow crop can carry a piece of a panel's border before the panel's own cue
+    for q in r["panels"]: allp |= q["mask"]
+    arrows = []                                                      # step 10: an arrow is cropped from the original too, so it can be revealed as a unit
     for ai, a in enumerate(ex["arrows"], start=1):
         arrows.append({"id": ai, "bbox": list(a["bbox"]), "from": a["from"], "to": a["to"], "headKnown": a["head_known"]})
-        if raster: arrows[-1]["raster"] = box_raster(src, a["bbox"], k)
+        if raster: arrows[-1]["raster"] = label_raster(src, a["mask"], a["bbox"], k, allp)   # the arrow's own mask, minus the panels (was: the opaque bbox rectangle)
         if raster and pen:
             bx, by, bw_, bh_ = [int(v) for v in a["bbox"]]
             am = np.zeros(img.shape[:2], bool); am[by:by + bh_, bx:bx + bw_] = True
+            am &= a["mask"] & ~(cv2.dilate(allp.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0)   # its pen plan and line art come from the arrow's own pixels, not the panel borders inside its box
+            if not am.any(): am[by:by + bh_, bx:bx + bw_] = True
             arrows[-1]["reveal"] = _pen(img, am, a["bbox"])
             ir = panel_raster(src, am, a["bbox"], k, ink=True)
             if ir: arrows[-1]["inkRaster"] = ir

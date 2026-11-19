@@ -39,6 +39,7 @@ def panel_raster(src, mask, bbox, scale, ink=False):
     if alpha.shape != (ch, cw):
         alpha = cv2.resize(alpha, (cw, ch), interpolation=cv2.INTER_LINEAR)
     rgb = src[oy:oy + ch, ox:ox + cw, :3]
+    panel_px = max(1, int((alpha > 128).sum()))                      # FIX PLAN step 9b: the panel's own pixels, to report how much of it is line art
     if ink:   # 0.16 line art: the SAME pixels, but only where they are dark (soft ramp), so the line pass and the colour pass match exactly
         mx = rgb.max(axis=2).astype(np.float32)
         la = np.clip((160.0 - mx) / 70.0, 0, 1)
@@ -50,7 +51,9 @@ def panel_raster(src, mask, bbox, scale, ink=False):
         if (alpha > 128).sum() < 0.01 * max(1, (mask[y:y + h, x:x + w]).sum() / (scale * scale)):
             return None   # no real line art (a painted panel): the front end draws it in one pass
     rgba = np.dstack([rgb, alpha])
-    return {"href": _png_url(rgba), "box": _canvas_box(c, scale), "size": [cw, ch]}
+    out = {"href": _png_url(rgba), "box": _canvas_box(c, scale), "size": [cw, ch]}
+    if ink: out["share"] = round(float((alpha > 128).sum()) / panel_px, 4)   # 0..1 share of the panel that is line art (the web side starts the colour wipe earlier when it is small)
+    return out
 
 
 def _box_fill(crop):
@@ -74,6 +77,23 @@ def box_raster(src, bbox, scale, pad=1):
     ox, oy, cw, ch = c
     crop = src[oy:oy + ch, ox:ox + cw, :3]
     return {"href": _png_url(crop), "box": _canvas_box(c, scale), "size": [cw, ch], "fill": _box_fill(crop)}
+
+
+def label_raster(src, mask, bbox, scale, others):
+    """FIX PLAN step 7: the label's crop with ITS OWN SHAPE as alpha (transparent outside), instead of a filled rectangle (`box_raster`).
+    mask = bool mask of the label box on the reduced picture (the dilated box found by `find_extras`), others = bool mask of every OTHER panel (the label's own
+    panel stays allowed: a real label overlaps its own panel's bottom edge). `others` is grown by one pixel and taken away from the mask, so no pixel of the crop can
+    lie inside the panel below (ref4: the label box ends only 3-4 px above it). Same answer as `box_raster` (`href`, `box`, `size`, `fill`); `fill` is the box's own colour
+    taken from the full rectangle. If nothing is left of the mask the plain rectangle is returned."""
+    grown = cv2.dilate(others.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    m = mask & ~grown
+    if not m.any():
+        return box_raster(src, bbox, scale)
+    r = panel_raster(src, m, bbox, scale)
+    sh, sw = src.shape[:2]
+    ox, oy, cw, ch = _crop_box(bbox, scale, sw, sh, pad=1)
+    r["fill"] = _box_fill(src[oy:oy + ch, ox:ox + cw, :3])
+    return r
 
 
 def frame_cutout(img, src, frame, scale):

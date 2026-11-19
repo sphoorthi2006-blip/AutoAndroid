@@ -413,7 +413,7 @@ export function planSlide(units: Unit[], W: number, H: number, D: number, elemen
     if (i < k) t = elementTimes![i];                                   // v0.14.9: element i takes script time i, whatever the two counts are
     else if (k > 0) { const last = elementTimes![k - 1]; t = last + (i - k + 1) * Math.max(0.3, (D - 0.4 - last) / (m - k + 1)); }   // more elements than script times: the rest follow the last script time
     else { const s0 = Math.max(headEnd + 0.15, 0.2), slot = Math.max(0.5, (D - 0.4 - s0) / Math.max(1, m)); t = s0 + i * slot; }
-    start.push(Math.max(t, i ? start[i - 1] + 0.05 : headEnd + 0.05));   // v0.14.10: script times closer than 0.3 s are kept as they are (only never backwards)
+    start.push(Math.max(t, i ? start[i - 1] + 0.05 : head ? headEnd + 0.05 : 0));   // FIX PLAN step 2: with no heading the first element begins EXACTLY at its cue   // v0.14.10: script times closer than 0.3 s are kept as they are (only never backwards)
   }
   // v0.14.9 no element limit: when the starts run past the end of the slide (many elements, or times late in the file), the whole row of starts is
   // squeezed evenly into the slide, so every element still gets its own slot, in order
@@ -479,6 +479,9 @@ export function layerTimes(plan: SlidePlan, p: Project): Map<string, { begin: nu
     const cen = (l: Layer) => ({ x: l.bbox.x + l.bbox.w / 2, y: l.bbox.y + l.bbox.h / 2 });
     // an arrow is drawn whole, from its far end towards the element it points to (so the head comes last); everything else top to bottom
     const ms = it.unit.layerIds.map(id => lay.get(id)!);
+    // FIX PLAN step 5: inside a panel unit the order is ALWAYS picture, label, caption, arrow, whatever order the layers are listed in (a label listed first used to be drawn first)
+    const roleRank = { panel: 0, label: 1, caption: 2, arrow: 3 } as const;
+    if (it.unit.panel !== undefined) ms.sort((a, b) => roleRank[a.panel?.role ?? "panel"] - roleRank[b.panel?.role ?? "panel"]);
     if (it.unit.panel === undefined) ms.sort(it.aim && it.unit.kind === "arrow"
       ? (a, b) => Math.hypot(cen(b).x - it.aim!.x, cen(b).y - it.aim!.y) - Math.hypot(cen(a).x - it.aim!.x, cen(a).y - it.aim!.y)
       : (a, b) => a.bbox.y - b.bbox.y || a.bbox.x - b.bbox.x);

@@ -26,7 +26,7 @@ export interface Layer {
   panel?: { k: number; role: "panel" | "label" | "caption" | "arrow" };
 }
 export interface Stroke { d: string; len: number }
-export interface Reveal { v?: number; w: number; paths: Stroke[]; cw?: number; cpaths?: Stroke[]; edgeFirst?: boolean }
+export interface Reveal { v?: number; w: number; paths: Stroke[]; cw?: number; cpaths?: Stroke[]; edgeFirst?: boolean; /** share (0..1) of the element that is dark line art; missing = treated as normal */ ink?: number }
 /** Entrance types (VideoScribe: Draw, Fade in, Pop/Bounce in, Move in, None). */
 export type Entrance = "draw" | "fade" | "pop" | "slide" | "none";
 /** Where "Move in" comes from. */

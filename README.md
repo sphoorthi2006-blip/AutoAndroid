@@ -18,6 +18,8 @@ The Bezalel screens share one dark, premium look: the home screen has tool cards
 
 Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (built green on GitHub Actions; not yet run on a phone); the web SVG Editor screen now exports the MP4 (with AI upscale, cache and cancel).
 
+**Latest status (2026-11-19):** Bezalel builds green; the APK is at Releases -> `bezalel-latest` (`Bezalel.apk`, unsigned debug; the repo is private, so open the link while logged in to GitHub). Not yet run on a phone. Developer guide: [`suko/DEVELOPER.md`](suko/DEVELOPER.md). Prompt skills for the SVG Editor (Bible and history, health and finance) and their README: [`suko/docs/skills/`](suko/docs/skills/README.md). Full step table and phone test lists: [`suko/README.md`](suko/README.md).
+
 ## Sukko Image Upscaler
 
 Two versions of the same tool:

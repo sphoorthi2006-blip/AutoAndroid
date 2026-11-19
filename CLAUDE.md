@@ -1,5 +1,7 @@
 # Upscaler (AutoAndroid) - project notes for Claude
 
+> Bezalel (`suko/`) is documented separately: start with `suko/DEVELOPER.md`, then `suko/README.md`. Prompt skills: `suko/docs/skills/README.md`. This file covers the Sukko image upscaler and the repo-wide build facts.
+
 Read this first. It records what exists, what was done, what is broken or untested, and what to do next.
 Repo: `sphoorthi2006-blip/AutoAndroid` (public), branch `main`. Last updated 2026-11-10 (speed work v2.1 pushed, untested on device).
 

@@ -24,25 +24,25 @@ class Step13Test {
 
     @Test fun nothingAtFrameZeroEverythingAtTheEnd() {
         val plan = HeadingWrite.plan(bits(), W, H)
-        val n = 90; val fps = 30; val secs = 2.0
-        val first = HeadingWrite.frame(plan, 0, n, fps, secs)
+        val n = 90; val fps = 30
+        val first = HeadingWrite.frame(plan, 0, n, fps)
         assertTrue(first.lines.isEmpty())
         assertEquals(0.0, first.finish, 1e-12)
-        val last = HeadingWrite.frame(plan, n - 1, n, fps, secs)
+        val last = HeadingWrite.frame(plan, n - 1, n, fps)
         assertEquals(1.0, last.finish, 1e-12)
         assertEquals(plan.strokes.size, last.lines.size)
         // and it is fully written well before the cue ends, then held
-        val held = HeadingWrite.frame(plan, (n * 0.85).toInt(), n, fps, secs)
+        val held = HeadingWrite.frame(plan, (n * 0.85).toInt(), n, fps)
         assertEquals(1.0, held.finish, 1e-12)
     }
 
     @Test fun neverGoesBackwards() {
         val plan = HeadingWrite.plan(bits(), W, H)
-        val n = 120; val fps = 60; val secs = 2.0
+        val n = 120; val fps = 60
         var prevLen = -1.0; var prevFinish = -1.0; var prevStrokes = -1; var prevU = -1.0
         for (f in 0 until n) {
-            val u = HeadingWrite.progress(f, n, fps, secs)
-            val fr = HeadingWrite.frame(plan, f, n, fps, secs)
+            val u = HeadingWrite.progress(f, n, fps)
+            val fr = HeadingWrite.frame(plan, f, n, fps)
             assertTrue(u >= prevU); assertTrue(fr.finish >= prevFinish)
             assertTrue(fr.lines.size >= prevStrokes); assertTrue(drawn(fr) >= prevLen - 1e-9)
             prevU = u; prevFinish = fr.finish; prevStrokes = fr.lines.size; prevLen = drawn(fr)
@@ -57,22 +57,18 @@ class Step13Test {
         for (i in 1 until xs.size) assertTrue("stroke $i starts left of stroke ${i - 1}", xs[i] >= xs[i - 1] - 6.0)
     }
 
-    @Test fun typedSecondsAreUsedAndCapped() {
-        assertEquals(2.0, HeadingWrite.writeSeconds(2.0, 20.0), 1e-9)
-        assertEquals(0.8, HeadingWrite.writeSeconds(5.0, 1.0), 1e-9)       // 1 s cue: writing takes at most 80 %
-        assertEquals(0.0, HeadingWrite.writeSeconds(-3.0, 20.0), 1e-9)
-        assertEquals(60, HeadingWrite.writeFrames(300, 30, 2.0))           // 2 s at 30 fps
-        assertEquals(120, HeadingWrite.writeFrames(300, 60, 2.0))
-        assertEquals(24, HeadingWrite.writeFrames(30, 30, 5.0))            // 1 s cue: capped to 0.8 s
-        // the last writing frame is exactly 1.0, the one before is not
-        assertEquals(1.0, HeadingWrite.progress(59, 300, 30, 2.0), 1e-12)
-        assertTrue(HeadingWrite.progress(58, 300, 30, 2.0) < 1.0)
-        assertEquals(0.0, HeadingWrite.progress(0, 300, 30, 2.0), 1e-12)
+    @Test fun writingTakesEightyPercentOfTheCue() {
+        assertEquals(240, HeadingWrite.writeFrames(300, 30))
+        assertEquals(24, HeadingWrite.writeFrames(30, 30))
+        assertEquals(1.0, HeadingWrite.progress(239, 300, 30), 1e-12)     // fully written on the last writing frame
+        assertTrue(HeadingWrite.progress(238, 300, 30) < 1.0)
+        assertEquals(0.0, HeadingWrite.progress(0, 300, 30), 1e-12)
+        assertEquals(1.0, HeadingWrite.progress(299, 300, 30), 1e-12)      // and held until the cue ends
     }
 
-    @Test fun zeroSecondsOrOneFrameShowsTheFinishedText() {
-        assertEquals(1.0, HeadingWrite.progress(0, 90, 30, 0.0), 1e-12)
-        assertEquals(1.0, HeadingWrite.progress(0, 1, 30, 2.0), 1e-12)
-        assertEquals(1.0, HeadingWrite.progress(1, 2, 30, 2.0), 1e-12)
+    @Test fun veryShortCuesStillFinish() {
+        assertEquals(1.0, HeadingWrite.progress(0, 1, 30), 1e-12)
+        assertEquals(0.0, HeadingWrite.progress(0, 2, 30), 1e-12)          // 2 frames: blank, then finished
+        assertEquals(1.0, HeadingWrite.progress(1, 2, 30), 1e-12)
     }
 }

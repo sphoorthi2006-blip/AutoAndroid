@@ -46,8 +46,6 @@ data class UiState(
     val message: String? = null,
     val check: CheckResult? = null,
     val fps: Int = 30,
-    /** Seconds the pen takes to write a heading or subscribe cue (typed by the owner). */
-    val writeSeconds: Double = HeadingWrite.DEFAULT_SECONDS,
     val audioSeconds: Double? = null,
     val core: TimingResult? = null,
     val timing: TimingReport? = null,
@@ -162,10 +160,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 inkPlan = HeadingWrite.plan(renderer.inkBits(ink), Defaults.W, Defaults.H)
                                 inkText = shown
                             }
-                            painter.draw(inkBmp!!, HeadingWrite.frame(inkPlan!!, f, n, s.fps, s.writeSeconds))
+                            painter.draw(inkBmp!!, HeadingWrite.frame(inkPlan!!, f, n, s.fps))
                                 .copy(Bitmap.Config.ARGB_8888, false)
                         }
-                        val secs = HeadingWrite.writeSeconds(s.writeSeconds, n.toDouble() / s.fps)
+                        val secs = HeadingWrite.writeFrames(n, s.fps).toDouble() / s.fps
                         _preview.value = PreviewState(cue, f, n, bmp.asImageBitmap(),
                             "Cue $cue: $what \"$shown\", handwritten.\nframe ${f + 1} of $n at ${s.fps} fps, writing time ${"%.2f".format(secs)} s")
                     }
@@ -363,7 +361,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setFps(fps: Int) = change { it.copy(fps = fps) }
-    fun setWriteSeconds(sec: Double) = change { it.copy(writeSeconds = sec.coerceIn(0.0, 60.0)) }
 
     private fun change(f: (UiState) -> UiState) {
         _state.update { recompute(f(it)) }
@@ -552,7 +549,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun resetAll() {
         File(ctx.cacheDir, "imgs").deleteRecursively()
         File(ctx.cacheDir, "bundle").deleteRecursively()
-        _state.value = UiState(fps = _state.value.fps, writeSeconds = _state.value.writeSeconds)
+        _state.value = UiState(fps = _state.value.fps)
         _preview.value = PreviewState()
     }
 

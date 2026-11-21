@@ -364,19 +364,7 @@ fun MainScreen(vm: AppViewModel) {
                 Spacer(Modifier.width(4.dp))
                 for (f in listOf(30, 60)) Pill("$f fps", s.fps == f) { vm.setFps(f) }
             }
-            var writeText by remember { mutableStateOf(HeadingWrite.DEFAULT_SECONDS.toString()) }
-            OutlinedTextField(
-                value = writeText,
-                onValueChange = { v ->
-                    val clean = v.filter { ch -> ch.isDigit() || ch == '.' }.take(5)
-                    writeText = clean
-                    clean.toDoubleOrNull()?.let { vm.setWriteSeconds(it) }
-                },
-                label = { Text("Handwriting time for headings and subscribe (seconds)") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("How long the pen takes to write a heading. Never more than 80% of that cue. 0 shows the text at once.", fontSize = 11.sp, color = Muted)
+            Text("Headings and subscribe cues are handwritten. The pen uses 80% of the cue's length, then the finished text stays.", fontSize = 11.sp, color = Muted)
             if (ex.busy) {
                 Text(ex.label, color = Amber, fontSize = 13.sp)
                 LinearProgressIndicator(progress = { ex.progress.toFloat() }, modifier = Modifier.fillMaxWidth(), color = Accent, trackColor = Hairline)

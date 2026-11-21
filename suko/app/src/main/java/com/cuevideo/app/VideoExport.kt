@@ -113,10 +113,10 @@ object VideoExport {
                         val tex = gd.newTexture()
                         try {
                             val n = seg.frames
-                            val wf = HeadingWrite.writeFrames(n, fps, s.writeSeconds)
+                            val wf = HeadingWrite.writeFrames(n, fps)
                             for (f in 0 until n) {
                                 if (f < wf) {
-                                    gd.upload(tex, painter.draw(ink, HeadingWrite.frame(wplan, f, n, fps, s.writeSeconds)))
+                                    gd.upload(tex, painter.draw(ink, HeadingWrite.frame(wplan, f, n, fps)))
                                 }
                                 gd.clear()
                                 gd.draw(false, tex, GlMath.FULL, 1f, 1f, 1f)

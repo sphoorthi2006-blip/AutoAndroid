@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Expected numbers come from the desktop engine (draw_text_layer, normalize_image). */
+/** Cover-crop numbers come from the desktop engine; heading numbers were recomputed for the 86 % width (no zoom, step 12). */
 class Stage3Test {
     private fun fake(t: String, sz: Int) = t.length * sz * 0.47     // same fake ruler used on the Python side
 
@@ -32,7 +32,7 @@ class Stage3Test {
     @Test fun mediumHeadingShrinksToOneLine() {
         val lay = SlideMath.layout("7. of the of Constantinople great", 1920, 1080, 2.0, 200.0,
             SlideMath.headingMaxWidth(1920), 80.0, ::fake)
-        assertEquals(190, lay.size)
+        assertEquals(212, lay.size)
         assertEquals(1, lay.lines.size)
     }
 
@@ -41,7 +41,7 @@ class Stage3Test {
             "Rome war the extraordinarily fell war Constantinople unbelievable war empire Rome of Rome",
             1920, 1080, 2.0, 200.0, SlideMath.headingMaxWidth(1920), 80.0, ::fake)
         assertEquals(160, lay.size)
-        assertEquals(listOf("Rome war the extraordinarily fell war", "Constantinople unbelievable war empire", "Rome of Rome"),
+        assertEquals(listOf("Rome war the extraordinarily fell war", "Constantinople unbelievable war empire Rome", "of Rome"),
             lay.lines.map { it.text })
         assertEquals(listOf(880.0, 1080.0, 1280.0), lay.lines.map { it.cy })
     }

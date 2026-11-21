@@ -77,7 +77,7 @@ class Stage5Test {
         // full picture: v' = 1 - v, u' = u
         val m = GlMath.FULL
         assertEquals(1f, m[0], 1e-6f); assertEquals(-1f, m[5], 1e-6f); assertEquals(1f, m[13], 1e-6f); assertEquals(0f, m[12], 1e-6f)
-        // crop box 80 %: the is the middle 80 %
+        // crop box: the middle 80 %
         val c = GlMath.crop(0.1, 0.1, 0.9, 0.9)
         assertEquals(0.8f, c[0], 1e-6f); assertEquals(-0.8f, c[5], 1e-6f)
         assertEquals(0.1f, c[12], 1e-6f); assertEquals(0.9f, c[13], 1e-6f)

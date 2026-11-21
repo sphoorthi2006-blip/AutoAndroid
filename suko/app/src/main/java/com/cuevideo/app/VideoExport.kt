@@ -65,7 +65,6 @@ object VideoExport {
             val gd = GlDraw(W, H)
             draw = gd
             val renderer = SlideRenderer(ctx)
-            val fadeFrames = SlideMath.fadeFrames(fps)
 
             var frameIdx = 0L
             val totalFrames = plan.totalFrames
@@ -111,20 +110,13 @@ object VideoExport {
                     }
                     SegKind.HEADING -> {
                         val layer = renderer.headingLayer(seg.text)
-                        val lw = layer.width
-                        val lh = layer.height
                         val tex = gd.newTexture()
                         gd.upload(tex, layer)
                         layer.recycle()
                         try {
-                            val n = seg.frames
-                            for (f in 0 until n) {
-                                val z = SlideMath.zoomFactor(f, n)
-                                val q = SlideMath.fadeBrightness(f, fadeFrames)
-                                val b = SlideMath.cropBox(lw, lh, z)
-                                val m = GlMath.crop(b.left / lw, b.top / lh, b.right / lw, b.bottom / lh)
+                            for (f in 0 until seg.frames) {
                                 gd.clear()
-                                gd.draw(false, tex, m, 1f, 1f, q.toFloat())
+                                gd.draw(false, tex, GlMath.FULL, 1f, 1f, 1f)
                                 present()
                             }
                         } finally { gd.deleteTexture(tex) }

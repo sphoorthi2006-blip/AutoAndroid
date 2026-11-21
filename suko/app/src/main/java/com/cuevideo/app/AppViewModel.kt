@@ -157,11 +157,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             layerBmp = renderer.headingLayer(text)
                             layerText = text
                         }
-                        val bmp = renderer.headingFrame(layerBmp!!, f, n, s.fps)
-                        val z = SlideMath.zoomFactor(f, n)
-                        val q = SlideMath.fadeBrightness(f, SlideMath.fadeFrames(s.fps))
-                        _preview.value = PreviewState(cue, f, n, bmp.asImageBitmap(),
-                            "Cue $cue: heading \"$text\"\nframe ${f + 1} of $n at ${s.fps} fps, zoom ${"%.3f".format(z)}x, brightness ${(q * 100).toInt()}%")
+                        val bmp = renderer.headingFrame(layerBmp!!)
+                        _preview.value = PreviewState(cue, 0, 0, bmp.asImageBitmap(),
+                            "Cue $cue: heading \"$text\", plain text on white, hard cut.")
                     }
                     CueKind.NORMAL -> {
                         val img = chk.imageForCue[cue]

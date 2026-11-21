@@ -473,7 +473,7 @@ fun MainScreen(vm: AppViewModel) {
                         onValueChange = { v -> slider = v; vm.showPreview(pv.cue, v.toInt()) },
                         valueRange = 0f..(pv.frames - 1).toFloat(),
                     )
-                    Text("Slide the bar to see the zoom and the fade-in frame by frame.", fontSize = 12.sp, color = Muted)
+                    Text("Slide the bar to move through the cue.", fontSize = 12.sp, color = Muted)
                 }
                 if (pv.info.isNotEmpty()) Text(pv.info, fontSize = 13.sp)
             }

@@ -24,7 +24,7 @@ class SlideRenderer(private val ctx: Context) {
 
     private val typeface: Typeface = Typeface.createFromAsset(ctx.assets, "PatrickHand-Regular.ttf")
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-        color = Color.WHITE
+        color = Color.BLACK
         typeface = this@SlideRenderer.typeface
         textAlign = Paint.Align.CENTER
     }
@@ -111,18 +111,18 @@ class SlideRenderer(private val ctx: Context) {
         return textPaint.measureText(text).toDouble()
     }
 
-    /** White text on black at 2x resolution (3840x2160), laid out like the desktop engine. */
+    /** Black text on white at 2x resolution (3840x2160), laid out like the desktop engine. */
     fun headingLayer(text: String): Bitmap {
         val lay = SlideMath.layout(
             text, W, H, Defaults.LAYER_SCALE,
             Defaults.HEADING_SIZE.toDouble(),
-            SlideMath.animMaxWidth(W, Defaults.ZOOM),
+            SlideMath.headingMaxWidth(W),
             Defaults.HEADING_MIN.toDouble(),
             ::measure,
         )
         val bmp = Bitmap.createBitmap(lay.layerW, lay.layerH, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-        c.drawColor(Color.BLACK)
+        c.drawColor(Color.WHITE)
         if (lay.size > 0) {
             textPaint.textSize = lay.size.toFloat()
             val fm = textPaint.fontMetrics
@@ -133,27 +133,12 @@ class SlideRenderer(private val ctx: Context) {
         return bmp
     }
 
-    /** Frame f (0-based) of a heading cue that lasts n frames: zoom crop + fade-in from black. */
-    fun headingFrame(layer: Bitmap, f: Int, n: Int, fps: Int): Bitmap {
-        val z = SlideMath.zoomFactor(f, n)
-        val q = SlideMath.fadeBrightness(f, SlideMath.fadeFrames(fps))
-        val box = SlideMath.cropBox(layer.width, layer.height, z)
-        val m = Matrix()
-        m.setRectToRect(
-            RectF(box.left.toFloat(), box.top.toFloat(), box.right.toFloat(), box.bottom.toFloat()),
-            RectF(0f, 0f, W.toFloat(), H.toFloat()),
-            Matrix.ScaleToFit.FILL,
-        )
+    /** A heading cue is its finished text on white, the same for every frame (hard cut, no zoom, no fade). */
+    fun headingFrame(layer: Bitmap): Bitmap {
         val out = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
-        c.drawColor(Color.BLACK)
-        val p = Paint(drawPaint)
-        if (q < 1.0) {
-            val cm = ColorMatrix()
-            cm.setScale(q.toFloat(), q.toFloat(), q.toFloat(), 1f)
-            p.colorFilter = ColorMatrixColorFilter(cm)
-        }
-        c.drawBitmap(layer, m, p)
+        c.drawColor(Color.WHITE)
+        c.drawBitmap(layer, null, RectF(0f, 0f, W.toFloat(), H.toFloat()), drawPaint)
         return out
     }
 }

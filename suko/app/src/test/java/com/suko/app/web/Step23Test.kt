@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Steps 20-24: Patrick Hand is the only text font (the owner's file) and the Text Editor exports 1080p at 30 or 60 fps. */
+/** Patrick Hand is the only text font (the owner's file) and the Text Editor exports 1080p at 30 or 60 fps (no 2K/4K). */
 class Step23Test {
     private val assets = File("src/main/assets/web/studio/assets")
     private val js get() = assets.listFiles { x -> x.extension == "js" }!!.joinToString("\n") { it.readText() }
@@ -28,17 +28,19 @@ class Step23Test {
 
     @Test
     fun theExportOffers30And60FramesAnd1080p() {
-        assertTrue(js.contains(" MP4, ") && js.contains("1080p"))
+        assertTrue(js.contains("Export video") && js.contains("Frame rate") && js.contains("1080p"))
         assertTrue(js.contains("avc1.64002a"))        // H.264 level 4.2, needed for 1080p at 60 fps
         assertTrue(js.contains(" fps"))
     }
 
-    /** Step 24: the web bundle is rebuilt by CI (npm run build:suko), so it must contain the 2K and 4K sizes and the font upload. */
+    /** 2026-11-21 owner decision: 1080p only, Patrick Hand only, handwriting only. The bundle must not offer 2K / 4K, font upload or the outline-then-fill motion. */
     @Test
-    fun theExportOffers2KAnd4KAndTheTextEditorTakesUploadedFonts() {
-        assertTrue(js.contains("2560 x 1440") && js.contains("3840 x 2160"))
-        assertTrue(js.contains("avc1.640033"))        // H.264 level 5.1, needed for 4K at 30 fps
-        assertTrue(js.contains("Upload font"))
-        assertTrue(js.contains(".ttf,.otf,.woff") || js.contains(".ttf") && js.contains(".otf") && js.contains(".woff"))
+    fun theBundleOffersNo2KOr4KNoFontUploadAndNoOutlineMotion() {
+        assertFalse(js.contains("2560 x 1440"))
+        assertFalse(js.contains("3840 x 2160"))
+        assertFalse(js.contains("Upload font"))
+        assertFalse(js.contains("Add font file"))
+        assertFalse(js.contains("Outline, then fill"))
+        assertTrue(js.contains("Patrick Hand (built in)"))
     }
 }

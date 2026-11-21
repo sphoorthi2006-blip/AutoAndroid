@@ -3,40 +3,14 @@ import { polyLength, skeletonStrokes, type Pt } from "./skeleton";
 import patrick from "./fonts/PatrickHand-Regular.ttf?url";
 import math from "@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff?url";
 
-export interface FontChoice { id: string; label: string; url: string; custom?: boolean }
+export interface FontChoice { id: string; label: string; url: string }
 /** Patrick Hand is the only text font (the owner's own file, bundled inside the app, so everything works offline); Noto Sans Math is only a hidden fallback for symbols. Math symbols (√ ∑ π ≠ ≤ ∞ ∫ Greek) come from the Math font when the chosen font lacks them. */
 export const FONTS: FontChoice[] = [
   { id: "patrick", label: "Handwriting (Patrick Hand)", url: patrick },
 ];
 export const MATH_URL = math;
-
-/** Step 24: fonts the owner uploads. They are parsed in memory (no network, no file URL) and listed after the bundled font. */
-const customChoices: FontChoice[] = [];
-/** Bundled fonts first, then the uploaded ones in the order they were added. */
-export const allFonts = (): FontChoice[] => [...FONTS, ...customChoices];
-export const findFont = (id: string): FontChoice => allFonts().find(f => f.id === id) ?? FONTS[0];
-export const FONT_EXTENSIONS = [".ttf", ".otf", ".woff"];
-const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "font";
-
-/** Reads font bytes (TTF, OTF or WOFF) and adds the font to the list. The same file name uploaded again replaces the old one. Throws a plain message for a file that is not a font. */
-export function addCustomFont(fileName: string, bytes: ArrayBuffer): FontChoice {
-  let font: opentype.Font;
-  try { font = opentype.parse(bytes); } catch { throw new Error(`${fileName} is not a font this app can read. Use a .ttf, .otf or .woff file.`); }
-  if (!font.glyphs || font.glyphs.length < 2) throw new Error(`${fileName} has no letters in it.`);
-  const family = font.names?.fontFamily?.en || Object.values(font.names?.fontFamily ?? {})[0] || fileName.replace(/\.[^.]+$/, "");
-  const sub = font.names?.fontSubfamily?.en;
-  const label = `${family}${sub && !/^regular$/i.test(sub) ? " " + sub : ""} (uploaded)`;
-  const id = `custom-${slug(fileName.replace(/\.[^.]+$/, ""))}`;
-  const choice: FontChoice = { id, label, url: `font:${id}`, custom: true };
-  cache.set(choice.url, Promise.resolve(font));
-  const at = customChoices.findIndex(f => f.id === id);
-  if (at >= 0) customChoices[at] = choice; else customChoices.push(choice);
-  return choice;
-}
-export function removeCustomFont(id: string): void {
-  const at = customChoices.findIndex(f => f.id === id);
-  if (at >= 0) { cache.delete(customChoices[at].url); customChoices.splice(at, 1); }
-}
+/** Patrick Hand is the ONLY font (owner decision 2026-11-21: no font upload). Any id gives Patrick Hand. */
+export const findFont = (_id?: string): FontChoice => FONTS[0];
 
 const cache = new Map<string, Promise<opentype.Font>>();
 export function loadFont(url: string): Promise<opentype.Font> {
@@ -52,8 +26,8 @@ export const SHAPES: { id: string; label: string; w: number; h: number }[] = [
   { id: "tall", label: "Tall 9:16 (Shorts)", w: 1080, h: 1920 },
   { id: "square", label: "Square 1:1", w: 1080, h: 1080 },
 ];
-/** write = handwritten: the pen follows the centre line of every letter (no outline). trace = the older look: outline drawn, then filled. */
-export type WriteStyle = "write" | "trace";
+/** The ONLY writing style is handwritten: the pen follows the centre line of every letter (no outline). The outline-then-fill look was removed (owner decision 2026-11-21). */
+export type WriteStyle = "write";
 export interface TextSettings { text: string; fontId: string; color: string; align: Align; size: number /* % of the biggest size that fits */; shape: string; style: WriteStyle; posX?: number /* 0 = far left, 100 = far right of the safe area; undefined = automatic */; posY?: number /* 0 = top, 100 = bottom; undefined = centred */; px?: number /* exact size in canvas pixels (Text Editor screen); when set it replaces the size % */ }
 export const DEFAULT_TEXT: TextSettings = { text: "The Lord is my shepherd;\nI shall not want.\n— Psalm 23:1", fontId: "patrick", color: "#1b2a41", align: "center", size: 100, shape: "wide", style: "write" };
 
@@ -239,8 +213,7 @@ export function glyphPlan(font: opentype.Font, ch: string): GlyphPlan | null {
 }
 
 /** Animated SVG of the text being written. Uses only `<animate from to begin dur>` (like the picture mode), so it exports to MP4 the same way.
- *  - "write": each letter is uncovered by a pen that follows the centre line of its strokes, so the letters appear as if written by hand.
- *  - "trace": each letter is traced by its outline and then filled in.
+ *  Each letter is uncovered by a pen that follows the centre line of its strokes, so the letters appear as if written by hand.
  *  Letters follow one another with no gaps; the whole text is finished exactly after `seconds`. */
 export function textSvg(laid: Laid, s: TextSettings, bgMarkupSvg: string, seconds: number): string {
   const parts = textParts(laid, s, Math.max(0.3, seconds), 0, "w");
@@ -249,24 +222,15 @@ export function textSvg(laid: Laid, s: TextSettings, bgMarkupSvg: string, second
 
 /** The letters of a laid-out text as animated SVG markup (no <svg> wrapper), written between `t0` and `t0 + T` seconds.
  *  `idp` makes the mask ids unique when several texts share one picture. T = 0 gives the finished text at once (no animation). */
-export function textParts(laid: Laid, s: { color: string; style: WriteStyle }, T: number, t0: number, idp: string): string {
+export function textParts(laid: Laid, s: { color: string; style?: WriteStyle }, T: number, t0: number, idp: string): string {
   if (T <= 0) return `<g fill="${s.color}">${laid.glyphs.map(g => `<path d="${g.d}"/>`).join("")}</g>`;
-  const sw = Math.max(1.2, laid.size * 0.022);
-  const write = s.style === "write";
-  const pl = write ? laid.glyphs.map(g => glyphPlan(g.font, g.ch)) : [];
-  const weights = laid.glyphs.map((g, i) => (write ? (pl[i] ? pl[i]!.strokes.reduce((a, q) => a + q.len, 0) : 0) + 260 : g.len + laid.size * 0.6));
+  const pl = laid.glyphs.map(g => glyphPlan(g.font, g.ch));
+  const weights = laid.glyphs.map((g, i) => (pl[i] ? pl[i]!.strokes.reduce((a, q) => a + q.len, 0) : 0) + 260);
   const total = weights.reduce((a, b) => a + b, 0) || 1;
   let t = t0;
   return laid.glyphs.map((g, i) => {
     const d = (weights[i] / total) * T, b = t; t += d;
     const plan = pl[i];
-    if (!write) {
-      return `<path d="${g.d}" pathLength="1" fill="${s.color}" fill-opacity="0" stroke="${s.color}" stroke-width="${f3(sw)}" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="1 2" stroke-dashoffset="1.02">`
-        + `<animate attributeName="stroke-dashoffset" from="1.02" to="0" begin="${f3(b)}s" dur="${f3(d * 0.65)}s" fill="freeze"/>`
-        + `<animate attributeName="fill-opacity" from="0" to="1" begin="${f3(b + d * 0.4)}s" dur="${f3(d * 0.6)}s" fill="freeze"/>`
-        + `<animate attributeName="stroke-opacity" from="1" to="0" begin="${f3(b + d * 0.75)}s" dur="${f3(d * 0.25)}s" fill="freeze"/>`
-        + `</path>`;
-    }
     const k = g.sz / 1000, place = `translate(${f3(g.x)} ${f3(g.y)}) scale(${+k.toFixed(6)})`;
     if (!plan || !plan.strokes.length) {   // nothing to follow: fade the letter in
       return `<g transform="${place}"><path d="${plan?.outline ?? ""}" fill="${s.color}" fill-opacity="0"><animate attributeName="fill-opacity" from="0" to="1" begin="${f3(b)}s" dur="${f3(Math.max(0.05, d))}s" fill="freeze"/></path></g>`;

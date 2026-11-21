@@ -41,26 +41,14 @@ const wide = mod.layoutText(main, math, base, cv), moved = mod.layoutText(main, 
 ok(wide.glyphs.length === moved.glyphs.length && wide.size === moved.size, "moving does not change the letters or the size");
 const box = mod.layoutInBox(main, math, "Heading", { x: 100, y: 100, w: 600, h: 120 }, cv);
 ok(box.glyphs.length === 7, "Video-tab box layout still works");
-// ---- step 24: uploaded fonts
+// ---- Patrick Hand is the ONLY font (owner decision 2026-11-21: no font upload)
 {
-  const buf = f => { const b = readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
-  ok(mod.allFonts().length === 1 && mod.allFonts()[0].id === "patrick", "step 24: at first only the bundled font is listed");
-  const c = mod.addCustomFont("My Hand.ttf", buf("src/fonts/PatrickHand-Regular.ttf"));
-  ok(c.id === "custom-my-hand" && c.custom === true && /\(uploaded\)$/.test(c.label), "step 24: an uploaded .ttf is listed as an uploaded font (" + c.label + ")");
-  ok(mod.allFonts().length === 2 && mod.allFonts()[1].id === c.id && mod.findFont(c.id).custom === true, "step 24: it is added after the bundled font and can be found by id");
-  const f = await mod.loadFont(c.url);
-  ok(f.charToGlyphIndex("A") > 0 && f.glyphs.length > 50, "step 24: loadFont returns the uploaded font without any network");
-  mod.addCustomFont("My Hand.ttf", buf("src/fonts/PatrickHand-Regular.ttf"));
-  ok(mod.allFonts().length === 2, "step 24: the same file name again replaces, not duplicates");
-  const w = mod.addCustomFont("Math.woff", buf("node_modules/@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff"));
-  ok(w.id === "custom-math" && mod.allFonts().length === 3, "step 24: a .woff file works too");
-  let msg = ""; try { mod.addCustomFont("notes.ttf", new TextEncoder().encode("this is not a font").buffer); } catch (e) { msg = e.message; }
-  ok(/not a font/.test(msg) && mod.allFonts().length === 3, "step 24: a file that is not a font is refused with a plain message and not listed");
-  ok(mod.findFont("custom-gone").id === "patrick", "step 24: an unknown font id falls back to the bundled font");
-  const laid = mod.layoutText(f, math, { ...mod.DEFAULT_TEXT, text: "Hello", size: 50 }, cv);
-  ok(laid.glyphs.length === 5, "step 24: text can be laid out with the uploaded font");
-  mod.removeCustomFont(c.id); mod.removeCustomFont(w.id);
-  ok(mod.allFonts().length === 1 && mod.findFont(c.id).id === "patrick", "step 24: removing the uploaded fonts leaves only the bundled one");
+  ok(mod.FONTS.length === 1 && mod.FONTS[0].id === "patrick", "only the bundled Patrick Hand font is listed");
+  ok(mod.findFont("custom-gone").id === "patrick" && mod.findFont(undefined).id === "patrick" && mod.findFont("anything").id === "patrick", "any font id gives Patrick Hand");
+  ok(mod.allFonts === undefined && mod.addCustomFont === undefined && mod.removeCustomFont === undefined && mod.FONT_EXTENSIONS === undefined, "font upload functions no longer exist");
+  const laid = mod.layoutText(main, math, { ...mod.DEFAULT_TEXT, text: "Hello", size: 50 }, cv);
+  ok(laid.glyphs.length === 5, "text can be laid out with Patrick Hand");
+  ok(mod.DEFAULT_TEXT.style === "write", "the only writing style is handwritten (write)");
 }
 const P = mod.layoutText(main, math, { ...base, px: 90 }, cv);
 ok(Math.abs(P.size - 90) < 0.01 && P.fit > 90, "exact px size: used as given, and the biggest fitting size is reported");

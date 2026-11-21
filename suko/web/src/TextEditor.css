@@ -1,4 +1,4 @@
-/* Text Editor screen (layout from "Text Editor - write / export"). Everything is scoped under .te so the Image and Video modes keep their own look. */
+/* Text Editor screen (layout from "Text Editor - write / export"). Everything is scoped under .te. */
 .te { --bg: #0b0d12; --card: #151821; --line: #2d3038; --track: #292a2f; --ink: #f4f5f8; --muted: #8b909c; --accent: #7c3aed; --accent2: #8b5cf6; --blue: #38bdf8; --warn: #f5b82e; --ok: #34d399;
   min-height: 100dvh; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
 .te *, .te *::before, .te *::after { box-sizing: border-box; }
@@ -37,7 +37,7 @@
 .te .range::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 50%; background: #eef0f6; border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
 .te .range::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #eef0f6; border: 0; }
 
-.te .tabrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; }
+.te .tabrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
 .te .pill { height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid var(--line); background: transparent; color: #dfe2ea; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .te .tabrow .pill { padding: 0; }
 .te .pill.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }

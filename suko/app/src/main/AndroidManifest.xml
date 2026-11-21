@@ -12,7 +12,7 @@
         android:largeHeap="true"
         android:theme="@style/Theme.Bezalel">
 
-        <!-- Home screen: the three tools -->
+        <!-- Home screen: the two tools -->
         <activity
             android:name="com.suko.app.HubActivity"
             android:exported="true">
@@ -21,26 +21,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Upscale Images: batch AI upscale (files, ZIPs, folders in; PNG folder or ZIPs out) -->
-        <activity
-            android:name="com.suko.app.UpscaleImagesActivity"
-            android:label="Upscale Images"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
-
-        <!-- Upscale self-test (step 2) -->
-        <activity
-            android:name="com.suko.app.UpscaleTestActivity"
-            android:label="Upscale test"
-            android:exported="false"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|layoutDirection|fontScale" />
-
-        <!-- SVG Editor (step 24: intake only) -->
-        <activity
-            android:name="com.suko.app.SvgEditorActivity"
-            android:label="SVG Editor"
-            android:exported="false" />
 
         <!-- Web host (steps 16-18): shows pages from assets/web, offline only. The app has no INTERNET permission. -->
         <activity

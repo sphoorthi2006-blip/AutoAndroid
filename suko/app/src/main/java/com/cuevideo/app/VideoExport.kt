@@ -1,18 +1,8 @@
 package com.cuevideo.app
 
 import android.content.Context
-import android.net.Uri
 import android.opengl.GLES20
-import com.suko.app.upscale.AiEngine
-import com.suko.app.upscale.ClassicEngine
-import com.suko.app.upscale.ExportProgress
-import com.suko.app.upscale.ExportUpscale
-import com.suko.app.upscale.Outcome
-import com.suko.app.upscale.UpscaleCache
-import com.suko.app.upscale.UpscaleRunner
-import com.suko.app.upscale.UpscaleSettings
 import java.io.File
-import java.io.IOException
 
 class ExportCancelled : Exception()
 
@@ -21,8 +11,6 @@ class ExportOutcome(
     val frames: Int,
     val seconds: Double,
     val audio: AudioResult?,
-    /** Step 14: plain sentence about pictures that were not upscaled normally, or null. */
-    val upscaleNote: String? = null,
 )
 
 /**
@@ -31,9 +19,7 @@ class ExportOutcome(
  * from one 2x text bitmap, scene clips are decoded to a texture and drawn with black bars.
  */
 object VideoExport {
-    private const val AUDIO_SHARE = 0.15      // share of phase 2 (render) used by the audio mix
-    private const val RENDER_FPS_GUESS = 90.0 // assumed encode speed, only used to split the one bar between the phases
-    private const val CACHE_LIMIT = 2L shl 30 // keep at most about 2 GB of upscaled pictures
+    private const val AUDIO_SHARE = 0.15      // share of the one progress bar used by the audio mix
 
     fun run(
         ctx: Context,
@@ -52,47 +38,9 @@ object VideoExport {
         val W = Defaults.W
         val H = Defaults.H
 
-        // 0. phase 1 (step 14): upscale every picture the video really shows, one at a time, into the cache.
-        //    Finished results are reused, so a second export or a resume after a cancel only does the rest.
-        val settings = UpscaleSettings(removeMark = true)
-        val cache = UpscaleCache(File(ctx.cacheDir, "upscale"))
-        //    The "Upscale images" switch (s.upscale) turns the whole phase off: pictures are then used as they are.
-        val pics = if (!s.upscale) emptyList() else plan.segments.filter { it.kind == SegKind.STILL }.mapNotNull { it.image }
-            .distinctBy { it.uri }.map { ExportUpscale.Pic(it.name, it.uri) }
-        var swap: Map<String, String> = emptyMap()
-        var upscaleNote: String? = null
-        if (s.upscale) progressOverall("Checking pictures...", 0.0)
-        val upPlan = if (!s.upscale) null else try {
-            ExportUpscale.prepare(pics, cache, settings) { uri ->
-                ctx.contentResolver.openInputStream(Uri.parse(uri)) ?: throw IOException("could not open $uri")
-            }
-        } catch (e: Exception) {
-            upscaleNote = "pictures were not upscaled (${e.message ?: e.javaClass.simpleName})."
-            null
-        }
-        val ep = ExportProgress(upPlan?.todo?.size ?: 0, plan.totalFrames / RENDER_FPS_GUESS)
-        if (upPlan != null) {
-            if (upPlan.todo.isNotEmpty()) {
-                val runner = UpscaleRunner(cache, AiEngine(ctx, settings.removeMark), ClassicEngine(ctx, settings.removeMark)) { System.gc() }
-                val batch = runner.run(
-                    upPlan, cancelled,
-                    onProgress = { r ->
-                        progressOverall(
-                            ep.label(ExportProgress.Phase.UPSCALE, r.picturesDone),
-                            ep.overall(ExportProgress.Phase.UPSCALE, ep.upscaleFraction(r.picturesDone, r.tileDone, r.tileTotal)),
-                        )
-                    },
-                    onPicture = { r, sec -> if (r.outcome == Outcome.OK) ep.pictureDone(sec) },
-                )
-                if (batch.cancelled) return null
-                upscaleNote = ExportUpscale.note(batch)
-            }
-            swap = ExportUpscale.swapMap(upPlan, cache)
-            cache.trimTo(CACHE_LIMIT, upPlan.jobs.map { it.key }.toSet())
-        }
-        // everything below is phase 2: its own 0..1 is mapped onto the rest of the one bar
+        // One phase only: the progress bar covers audio mix + drawing the video (pictures are used as they are).
         val audioShare = if (audioEnabled) AUDIO_SHARE else 0.0
-        val progress: (String, Double) -> Unit = { label, p -> progressOverall(label, ep.overall(ExportProgress.Phase.RENDER, p)) }
+        val progress: (String, Double) -> Unit = { label, p -> progressOverall(label, p) }
 
         // 1. Optional audio mix. With no voice-over and clicks off, the MP4 has no audio track.
         val mix = File(workDir, "mix.m4a")
@@ -144,7 +92,7 @@ object VideoExport {
                     SegKind.STILL -> {
                         val img = seg.image!!
                         val loaded = try {
-                            renderer.loadPicture(swap[img.uri] ?: img.uri)
+                            renderer.loadPicture(img.uri)
                         } catch (e: OutOfMemoryError) {
                             throw RuntimeException("Not enough memory for the picture ${img.name}.")
                         }
@@ -205,7 +153,7 @@ object VideoExport {
             progress("Finishing the video file...", audioShare + (1 - audioShare) * 0.97)
             sk.finish()
             sink = null
-            return ExportOutcome(outVideo, totalFrames, (System.currentTimeMillis() - started) / 1000.0, audio, upscaleNote)
+            return ExportOutcome(outVideo, totalFrames, (System.currentTimeMillis() - started) / 1000.0, audio)
         } catch (e: ExportCancelled) {
             outVideo.delete()
             return null

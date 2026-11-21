@@ -1,9 +1,9 @@
 pluginManagement {
-    repositories { google(); mavenCentral(); gradlePluginPortal(); maven("https://chaquo.com/maven") }
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral(); maven("https://chaquo.com/maven") }
+    repositories { google(); mavenCentral() }
 }
 rootProject.name = "Bezalel"
 include(":app")

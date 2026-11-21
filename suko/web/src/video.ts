@@ -111,27 +111,24 @@ export function renderMp4(o: Mp4Options): Promise<Blob> {
   return renderMp4Timeline({ slides: [{ svg: o.svg, width: o.width, height: o.height, start: 0, end: o.seconds }], fps: o.fps, resolution: o.resolution, onProgress: o.onProgress, cancelled: o.cancelled });
 }
 
-/** v2 step 9: the default export is 1920x1080 at 30 frames per second, whatever the size of the pictures (they are fitted inside, never stretched). Step 24 adds 2K and 4K (RESOLUTIONS). */
+/** The export is ALWAYS 1920x1080 (owner decision 2026-11-21: 1080p only, no 2K or 4K), whatever the size of the pictures (they are fitted inside, never stretched). */
 export const EXPORT_W = 1920, EXPORT_H = 1080, EXPORT_FPS = 30;
-/** Step 23: the frame rates the owner can choose. */
+/** The frame rates the owner can choose. */
 export const FPS_CHOICES = [30, 60] as const;
 export const safeFps = (v: unknown): number => (v === 60 ? 60 : EXPORT_FPS);
 
-/** Step 24: the export sizes the owner can choose. All are 16:9; pictures are fitted inside (never stretched). */
+/** The one export size. (Kept as a list of one so older callers that pass a `resolution` still work: it is ignored.) */
 export interface Resolution { id: string; label: string; w: number; h: number }
 export const RESOLUTIONS: Resolution[] = [
   { id: "1080p", label: "1080p (1920 x 1080)", w: 1920, h: 1080 },
-  { id: "2k", label: "2K (2560 x 1440)", w: 2560, h: 1440 },
-  { id: "4k", label: "4K (3840 x 2160)", w: 3840, h: 2160 },
 ];
 export const DEFAULT_RESOLUTION = "1080p";
-/** Any unknown value falls back to 1080p. */
-export const safeRes = (v: unknown): Resolution => RESOLUTIONS.find(r => r.id === v) ?? RESOLUTIONS[0];
-/** 4K is limited to 30 frames per second (phones cannot encode or hold 4K at 60). */
-export const MAX_FPS: Record<string, number> = { "4k": 30 };
-export const fpsFor = (res: unknown, fps: unknown): number => Math.min(safeFps(fps), MAX_FPS[safeRes(res).id] ?? 60);
+/** Whatever is asked, the answer is 1080p. */
+export const safeRes = (_v?: unknown): Resolution => RESOLUTIONS[0];
+/** 30 or 60 frames per second (anything else gives 30). The first argument is ignored (there is only 1080p). */
+export const fpsFor = (_res: unknown, fps: unknown): number => safeFps(fps);
 
-/** Frame count, bitrate and key-frame spacing of an export at 1080p, 2K or 4K, 30 or 60 frames per second. */
+/** Frame count, bitrate and key-frame spacing of a 1080p export at 30 or 60 frames per second. */
 export function exportPlan(seconds: number, fpsIn?: number, resIn?: string) {
   const res = safeRes(resIn), fps = fpsFor(res.id, fpsIn);
   return { fps, res, width: res.w, height: res.h, total: Math.max(1, Math.round(seconds * fps)), bitrate: Math.round(res.w * res.h * fps * 0.15), keyEvery: fps * 2,
@@ -140,7 +137,7 @@ export function exportPlan(seconds: number, fpsIn?: number, resIn?: string) {
 /** Rough size of the finished MP4 in bytes (the muxer keeps the whole file in memory, so very big ones can fail on a phone). */
 export const estimateBytes = (seconds: number, fpsIn?: number, resIn?: string): number => Math.round((exportPlan(seconds, fpsIn, resIn).bitrate * Math.max(0, seconds)) / 8);
 
-/** H.264 levels to try, best first. 1080p at 60 fps needs level 4.2 (2a); 2K at 30 fps needs 5.0 (32), 2K at 60 and 4K at 30 need 5.1 (33). 4K is 30 fps only. */
+/** H.264 levels to try, best first. 1080p at 60 fps needs level 4.2 (2a). The higher levels stay in the list as harmless extras. */
 export const H264_CODECS = ["avc1.640034", "avc1.4d0034", "avc1.640033", "avc1.4d0033", "avc1.640032", "avc1.4d0032", "avc1.64002a", "avc1.4d002a", "avc1.42002a", "avc1.42003e", "avc1.640028", "avc1.42001f"];
 /** [level_idc, max macroblocks per second, max macroblocks per frame] from the H.264 level table. */
 const LEVELS: [number, number, number][] = [[0x1f, 108000, 3600], [0x28, 245760, 8192], [0x2a, 522240, 8704], [0x32, 589824, 22080], [0x33, 983040, 36864], [0x34, 2073600, 36864], [0x3e, 4177920, 139264]];
@@ -152,7 +149,7 @@ export function codecsFor(w: number, h: number, fps: number): string[] {
     return !!row && mbs <= row[2] && mbs * fps <= row[1];
   });
 }
-/** Which of the export sizes this phone's encoder can make at this frame rate (nothing is encoded, only asked). */
+/** Whether this phone's encoder can make 1080p at this frame rate (nothing is encoded, only asked). */
 export async function supportedResolutions(fpsIn?: number): Promise<Record<string, boolean>> {
   const out: Record<string, boolean> = {};
   for (const r of RESOLUTIONS) {
@@ -257,7 +254,7 @@ export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
   if (!o.slides.length) throw new Error("There is nothing to export yet.");
   const slides = o.slides;
   const seconds = slides[slides.length - 1].end;
-  const plan = exportPlan(seconds, o.fps, o.resolution);   // step 23/24: 1080p, 2K or 4K at 30 or 60 fps
+  const plan = exportPlan(seconds, o.fps, o.resolution);   // 1080p at 30 or 60 fps
   const fps = plan.fps, total = plan.total;
   const W = plan.width, H = plan.height;
 
@@ -267,7 +264,7 @@ export async function renderMp4Timeline(o: TimelineOptions): Promise<Blob> {
     const c: VideoEncoderConfig = { ...base, codec, avc: { format: "avc" } } as VideoEncoderConfig;
     try { if ((await VideoEncoder.isConfigSupported(c)).supported) { config = c; break; } } catch { /* try the next one */ }
   }
-  if (!config) throw new Error(`This phone has no H.264 encoder for ${plan.res.id === "1080p" ? "1080p" : plan.res.id.toUpperCase()} at ${fps} frames per second. Try a smaller size${fps > 30 ? " or 30 frames per second" : ""}.`);
+  if (!config) throw new Error(`This phone has no H.264 encoder for 1080p at ${fps} frames per second.${fps > 30 ? " Try 30 frames per second." : ""}`);
 
   const target = new ArrayBufferTarget();
   const wantsAudio = !!o.audio || !!o.soundEvents?.length;

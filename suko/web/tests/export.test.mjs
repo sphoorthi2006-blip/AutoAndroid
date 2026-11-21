@@ -57,41 +57,34 @@ ok(calls.configs[0].framerate === 30 && calls.encoded.length === 30, "no fps giv
 let n = 0;
 let msg = ""; try { await mod.renderMp4({ svg, width: 1920, height: 1080, seconds: 5, fps: 60, cancelled: () => ++n > 20 }); } catch (e) { msg = e.message; }
 ok(/cancel/i.test(msg), "cancel stops a 60 fps export with a clear message");
-// ---- step 24: 1080p / 2K / 4K
-ok(JSON.stringify(mod.RESOLUTIONS.map(r => [r.id, r.w, r.h])) === '[["1080p",1920,1080],["2k",2560,1440],["4k",3840,2160]]', "step 24: the sizes are 1080p, 2K (2560x1440) and 4K (3840x2160)");
-ok(mod.safeRes("4k").w === 3840 && mod.safeRes("2k").h === 1440 && mod.safeRes("8k").id === "1080p" && mod.safeRes(undefined).id === "1080p", "step 24: any unknown size falls back to 1080p");
-ok(mod.exportPlan(10, 30).width === 1920 && mod.exportPlan(10, 30).bitrate === Math.round(1920 * 1080 * 30 * 0.15), "step 24: no size given = 1080p with the old bitrate");
-const q4 = mod.exportPlan(10, 30, "4k"), q2 = mod.exportPlan(10, 60, "2k");
-ok(q4.width === 3840 && q4.height === 2160 && q4.bitrate === Math.round(3840 * 2160 * 30 * 0.15) && q4.total === 300, "step 24: 4K plan (size, bitrate, frames)");
-ok(q2.width === 2560 && q2.total === 600 && q2.bitrate === Math.round(2560 * 1440 * 60 * 0.15), "step 24: 2K at 60 fps plan");
-ok(mod.estimateBytes(10, 30, "4k") === Math.round(q4.bitrate * 10 / 8) && mod.estimateBytes(10, 30, "4k") > mod.estimateBytes(10, 30, "2k") && mod.estimateBytes(10, 30, "2k") > mod.estimateBytes(10, 30, "1080p"), "step 24: bigger size = bigger estimated file");
+// ---- 1080p only (owner decision 2026-11-21: no 2K, no 4K)
+ok(JSON.stringify(mod.RESOLUTIONS.map(r => [r.id, r.w, r.h])) === '[["1080p",1920,1080]]', "the only size is 1080p (1920x1080)");
+ok(mod.safeRes("4k").w === 1920 && mod.safeRes("2k").h === 1080 && mod.safeRes("8k").id === "1080p" && mod.safeRes(undefined).id === "1080p", "any size asked for (2K, 4K, unknown) gives 1080p");
+ok(mod.exportPlan(10, 30).width === 1920 && mod.exportPlan(10, 30).bitrate === Math.round(1920 * 1080 * 30 * 0.15), "1080p plan at 30 fps");
+const p4 = mod.exportPlan(10, 60, "4k");
+ok(p4.width === 1920 && p4.height === 1080 && p4.fps === 60 && p4.total === 600 && p4.bitrate === Math.round(1920 * 1080 * 60 * 0.15), "asking 4K still gives a 1080p plan (60 fps kept)");
+ok(mod.estimateBytes(10, 60) > mod.estimateBytes(10, 30), "60 fps = bigger estimated file than 30 fps");
 const lv = c => parseInt(c.slice(-2), 16);
-ok(mod.codecsFor(1920, 1080, 30).some(c => lv(c) === 0x28) && mod.codecsFor(1920, 1080, 30).length > 0, "step 24: 1080p at 30 fps may use level 4.0");
-ok(mod.codecsFor(1920, 1080, 60).every(c => lv(c) >= 0x2a), "step 24: 1080p at 60 fps needs level 4.2 or higher");
-ok(mod.codecsFor(2560, 1440, 30).every(c => lv(c) >= 0x32) && mod.codecsFor(2560, 1440, 30).length > 0, "step 24: 2K at 30 fps needs level 5.0 or higher");
-ok(mod.codecsFor(2560, 1440, 60).every(c => lv(c) >= 0x33) && mod.codecsFor(3840, 2160, 30).every(c => lv(c) >= 0x33) && mod.codecsFor(3840, 2160, 30).length > 0, "step 24: 2K at 60 fps and 4K at 30 fps need level 5.1 or higher");
-ok(mod.fpsFor("4k", 60) === 30 && mod.fpsFor("4k", 30) === 30 && mod.fpsFor("2k", 60) === 60 && mod.fpsFor("1080p", 60) === 60, "step 24: 4K is 30 fps only; 1080p and 2K keep 30 or 60");
-ok(mod.exportPlan(10, 60, "4k").fps === 30 && mod.exportPlan(10, 60, "4k").total === 300, "step 24: asking 4K at 60 fps gives 30 fps");
-Object.assign(calls, { configs: [], encoded: [] });
-await mod.renderMp4({ svg, width: 1920, height: 1080, seconds: 1, fps: 60, resolution: "4k" });
-ok(calls.configs[0].framerate === 30 && calls.encoded.length === 30, "step 24: a 4K export asked for 60 fps is made at 30 fps");
-for (const [id, W, H] of [["2k", 2560, 1440], ["4k", 3840, 2160], ["1080p", 1920, 1080]]) {
+ok(mod.codecsFor(1920, 1080, 30).some(c => lv(c) === 0x28) && mod.codecsFor(1920, 1080, 30).length > 0, "1080p at 30 fps may use level 4.0");
+ok(mod.codecsFor(1920, 1080, 60).every(c => lv(c) >= 0x2a), "1080p at 60 fps needs level 4.2 or higher");
+ok(mod.fpsFor("4k", 60) === 60 && mod.fpsFor("1080p", 30) === 30 && mod.fpsFor("1080p", 45) === 30, "frame rate is 30 or 60 only (anything else gives 30)");
+for (const fpsWanted of [30, 60]) {
   Object.assign(calls, { configs: [], encoded: [] }); globalThis.__chunks = 0;
   const made = []; const keep = globalThis.document.createElement;
   globalThis.document.createElement = () => { const c = { width: 0, height: 0, getContext: () => ctx }; made.push(c); return c; };
-  await mod.renderMp4({ svg, width: 1920, height: 1080, seconds: 1, fps: 30, resolution: id });
+  await mod.renderMp4({ svg, width: 1920, height: 1080, seconds: 1, fps: fpsWanted, resolution: "4k" });
   globalThis.document.createElement = keep;
-  ok(calls.configs[0].width === W && calls.configs[0].height === H && calls.configs[0].framerate === 30, `step 24: ${id}: encoder set to ${W}x${H}`);
-  ok(globalThis.__mux.video.width === W && globalThis.__mux.video.height === H, `step 24: ${id}: muxer told ${W}x${H}`);
-  ok(made.some(c => c.width === W && c.height === H) && calls.encoded.length === 30, `step 24: ${id}: frames are drawn on a ${W}x${H} canvas, 30 frames for 1 s`);
+  ok(calls.configs[0].width === 1920 && calls.configs[0].height === 1080 && calls.configs[0].framerate === fpsWanted, `${fpsWanted} fps: encoder set to 1920x1080 even when 4K is asked`);
+  ok(globalThis.__mux.video.width === 1920 && globalThis.__mux.video.height === 1080, `${fpsWanted} fps: muxer told 1920x1080`);
+  ok(made.some(c => c.width === 1920 && c.height === 1080) && calls.encoded.length === fpsWanted, `${fpsWanted} fps: frames are drawn on a 1920x1080 canvas, ${fpsWanted} frames for 1 s`);
 }
 {
   const keepSupport = globalThis.VideoEncoder.isConfigSupported;
-  globalThis.VideoEncoder.isConfigSupported = async c => ({ supported: c.width < 3000 });   // a phone that cannot do 4K
-  const sup = await mod.supportedResolutions(30);
-  ok(sup["1080p"] === true && sup["2k"] === true && sup["4k"] === false, "step 24: the phone check says yes to 1080p and 2K, no to 4K");
-  let m4 = ""; try { await mod.renderMp4({ svg, width: 1920, height: 1080, seconds: 1, resolution: "4k" }); } catch (e) { m4 = e.message; }
-  ok(/4K/.test(m4) && /smaller size/.test(m4), "step 24: an unsupported size gives a clear message (" + m4 + ")");
+  globalThis.VideoEncoder.isConfigSupported = async c => ({ supported: c.framerate <= 30 });   // a phone that cannot do 1080p at 60
+  const sup30 = await mod.supportedResolutions(30), sup60 = await mod.supportedResolutions(60);
+  ok(sup30["1080p"] === true && sup60["1080p"] === false, "the phone check says yes to 1080p at 30 fps and no at 60 fps");
+  let m6 = ""; try { await mod.renderMp4({ svg, width: 1920, height: 1080, seconds: 1, fps: 60 }); } catch (e) { m6 = e.message; }
+  ok(/1080p/.test(m6) && /30 frames/.test(m6), "an unsupported frame rate gives a clear message (" + m6 + ")");
   globalThis.VideoEncoder.isConfigSupported = keepSupport;
 }
 // ---- new workflow step 7: a scene clip in the timeline

@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { bgMarkup, download } from "./compose";
+import { bgMarkup, download } from "./bg";
 import { goBack } from "./bridge";
-import { allFonts, buildTextSvg, DEFAULT_TEXT, findFont, FONT_EXTENSIONS, SHAPES, type TextScene, type TextSettings } from "./textanim";
-import { restoreFonts, uploadFont } from "./fontStore";
-import type { Background, Project } from "./types";
+import { buildTextSvg, DEFAULT_TEXT, FONTS, SHAPES, type TextScene, type TextSettings } from "./textanim";
+import type { Background } from "./types";
 import { keepAlive } from "./bridge";
-import { estimateBytes, exportPlan, FPS_CHOICES, fpsFor, mp4Supported, renderMp4, RESOLUTIONS, safeRes, Scrubber, supportedResolutions } from "./video";
+import { estimateBytes, exportPlan, FPS_CHOICES, mp4Supported, renderMp4, Scrubber, supportedResolutions } from "./video";
 import "./TextEditor.css";
 
 /** The video ends this long after the last letter is finished, so the finished text is on screen in the last frames. */
 const HOLD = 0.1;
-const TABS = [{ id: "text", label: "Text" }, { id: "style", label: "Style" }, { id: "motion", label: "Motion" }, { id: "export", label: "Export" }] as const;
+const TABS = [{ id: "text", label: "Text" }, { id: "style", label: "Style" }, { id: "export", label: "Export" }] as const;
 type Tab = (typeof TABS)[number]["id"];
 const TEXT_COLORS = ["#1b2a41", "#000000", "#ffffff", "#c0392b", "#1f4fd8", "#2e7d32", "#b7791f"];
 const BG_COLORS = ["#fdf6e3", "#ffffff", "#0b0d12", "#1b2a41", "#fff3b0", "#dff3ff"];
@@ -121,29 +120,25 @@ export default function TextEditor() {
   const [seconds, setSeconds] = useState(8);
   const [durText, setDurText] = useState("8");
   const [fps, setFps] = useState<number>(30);
-  const [resId, setResId] = useState<string>("1080p");
-  const [resOk, setResOk] = useState<Record<string, boolean> | null>(null);
+  const [resOk, setResOk] = useState<boolean | null>(null);   // can this phone encode 1080p at the chosen frame rate
   const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
-  const [fontName, setFontName] = useState(0);   // re-renders the font line after a font file is added
   const cancel = useRef(false);
-  const fontFile = useRef<HTMLInputElement>(null);
   const bgFile = useRef<HTMLInputElement>(null);
 
   // The handwriting font is also used for the text box, so what you type looks like what is drawn.
   useEffect(() => {
-    try { const f = new FontFace("SukoHand", `url(${allFonts()[0].url})`); f.load().then(() => document.fonts.add(f)).catch(() => {}); } catch { /* the box keeps the system font */ }
+    try { const f = new FontFace("SukoHand", `url(${FONTS[0].url})`); f.load().then(() => document.fonts.add(f)).catch(() => {}); } catch { /* the box keeps the system font */ }
     document.body.style.background = "#0b0d12";
-    restoreFonts().then(() => setFontName(n => n + 1));   // fonts the owner uploaded earlier
   }, []);
 
-  // Which export sizes this phone's encoder can make (asked, not encoded).
+  // Can this phone's encoder make 1080p at the chosen frame rate (asked, not encoded).
   useEffect(() => {
     let live = true; setResOk(null);
-    if (mp4Supported()) supportedResolutions(fpsFor(resId, fps)).then(r => { if (live) setResOk(r); }).catch(() => {});
+    if (mp4Supported()) supportedResolutions(fps).then(r => { if (live) setResOk(r["1080p"] ?? false); }).catch(() => {});
     return () => { live = false; };
-  }, [fps, resId]);
+  }, [fps]);
 
   // Typing "20" must not restart the preview at "2": the length is applied when typing stops.
   useEffect(() => {
@@ -156,7 +151,7 @@ export default function TextEditor() {
   useEffect(() => {
     let live = true;
     const id = setTimeout(() => {
-      buildTextSvg(tx, (w, h) => bgMarkup({ width: w, height: h } as Project, bg), Math.max(0.5, seconds - HOLD))
+      buildTextSvg(tx, (w, h) => bgMarkup({ width: w, height: h }, bg), Math.max(0.5, seconds - HOLD))
         .then(r => { if (live) { setScene(r); setError(""); } })
         .catch(e => { if (live) setError(e.message ?? "Could not draw the text."); });
     }, 60);
@@ -166,14 +161,6 @@ export default function TextEditor() {
   const pos = posOf(scene);
   const set = (p: Partial<TextSettings>) => setTx(t => ({ ...t, ...p }));
   const nudge = (dx: number, dy: number) => set({ posX: clamp(Math.round((tx.posX ?? pos.x) + dx), 0, 100), posY: clamp(Math.round((tx.posY ?? pos.y) + dy), 0, 100) });
-  const fonts = allFonts(), font = findFont(tx.fontId);
-  void fontName;
-
-  async function pickFont(f: File | undefined) {
-    if (!f) return;
-    try { const c = await uploadFont(f); set({ fontId: c.id }); setFontName(n => n + 1); }
-    catch (e: any) { setError(e.message ?? "Could not use this font file."); }
-  }
   function pickBg(f: File | undefined) {
     if (!f) return;
     const r = new FileReader();
@@ -189,10 +176,10 @@ export default function TextEditor() {
 
   async function exportMp4() {
     if (!scene) return;
-    setError(""); setSaved(""); cancel.current = false; setExporting({ done: 0, total: exportPlan(seconds, fpsFor(resId, fps), resId).total }); void keepAlive(true);
+    setError(""); setSaved(""); cancel.current = false; setExporting({ done: 0, total: exportPlan(seconds, fps).total }); void keepAlive(true);
     try {
-      const blob = await renderMp4({ svg: scene.svg, width: scene.width, height: scene.height, seconds, fps: fpsFor(resId, fps), resolution: resId, onProgress: (done, total) => setExporting({ done, total }), cancelled: () => cancel.current });
-      const name = `text-${resId}-${fpsFor(resId, fps)}fps-${Math.round(seconds * 10) / 10}s.mp4`;
+      const blob = await renderMp4({ svg: scene.svg, width: scene.width, height: scene.height, seconds, fps, onProgress: (done, total) => setExporting({ done, total }), cancelled: () => cancel.current });
+      const name = `text-1080p-${fps}fps-${Math.round(seconds * 10) / 10}s.mp4`;
       download(name, blob);
       setSaved(name);
     } catch (e: any) { if (!cancel.current) setError(e.message ?? "MP4 export failed."); }
@@ -217,7 +204,7 @@ export default function TextEditor() {
 
       <div className="body">
         {error && <p className="xerr">{error}</p>}
-        <Player scene={scene} seconds={seconds} controls={!onExport} boxes={!onExport} badge={resId === "1080p" ? "1080p" : resId.toUpperCase()} onMove={(x, y) => set({ posX: x ?? tx.posX, posY: y ?? tx.posY })} onSize={px => sizeSet(px)} />
+        <Player scene={scene} seconds={seconds} controls={!onExport} boxes={!onExport} badge="1080p" onMove={(x, y) => set({ posX: x ?? tx.posX, posY: y ?? tx.posY })} onSize={px => sizeSet(px)} />
 
         <div className="tabrow" role="tablist">
           {TABS.map(x => <button key={x.id} role="tab" aria-selected={tab === x.id} className={tab === x.id ? "pill on" : "pill"} onClick={() => setTab(x.id)}>{x.label}</button>)}
@@ -231,14 +218,7 @@ export default function TextEditor() {
               <input id="te-len" className="field numf" type="text" inputMode="decimal" value={durText} disabled={!!exporting} onChange={e => setDurText(e.target.value)} />
             </div>
             <p className="note">The text is written in exactly this time. Press play above to watch it; the exported video is the same length.</p>
-            <div className="row between">
-              <div><span className="lab">Font</span><b className="val">{font.id === "patrick" ? "Patrick Hand (built in)" : font.label}</b></div>
-              <button className="pill" onClick={() => fontFile.current?.click()}>Add font file</button>
-              <input ref={fontFile} type="file" accept={FONT_EXTENSIONS.join(",")} hidden onChange={e => { pickFont(e.target.files?.[0]); e.target.value = ""; }} />
-            </div>
-            {fonts.length > 1 && (
-              <select className="field" value={tx.fontId} onChange={e => set({ fontId: e.target.value })} aria-label="Font">{fonts.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}</select>
-            )}
+            <div className="row between"><span className="lab">Font</span><b className="val">Patrick Hand (built in)</b></div>
             <div className="row between"><span className="lab">Size</span><span className="val">{sizeFmt(sizeNow)} px</span></div>
             <input className="range" type="range" min="20" max={sizeMax} step="1" value={clamp(sizeNow, 20, sizeMax)} style={fill(clamp(sizeNow, 20, sizeMax), 20, sizeMax)} aria-label="Size" onChange={e => sizeSet(+e.target.value)} />
             <span className="lab">Position</span>
@@ -282,24 +262,14 @@ export default function TextEditor() {
             </div>
           </>)}
 
-          {tab === "motion" && (<>
-            <span className="lab">How the text appears</span>
-            <button className={tx.style === "write" ? "opt on" : "opt"} onClick={() => set({ style: "write" })}><b>Handwritten</b><small>The pen follows each stroke of every letter.</small></button>
-            <button className={tx.style === "trace" ? "opt on" : "opt"} onClick={() => set({ style: "trace" })}><b>Outline, then fill</b><small>Each letter is traced by its outline, then filled in.</small></button>
-            <p className="note">All the text is written in exactly the video length (set it in the Text tab). Press play above to watch it.</p>
-          </>)}
-
           {tab === "export" && (<>
             <h2>Export video</h2>
-            <div className="row between"><span className="lab">Size</span><b className="val">{safeRes(resId).w} x {safeRes(resId).h}</b></div>
+            <div className="row between"><span className="lab">Size</span><b className="val">1920 x 1080 (1080p)</b></div>
             <div className="row between"><span className="lab">Video length</span><b className="val">{seconds} s (change it in the Text tab)</b></div>
-            <div className="row wrap">
-              {RESOLUTIONS.map(r => <button key={r.id} className={resId === r.id ? "pill on" : "pill"} disabled={!!exporting} onClick={() => { setResId(r.id); setFps(f => fpsFor(r.id, f)); }}>{r.id === "1080p" ? "1080p" : r.id.toUpperCase()}{resOk && !resOk[r.id] ? " ✕" : ""}</button>)}
-            </div>
             <div className="row"><span className="lab">Frame rate</span>
-              {FPS_CHOICES.map(f => <button key={f} className={fps === f ? "pill on" : "pill"} disabled={!!exporting || f !== fpsFor(resId, f)} onClick={() => setFps(f)}>{f} fps</button>)}
+              {FPS_CHOICES.map(f => <button key={f} className={fps === f ? "pill on" : "pill"} disabled={!!exporting} onClick={() => setFps(f)}>{f} fps</button>)}
             </div>
-            <p className="inset">No upscaling here: text is drawn sharp at every size, so the Upscale images switch is not shown in this tool. About {mb(estimateBytes(seconds, fpsFor(resId, fps), resId))} for {Math.round(seconds)} s.{resId === "4k" ? " 4K is 30 fps only." : ""}{resOk && !resOk[resId] ? " This phone's encoder may not support this size at this frame rate; try a smaller size." : ""}{estimateBytes(seconds, fpsFor(resId, fps), resId) > 400e6 ? " Big file: it is built in memory, so a phone with little RAM may fail." : ""}</p>
+            <p className="inset">Text is drawn sharp, so nothing is upscaled. About {mb(estimateBytes(seconds, fps))} for {Math.round(seconds)} s.{resOk === false ? " This phone's encoder may not support 1080p at this frame rate; try 30 fps." : ""}{estimateBytes(seconds, fps) > 400e6 ? " Big file: it is built in memory, so a phone with little RAM may fail." : ""}</p>
             <button className="go" disabled={!mp4Supported() || !durOk || !scene || !!exporting} onClick={exportMp4}>Export video</button>
             <p className="lab">The MP4 is saved to Download/Bezalel.</p>
             {!mp4Supported() && <p className="xwarn">This phone's web view cannot make MP4 (no WebCodecs). Update "Android System WebView" in the Play Store.</p>}

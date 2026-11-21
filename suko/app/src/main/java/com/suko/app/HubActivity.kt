@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cuevideo.app.CueTheme
 
-/** Bezalel home screen: three tools. */
+/** Bezalel home screen: two tools, Auto Editor and Text Editor. */
 class HubActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,12 +46,6 @@ class HubActivity : ComponentActivity() {
                         onOpenAutoEditor = {
                             startActivity(Intent(this, com.cuevideo.app.MainActivity::class.java))
                         },
-                        onOpenUpscale = {
-                            startActivity(Intent(this, UpscaleImagesActivity::class.java))
-                        },
-                        onOpenSvgEditor = {
-                            openWeb(SVG_EDITOR_PAGE, "SVG Editor")   // new workflow: the Video screen of the web editor, inside the app (offline)
-                        },
                         onOpenTextEditor = { openWeb(TEXT_EDITOR_PAGE, "Text Editor") },
                     )
                 }
@@ -60,11 +54,8 @@ class HubActivity : ComponentActivity() {
     }
 }
 
-/** Step 19: the Text Editor is the Layer Studio's Text tab, opened inside the app (offline web view) with the other tabs hidden. */
+/** The Text Editor web page, opened inside the app (offline web view). The page always shows the Text Editor; the ?app= part is ignored. */
 const val TEXT_EDITOR_PAGE = "web/studio/index.html?app=text"
-
-/** New workflow: the SVG Editor is the web editor's Video screen (headings, subscribe, scenes, timeline), opened inside the app with the other tabs hidden. */
-const val SVG_EDITOR_PAGE = "web/studio/index.html?app=video"
 
 /** Steps 16-18: opens a page from the app's own web assets. [sample] hands the page one small file so the smoke test can read it. */
 private fun android.app.Activity.openWeb(page: String, title: String, sample: Boolean = false) {
@@ -89,7 +80,7 @@ private val CardTop = Color(0xFF1A1E2B)
 
 @Composable
 private fun HubScreen(
-    onOpenAutoEditor: () -> Unit, onOpenUpscale: () -> Unit, onOpenSvgEditor: () -> Unit, onOpenTextEditor: () -> Unit,
+    onOpenAutoEditor: () -> Unit, onOpenTextEditor: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -119,23 +110,9 @@ private fun HubScreen(
             onClick = onOpenAutoEditor,
         )
         ToolCard(
-            title = "Upscale Images",
-            tag = "Images",
-            blurb = "AI upscale 2x. Pictures, ZIPs and folders in; PNG folder or ZIPs out.",
-            colors = listOf(Color(0xFF34D399), Accent2),
-            onClick = onOpenUpscale,
-        )
-        ToolCard(
-            title = "SVG Editor",
-            tag = "Animation",
-            blurb = "Turn your pictures and a timing file into a drawn, animated video.",
-            colors = listOf(Color(0xFFF472B6), Accent),
-            onClick = onOpenSvgEditor,
-        )
-        ToolCard(
             title = "Text Editor",
             tag = "Text",
-            blurb = "Write text by hand-style animation. Use your own font and export in 1080p, 2K or 4K.",
+            blurb = "Type text and watch it written by hand. Export a 1080p video at 30 or 60 fps.",
             colors = listOf(Color(0xFFFBBF24), Color(0xFFF472B6)),
             onClick = onOpenTextEditor,
         )

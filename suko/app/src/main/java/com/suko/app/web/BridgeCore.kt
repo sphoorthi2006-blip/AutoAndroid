@@ -5,29 +5,17 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.Base64
 
-/** A flag the page can raise while a long native job runs (it is set from a thread that does NOT wait in the job queue). */
-object WorkControl {
-    @Volatile var cancelled = false
-}
-
 /** The native methods a page may call. Each takes the page's text payload and returns a JSON object as text. */
 typealias NativeMethod = (payload: String) -> String
 
 object NativeMethods {
-    /**
-     * Steps 17-18: only the host itself. Picture separation ("process") and panel detection ("panels") are the Kotlin
-     * vision ports of steps 26-28; until then they answer "not ready" so the Studio shows a clear reason instead of failing silently.
-     */
+    /** Only the host itself: "health" and the "size" test helper. The app adds "keepalive" (see PhoneEngine). */
     fun defaults(extra: Map<String, NativeMethod> = emptyMap()): Map<String, NativeMethod> = base() + extra
 
     private fun base(): Map<String, NativeMethod> = mapOf(
         "health" to { _ -> """{"engine":"${WebConfig.ENGINE}","ready":false}""" },
         "size" to { p -> """{"chars":${p.length}}""" },     // test helper: proves big payloads arrive whole
-        "process" to { _ -> NOT_READY },
-        "panels" to { _ -> NOT_READY },
     )
-
-    const val NOT_READY = """{"error":"not_ready","detail":"Picture separation and panel detection are not built into the app yet (steps 26-28)."}"""
 }
 
 /** Runs native methods and keeps each answer as a file until the page has read it once. */

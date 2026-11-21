@@ -59,7 +59,7 @@ class Stage5Test {
         assertEquals("cue,start,end,source,replaced_image,text", lines[0])
         assertEquals("1,0.00,2.00,1.jpg,,Welcome to the show", lines[1])
         assertEquals("2,2.00,4.00,\"TEXT SLIDE (heading, handwritten)\",2.jpg,1. The first thing", lines[2])
-        assertEquals("5,8.00,10.00,TEXT SLIDE (subscribe),5.jpg,Please subscribe now", lines[5])
+        assertEquals("5,8.00,10.00,\"TEXT SLIDE (subscribe, handwritten)\",5.jpg,Please subscribe now", lines[5])
         val (used, unused) = ReportCsv.usage(plan, imgs(1, 2, 3, 4, 5, 6, 7))
         assertEquals(4, used)
         assertEquals(listOf("2.jpg", "5.jpg", "7.jpg"), unused)

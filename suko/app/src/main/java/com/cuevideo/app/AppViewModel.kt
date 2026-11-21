@@ -46,6 +46,8 @@ data class UiState(
     val message: String? = null,
     val check: CheckResult? = null,
     val fps: Int = 30,
+    /** Seconds the pen takes to write a heading or subscribe cue (typed by the owner). */
+    val writeSeconds: Double = HeadingWrite.DEFAULT_SECONDS,
     val audioSeconds: Double? = null,
     val core: TimingResult? = null,
     val timing: TimingReport? = null,
@@ -120,8 +122,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val preview: StateFlow<PreviewState> = _preview
     private var previewJob: Job? = null
     private val renderer by lazy { SlideRenderer(ctx) }
-    private var layerText: String? = null
-    private var layerBmp: Bitmap? = null
+    private var inkText: String? = null
+    private var inkBmp: Bitmap? = null
+    private var inkPlan: WritePlan? = null
+    private val painter by lazy { HeadingPainter() }
 
     fun showPreview(cue: Int, frame: Int) {
         previewJob?.cancel()
@@ -145,21 +149,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 when (CueClassifier.classify(text)) {
-                    CueKind.SUBSCRIBE -> {
-                        val bmp = renderer.blackFrame()
-                        _preview.value = PreviewState(cue, 0, 0, bmp.asImageBitmap(),
-                            "Cue $cue: subscribe slide, pure black picture, no text.")
-                    }
-                    CueKind.HEADING -> {
+                    CueKind.SUBSCRIBE, CueKind.HEADING -> {
+                        val shown = text.trim()
+                        val what = if (CueClassifier.classify(text) == CueKind.SUBSCRIBE) "subscribe" else "heading"
                         val n = if (rep != null) rep.frames[cue] - rep.frames[cue - 1] else 90
                         val f = frame.coerceIn(0, maxOf(0, n - 1))
-                        if (layerText != text || layerBmp == null) {
-                            layerBmp = renderer.headingLayer(text)
-                            layerText = text
+                        val bmp = synchronized(painter) {
+                            if (inkText != shown || inkBmp == null || inkPlan == null) {
+                                inkBmp?.recycle()
+                                val ink = renderer.headingInk(shown)
+                                inkBmp = ink
+                                inkPlan = HeadingWrite.plan(renderer.inkBits(ink), Defaults.W, Defaults.H)
+                                inkText = shown
+                            }
+                            painter.draw(inkBmp!!, HeadingWrite.frame(inkPlan!!, f, n, s.fps, s.writeSeconds))
+                                .copy(Bitmap.Config.ARGB_8888, false)
                         }
-                        val bmp = renderer.headingFrame(layerBmp!!)
-                        _preview.value = PreviewState(cue, 0, 0, bmp.asImageBitmap(),
-                            "Cue $cue: heading \"$text\", plain text on white, hard cut.")
+                        val secs = HeadingWrite.writeSeconds(s.writeSeconds, n.toDouble() / s.fps)
+                        _preview.value = PreviewState(cue, f, n, bmp.asImageBitmap(),
+                            "Cue $cue: $what \"$shown\", handwritten.\nframe ${f + 1} of $n at ${s.fps} fps, writing time ${"%.2f".format(secs)} s")
                     }
                     CueKind.NORMAL -> {
                         val img = chk.imageForCue[cue]
@@ -355,6 +363,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setFps(fps: Int) = change { it.copy(fps = fps) }
+    fun setWriteSeconds(sec: Double) = change { it.copy(writeSeconds = sec.coerceIn(0.0, 60.0)) }
 
     private fun change(f: (UiState) -> UiState) {
         _state.update { recompute(f(it)) }
@@ -543,7 +552,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun resetAll() {
         File(ctx.cacheDir, "imgs").deleteRecursively()
         File(ctx.cacheDir, "bundle").deleteRecursively()
-        _state.value = UiState(fps = _state.value.fps)
+        _state.value = UiState(fps = _state.value.fps, writeSeconds = _state.value.writeSeconds)
         _preview.value = PreviewState()
     }
 

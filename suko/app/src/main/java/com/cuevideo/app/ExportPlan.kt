@@ -78,8 +78,8 @@ object ReportCsv {
             val source = if (seg == null) "" else when (seg.kind) {
                 SegKind.STILL -> seg.image!!.name
                 SegKind.SCENE -> "SCENE " + seg.clip!!.name
-                SegKind.HEADING -> "TEXT SLIDE (heading, plain text)"
-                SegKind.BLACK -> "TEXT SLIDE (subscribe)"
+                SegKind.HEADING -> "TEXT SLIDE (heading, handwritten)"
+                SegKind.BLACK -> "TEXT SLIDE (subscribe, handwritten)"
             }
             val replaced = if (seg != null && seg.kind != SegKind.STILL) (chk.imageForCue[i]?.name ?: "") else ""
             val text = cues[i - 1].text.take(80)

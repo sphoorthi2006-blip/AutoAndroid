@@ -85,9 +85,6 @@ object VideoExport {
             for (seg in plan.segments) {
                 if (cancelled()) throw ExportCancelled()
                 when (seg.kind) {
-                    SegKind.BLACK -> {
-                        for (f in 0 until seg.frames) { gd.clear(); present() }
-                    }
                     SegKind.STILL -> {
                         val img = seg.image!!
                         val loaded = try {
@@ -108,18 +105,24 @@ object VideoExport {
                             }
                         } finally { gd.deleteTexture(tex) }
                     }
-                    SegKind.HEADING -> {
-                        val layer = renderer.headingLayer(seg.text)
+                    SegKind.HEADING, SegKind.BLACK -> {
+                        // handwriting: the pen frames are drawn one by one, the finished text is then held
+                        val ink = renderer.headingInk(seg.text)
+                        val wplan = HeadingWrite.plan(renderer.inkBits(ink), W, H)
+                        val painter = HeadingPainter(W, H)
                         val tex = gd.newTexture()
-                        gd.upload(tex, layer)
-                        layer.recycle()
                         try {
-                            for (f in 0 until seg.frames) {
+                            val n = seg.frames
+                            val wf = HeadingWrite.writeFrames(n, fps, s.writeSeconds)
+                            for (f in 0 until n) {
+                                if (f < wf) {
+                                    gd.upload(tex, painter.draw(ink, HeadingWrite.frame(wplan, f, n, fps, s.writeSeconds)))
+                                }
                                 gd.clear()
                                 gd.draw(false, tex, GlMath.FULL, 1f, 1f, 1f)
                                 present()
                             }
-                        } finally { gd.deleteTexture(tex) }
+                        } finally { gd.deleteTexture(tex); painter.recycle(); ink.recycle() }
                     }
                     SegKind.SCENE -> {
                         val clip = seg.clip!!

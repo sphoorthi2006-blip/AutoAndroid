@@ -9,7 +9,7 @@ object Defaults {
     const val H = 1080
     const val HEADING_SIZE = 200      // at 1080p
     const val HEADING_MIN = 80        // at 1080p
-    const val LAYER_SCALE = 2.0       // text layer is drawn at 2x for 1080p
+    const val LAYER_SCALE = 1.0       // text layer is drawn at the video size
 }
 
 data class CoverCrop(val newW: Int, val newH: Int, val left: Int, val top: Int)

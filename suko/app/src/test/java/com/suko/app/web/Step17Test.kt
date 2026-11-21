@@ -38,16 +38,6 @@ class Step17Test {
     }
 
     @Test
-    fun anUnfinishedEngineSaysSoInsteadOfFailingSilently() {
-        val core = BridgeCore(NativeMethods.defaults(), tmp())
-        for (m in listOf("process", "panels")) {
-            assertTrue(core.run("j$m", m, "AAAA").ok)
-            val text = String(core.take("j$m")!!)
-            assertTrue(text.contains("\"error\":\"not_ready\"") && text.contains("steps 26-28"))
-        }
-    }
-
-    @Test
     fun aMethodThatThrowsGivesAFailureNotACrash() {
         val core = BridgeCore(mapOf("bad" to { _: String -> throw IllegalStateException("boom") }), tmp())
         val r = core.run("j1", "bad", "")

@@ -17,7 +17,6 @@ type Host = {
   inputList(): string;
   info(): string;
   back?(): void;
-  cancelWork?(): void;
 };
 
 const host = (): Host | undefined => (globalThis as any).SukoBridge;
@@ -110,9 +109,4 @@ export function goBack(): void {
 export async function keepAlive(on: boolean): Promise<void> {
   if (!hasHost()) return;
   try { await nativeCall("keepalive", on ? "1" : "0"); } catch { /* the export still works, only without the screen-off protection */ }
-}
-
-/** Asks the app to stop the native job that is running right now (the AI upscale of one picture). It does not wait in the job queue. Does nothing in a normal browser; never throws. */
-export function cancelNative(): void {
-  try { host()?.cancelWork?.(); } catch { /* nothing to stop */ }
 }

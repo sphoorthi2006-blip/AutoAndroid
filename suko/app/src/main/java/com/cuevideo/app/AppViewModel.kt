@@ -46,8 +46,6 @@ data class UiState(
     val message: String? = null,
     val check: CheckResult? = null,
     val fps: Int = 30,
-    /** The "Upscale images" switch of the export: on = every picture is AI-upscaled before the video is rendered. */
-    val upscale: Boolean = true,
     val audioSeconds: Double? = null,
     val core: TimingResult? = null,
     val timing: TimingReport? = null,
@@ -65,8 +63,6 @@ data class ExportSummary(
     val unusedImages: List<String>,
     val lufs: Double?,
     val clicks: Int,
-    val upscaleNote: String? = null,
-    val upscaleOn: Boolean = true,
 )
 
 data class ExportUi(
@@ -305,7 +301,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _export.value = ExportUi(
                     result = ExportSummary(
                         vname, rf.name ?: "report.csv", out.frames, out.frames.toDouble() / s.fps, out.seconds,
-                        used, s.images.size, unused, out.audio?.lufs, out.audio?.clicks ?: 0, out.upscaleNote, s.upscale,
+                        used, s.images.size, unused, out.audio?.lufs, out.audio?.clicks ?: 0,
                     ),
                 )
             } catch (e: OutOfMemoryError) {
@@ -361,8 +357,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setFps(fps: Int) = change { it.copy(fps = fps) }
-
-    fun setUpscale(on: Boolean) = change { it.copy(upscale = on) }
 
     private fun change(f: (UiState) -> UiState) {
         _state.update { recompute(f(it)) }

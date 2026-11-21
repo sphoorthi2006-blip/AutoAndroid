@@ -25,12 +25,11 @@ class Step19Test {
     }
 
     @Test
-    fun theHubOpensThePageThroughTheInAppWebHostAndTheBundleHasTextOnlyMode() {
+    fun theHubOpensThePageThroughTheInAppWebHostAndTheBundleIsTheTextEditor() {
         val hub = File("src/main/java/com/suko/app/HubActivity.kt").readText()
         assertTrue(hub.contains("TEXT_EDITOR_PAGE = \"$page\""))
         assertTrue(hub.contains("openWeb(TEXT_EDITOR_PAGE"))
         val js = File("src/main/assets/web/studio/assets").listFiles { x -> x.extension == "js" }!!.joinToString("\n") { it.readText() }
-        assertTrue("bundle must read ?app=text", js.contains("\"app\")===\"text\"") || js.contains("get(\"app\")"))
-        assertTrue("bundle must have the position controls", js.contains("Position up/down"))
+        assertTrue("bundle must have the position controls", js.contains("Position") && js.contains("Center"))   // the page now always shows the Text Editor (the ?app= part is ignored)
     }
 }

@@ -27,9 +27,7 @@ globalThis.SukoBridge = {
   saveEnd(id) { const s = saved.find(x => x.id === id); s.ended = true; setTimeout(() => globalThis.__sukoDone(id, true, "Download/Bezalel/" + s.name), 1); },
   inputList() { return JSON.stringify(files.map(f => ({ name: f.name, mime: f.mime, size: f.bytes.length }))); },
   info() { return JSON.stringify({ host: "suko", blocked: 2 }); },
-  cancelWork() { cancelled++; },
 };
-let cancelled = 0;
 const mod = await import("data:text/javascript;base64," + Buffer.from(r.outputFiles[0].text).toString("base64"));
 
 ok(mod.hasHost() === true, "host is detected");
@@ -53,12 +51,7 @@ const inp = await mod.inputFiles();
 ok(inp.length === 2 && inp[0].name === "a.png" && inp[0].type === "image/png" && inp[0].size === 3, "inputFiles gives named, typed files");
 ok(mod.hostInfo().blocked === 2, "hostInfo is read");
 
-mod.cancelNative();
-ok(cancelled === 1, "cancelNative reaches the host's cancelWork without waiting in the job queue");
-
 delete globalThis.SukoBridge;
-mod.cancelNative();
-ok(cancelled === 1, "cancelNative without a host does nothing and does not throw");
 ok(mod.hasHost() === false && (await mod.inputFiles()).length === 0, "without a host: hasHost is false and there are no input files");
 let m2 = ""; try { await mod.nativeCall("health"); } catch (e) { m2 = e.message; }
 ok(m2.includes("not running inside the Bezalel app"), "without a host nativeCall explains itself");

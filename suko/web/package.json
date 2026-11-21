@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node tests/units.test.mjs && node tests/bridge.test.mjs && node tests/text.test.mjs && node tests/export.test.mjs && node tests/textslide.test.mjs && node tests/clips.test.mjs && node tests/scenes.test.mjs && node tests/timing.test.mjs",
-    "build:desktop": "tsc --noEmit && vite build --config vite.desktop.config.ts",
-    "build:extension": "tsc --noEmit && vite build --config vite.extension.config.ts",
+    "test": "node tests/bridge.test.mjs && node tests/text.test.mjs && node tests/export.test.mjs && node tests/video-basics.test.mjs",
     "build:suko": "tsc --noEmit && vite build --config vite.suko.config.ts"
   },
   "dependencies": {

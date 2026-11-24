@@ -6,7 +6,6 @@ This repository contains three separate Android projects plus a browser extensio
 |---|---|---|---|
 | **Sukko Image Upscaler** | repository root (`app/`, `extension/`) | AI image upscaler for Android and browser extension | `.github/workflows/build.yml` |
 | **Bezalel** | `suko/` | Offline Android app with Auto Editor, SVG Editor and Text Editor | `.github/workflows/build-suko.yml` |
-| **Image Layer Studio Android** | `ils-android/` | Standalone handwriting / slide-rendering Android app | `.github/workflows/build-ils.yml` |
 
 ## Bezalel Android video editor
 

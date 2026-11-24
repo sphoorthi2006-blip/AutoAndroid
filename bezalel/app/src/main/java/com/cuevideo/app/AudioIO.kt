@@ -202,6 +202,8 @@ object AudioMix {
     fun mix(
         voice: File?, click: FloatArray, gain: Double, clickTimes: List<Double>, totalSeconds: Double,
         sink: (ShortArray, Int) -> Unit, progress: (Double) -> Unit = {}, cancelled: () -> Boolean = { false },
+        bgm: BgmLayer? = null, voiceGains: VoiceGains? = null, master: Double = 1.0,
+        tap: ((FloatArray, FloatArray, Int) -> Unit)? = null,
     ): Boolean {
         val totalSamples = Math.rint(totalSeconds * MIX_RATE).toLong()
         val pos = LongArray(clickTimes.size) { Math.rint(clickTimes[it] * MIX_RATE).toLong() }
@@ -235,6 +237,8 @@ object AudioMix {
                         r[i] = ((raw[o + 2].toInt() and 0xFF) or (raw[o + 3].toInt() shl 8)).toShort() / 32768f
                     } else { l[i] = 0f; r[i] = 0f }
                 }
+                // background music (loop, levelled, ducked) and the narration levelling
+                if (bgm != null) bgm.mixInto(l, r, n, done, totalSamples, voiceGains ?: VoiceGains(FloatArray(0), FloatArray(0), 0))
                 // click track part of this block (click track is clipped to -1..1 before the mix)
                 while (first < pos.size && pos[first] + click.size <= done) first++
                 var c = first
@@ -252,6 +256,8 @@ object AudioMix {
                         l[i] += v; r[i] += v
                     }
                 }
+                tap?.invoke(l, r, n)
+                if (master != 1.0) { val mg = master.toFloat(); for (i in 0 until n) { l[i] *= mg; r[i] *= mg } }
                 emit(limiter.process(l, r, n), outS, sink)
                 done += n
                 progress(done.toDouble() / totalSamples)

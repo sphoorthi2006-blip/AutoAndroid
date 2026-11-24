@@ -39,6 +39,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -103,6 +104,45 @@ fun CueTheme(content: @Composable () -> Unit) {
         ),
         content = content,
     )
+}
+
+/** Background music: one bundled track chosen from a list, with a level setting. */
+@Composable
+private fun BgmSection(s: UiState, vm: AppViewModel, locked: Boolean) {
+    Section("Background music") {
+        Text("Pick one track. It repeats to cover the whole video. Loud swells are levelled out and the music is kept under the voice-over automatically.", fontSize = 12.sp, color = Muted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = s.bgmId == null, onClick = { vm.setBgm(null) }, enabled = !locked)
+            Text("No music", fontSize = 14.sp, color = TextMain)
+        }
+        for (t in BgmCatalog.tracks) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = s.bgmId == t.id, onClick = { vm.setBgm(t.id) }, enabled = !locked)
+                Column {
+                    Text(t.title, fontSize = 14.sp, color = TextMain)
+                    Text(t.note, fontSize = 11.sp, color = Muted)
+                }
+            }
+        }
+        if (s.bgmId != null) {
+            val lo = BgmDefaults.MIN_LEVEL.toFloat()
+            val hi = BgmDefaults.MAX_LEVEL.toFloat()
+            Text("Music level: " + "%.0f".format(s.bgmLevel) + " dB under the voice", fontSize = 13.sp, color = TextMain)
+            // the bar goes from quieter (left) to louder (right)
+            Slider(
+                value = lo + hi - s.bgmLevel.toFloat(),
+                onValueChange = { v -> vm.setBgmLevel((lo + hi - v).toDouble().let { Math.rint(it) }) },
+                valueRange = lo..hi,
+                steps = (hi - lo).toInt() - 1,
+                enabled = !locked,
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("Quieter", fontSize = 11.sp, color = Muted)
+                Spacer(Modifier.weight(1f))
+                Text("Louder", fontSize = 11.sp, color = Muted)
+            }
+        }
+    }
 }
 
 @Composable
@@ -354,8 +394,11 @@ fun MainScreen(vm: AppViewModel) {
                 for (e in c.errors) Text(e, color = Red, fontSize = 13.sp)
                 if (c.missing.isNotEmpty()) Text(c.missingText, color = Red, fontWeight = FontWeight.Medium, fontSize = 13.sp)
                 if (s.audio == null) Text(
-                    if (s.clicksEnabled) "No voice-over selected. Export will contain click sounds only."
-                    else "No voice-over or click sounds selected. Export will be silent.",
+                    when {
+                        s.bgmId != null -> "No voice-over selected. Export will contain the background music" + if (s.clicksEnabled) " and click sounds." else "."
+                        s.clicksEnabled -> "No voice-over selected. Export will contain click sounds only."
+                        else -> "No voice-over, music or click sounds selected. Export will be silent."
+                    },
                     color = Muted, fontSize = 12.sp,
                 )
                 if (c.missing.isNotEmpty() || c.headingCues + c.subscribeCues > 0)
@@ -386,9 +429,10 @@ fun MainScreen(vm: AppViewModel) {
                 Text("Report: ${r.reportName}", fontSize = 13.sp, color = Muted)
                 val audioSummary = when {
                     r.lufs != null -> "voice-over ${"%.1f".format(r.lufs)} LUFS"
+                    r.bgmTitle != null -> "music only"
                     r.clicks > 0 -> "clicks only"
                     else -> "silent MP4"
-                }
+                } + (if (r.bgmTitle != null) ", music: ${r.bgmTitle}" + (if (r.mixLufs != null) ", mix ${"%.1f".format(r.mixLufs)} LUFS" else "") else "")
                 Text("${r.frames} frames, ${"%.1f".format(r.seconds)} s of video, made in ${"%.0f".format(r.took)} s. ${r.clicks} clicks, $audioSummary.", fontSize = 13.sp, color = Muted)
                 Text("Pictures used: ${r.usedImages} of ${r.givenImages}.", fontSize = 13.sp, color = Muted)
                 if (r.unusedImages.isNotEmpty())
@@ -487,9 +531,11 @@ fun MainScreen(vm: AppViewModel) {
         }
 
 
+        BgmSection(s, vm, ex.busy || au.busy)
+
         Section("Audio mix test") {
             val times = if (s.clicksEnabled) clickTimesFor(s) else emptyList()
-            Text("Mixes the optional voice-over and optional click sounds, then saves a limited AAC 192 kbps .m4a for checking.", fontSize = 13.sp)
+            Text("Mixes the optional voice-over, background music and click sounds, then saves a limited AAC 192 kbps .m4a for checking.", fontSize = 13.sp)
             if (times == null) {
                 Text("Choose the master SRT first.", color = Muted, fontSize = 13.sp)
             } else if (s.clicksEnabled) {
@@ -498,8 +544,16 @@ fun MainScreen(vm: AppViewModel) {
             } else {
                 Text("Click sounds are disabled.", color = Muted, fontSize = 13.sp)
             }
-            val canMix = times != null && s.timing != null && (s.audio != null || s.clicksEnabled) && (s.check?.errors?.isEmpty() == true) && !au.busy && !ex.busy
-            if (s.audio == null) Text(if (s.clicksEnabled) "No voice-over: this test will contain clicks only." else "No voice-over or clicks: there is no audio to mix.", color = Muted, fontSize = 12.sp)
+            val canMix = times != null && s.timing != null && (s.audio != null || s.clicksEnabled || s.bgmId != null) && (s.check?.errors?.isEmpty() == true) && !au.busy && !ex.busy
+            if (s.audio == null) Text(
+                when {
+                    s.bgmId != null && s.clicksEnabled -> "No voice-over: this test will contain the music and clicks."
+                    s.bgmId != null -> "No voice-over: this test will contain the music only."
+                    s.clicksEnabled -> "No voice-over: this test will contain clicks only."
+                    else -> "No voice-over, music or clicks: there is no audio to mix."
+                },
+                color = Muted, fontSize = 12.sp,
+            )
             if (au.busy) {
                 Text(au.label, color = Amber)
                 LinearProgressIndicator(progress = { au.progress.toFloat() }, modifier = Modifier.fillMaxWidth())

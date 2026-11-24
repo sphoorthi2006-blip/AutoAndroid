@@ -15,6 +15,12 @@ data class AudioResult(
     val gainDb: Double,
     val clicks: Int,
     val seconds: Double,
+    /** Title of the background music, null when there is none. */
+    val bgmTitle: String? = null,
+    /** How many times the music track was repeated to cover the video. */
+    val bgmLoops: Double = 0.0,
+    /** Loudness of the finished mix (set to the target when music is on). */
+    val mixLufs: Double? = null,
 )
 
 fun clickTimesFor(s: UiState): List<Double>? {
@@ -43,12 +49,15 @@ object AudioJob {
         totalSeconds: Double,
         voiceSeconds: Double?,
         out: File,
+        bgm: BgmTrack? = null,
+        bgmLevelDb: Double = BgmDefaults.LEVEL_BELOW_VOICE,
         progress: (String, Double) -> Unit,
         cancelled: () -> Boolean,
     ): AudioResult? {
-        require(voice != null || clicksEnabled) { "There is no audio track to mix." }
+        require(voice != null || clicksEnabled || bgm != null) { "There is no audio track to mix." }
         val tmpDir = File(ctx.cacheDir, "audio").apply { mkdirs() }
         val pcm = File(tmpDir, "voice_44100_stereo.pcm")
+        val bgmPcm = File(tmpDir, "bgm_44100_stereo.pcm")
         var voiceLufs: Double? = null
         var lufsMeasured = false
         try {
@@ -93,7 +102,54 @@ object AudioJob {
             val gainDb = if (clicksEnabled) ClickPrep.gainDb(click, voiceLufs ?: FALLBACK_LUFS) else 0.0
             val gain = if (clicksEnabled) 10.0.pow(gainDb / 20.0) else 1.0
             val activeTimes = if (clicksEnabled) clickTimes else emptyList()
-            progress("Mixing and encoding...", 0.35)
+
+            // ---- background music: one bundled track, looped, levelled and set against this voice
+            var layer: BgmLayer? = null
+            var voiceGains: VoiceGains? = null
+            var master = 1.0
+            var mixLufs: Double? = null
+            var loops = 0.0
+            if (bgm != null) {
+                progress("Preparing the music...", 0.34)
+                val norm = StereoNormalizer(bgmPcm)
+                try {
+                    AudioDecoder.decodeAsset(ctx, bgm.asset, { ch, n, rate -> norm.accept(ch, n, rate) }, cancelled)
+                } catch (e: Exception) {
+                    norm.abort()
+                    throw e
+                }
+                norm.finish()
+                if (cancelled()) return null
+                val cycle = BgmPrep.build(bgmPcm)
+                bgmPcm.delete()
+                progress("Preparing the music...", 0.40)
+                voiceGains = VoiceAnalysis.analyse(if (voice != null) pcm else null)
+                // with a voice-over the music sits bgmLevelDb under it; music alone just plays at the target level
+                val vl = voiceLufs
+                val musicTarget = if (vl != null) vl - bgmLevelDb else BgmDefaults.TARGET_LUFS - BgmDefaults.PAUSE_RISE_DB
+                val baseDb = musicTarget - cycle.lufs
+                layer = BgmLayer(cycle, 10.0.pow(baseDb / 20.0))
+                loops = totalSeconds / cycle.seconds
+                // first pass: measure the mix, so the finished video is at one steady loudness
+                progress("Balancing the mix...", 0.42)
+                val meter = LoudnessMeter(MIX_RATE, 2)
+                val measured = AudioMix.mix(
+                    if (voice != null) pcm else null, click.samples, gain, activeTimes, totalSeconds,
+                    { _, _ -> },
+                    { p -> progress("Balancing the mix...", 0.42 + 0.18 * p) },
+                    cancelled, layer, voiceGains, 1.0,
+                    { l, r, n -> meter.push(arrayOf(l, r), n) },
+                )
+                if (!measured) return null
+                val m = meter.result()
+                if (m != null) {
+                    val masterDb = (BgmDefaults.TARGET_LUFS - m).coerceIn(-12.0, 12.0)
+                    master = 10.0.pow(masterDb / 20.0)
+                    mixLufs = m + masterDb
+                }
+            }
+            val encodeFrom = if (bgm != null) 0.60 else 0.35
+            progress("Mixing and encoding...", encodeFrom)
             out.delete()
             val writer = AacWriter(out)
             var ok = false
@@ -101,8 +157,8 @@ object AudioJob {
                 ok = AudioMix.mix(
                     if (voice != null) pcm else null, click.samples, gain, activeTimes, totalSeconds,
                     { buf, n -> writer.write(buf, n) },
-                    { p -> progress("Mixing and encoding...", 0.35 + 0.65 * p) },
-                    cancelled,
+                    { p -> progress("Mixing and encoding...", encodeFrom + (1.0 - encodeFrom) * p) },
+                    cancelled, layer, voiceGains, master,
                 )
                 if (ok) writer.finish()
             } finally {
@@ -114,9 +170,11 @@ object AudioJob {
                 if (clicksEnabled) 20 * log10(maxOf(click.rms, 1e-6)) else 0.0,
                 if (clicksEnabled) click.peak else 0.0,
                 gainDb, activeTimes.size, totalSeconds,
+                bgm?.title, loops, mixLufs,
             )
         } finally {
             pcm.delete()
+            bgmPcm.delete()
         }
     }
 }

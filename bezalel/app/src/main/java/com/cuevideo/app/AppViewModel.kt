@@ -38,6 +38,10 @@ data class UiState(
     val click: FileInfo? = null,
     /** Click sound at image/clip starts; off means voice-only or a silent MP4. */
     val clicksEnabled: Boolean = true,
+    /** Id of the chosen background music (see BgmCatalog), null = no music. */
+    val bgmId: String? = null,
+    /** How many LU under the voice-over the music sits while someone is speaking. */
+    val bgmLevel: Double = BgmDefaults.LEVEL_BELOW_VOICE,
     val masterCues: List<Cue> = emptyList(),
     val images: List<ImageEntry> = emptyList(),
     val clips: List<ClipEntry> = emptyList(),
@@ -65,6 +69,8 @@ data class ExportSummary(
     val unusedImages: List<String>,
     val lufs: Double?,
     val clicks: Int,
+    val bgmTitle: String? = null,
+    val mixLufs: Double? = null,
 )
 
 data class ExportUi(
@@ -228,7 +234,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val voice = s.audio
         val t = s.timing
         val times = if (s.clicksEnabled) clickTimesFor(s) else emptyList()
-        if ((voice == null && !s.clicksEnabled) || t == null || times == null || _audio.value.busy) return
+        val bgm = BgmCatalog.byId(s.bgmId)
+        if ((voice == null && !s.clicksEnabled && bgm == null) || t == null || times == null || _audio.value.busy) return
         audioCancel = false
         _audio.value = AudioUi(busy = true, label = "Starting...")
         audioJob = viewModelScope.launch(Dispatchers.IO) {
@@ -236,7 +243,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 var lastPct = -1
                 val res = AudioJob.run(
-                    ctx, voice, s.click, s.clicksEnabled, times, t.totalSeconds, s.audioSeconds, tmp,
+                    ctx, voice, s.click, s.clicksEnabled, times, t.totalSeconds, s.audioSeconds, tmp, bgm, s.bgmLevel,
                     { label, p ->
                         val pct = (p * 100).toInt()
                         if (pct != lastPct) {
@@ -331,6 +338,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     result = ExportSummary(
                         vname, rf.name ?: "report.csv", out.frames, out.frames.toDouble() / s.fps, out.seconds,
                         used, s.images.size, unused, out.audio?.lufs, out.audio?.clicks ?: 0,
+                        out.audio?.bgmTitle, out.audio?.mixLufs,
                     ),
                 )
             } catch (e: OutOfMemoryError) {
@@ -628,6 +636,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearClick() = change { it.copy(click = null) }
 
     fun setClicksEnabled(enabled: Boolean) = change { it.copy(clicksEnabled = enabled) }
+
+    /** Background music: pick a track from the bundled list, or null for none. */
+    fun setBgm(id: String?) = change { it.copy(bgmId = id) }
+
+    fun setBgmLevel(lu: Double) = change { it.copy(bgmLevel = lu.coerceIn(BgmDefaults.MIN_LEVEL, BgmDefaults.MAX_LEVEL)) }
 
     // ---------- images ----------
 

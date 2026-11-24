@@ -22,7 +22,18 @@ object AudioDecoder {
                 if (delivered) throw e
             }
         }
-        decodeWithCodec(ctx, uri, sink, cancelled)
+        decodeWithCodec({ it.setDataSource(ctx, uri, null) }, sink, cancelled)
+    }
+
+    /** A bundled track (mp3 or m4a in assets): copied to the cache, then decoded like any file. */
+    fun decodeAsset(ctx: Context, asset: String, sink: PcmSink, cancelled: () -> Boolean) {
+        val tmp = java.io.File(ctx.cacheDir, "bgm_" + asset.substringAfterLast('/'))
+        try {
+            ctx.assets.open(asset).use { ins -> tmp.outputStream().use { ins.copyTo(it) } }
+            decodeWithCodec({ it.setDataSource(tmp.absolutePath) }, sink, cancelled)
+        } finally {
+            tmp.delete()
+        }
     }
 
     /** The bundled click is a plain 16-bit WAV. */
@@ -30,11 +41,11 @@ object AudioDecoder {
         ctx.assets.open(asset).use { WavStream.read(it, sink) }
     }
 
-    private fun decodeWithCodec(ctx: Context, uri: Uri, sink: PcmSink, cancelled: () -> Boolean) {
+    private fun decodeWithCodec(setSource: (MediaExtractor) -> Unit, sink: PcmSink, cancelled: () -> Boolean) {
         val ex = MediaExtractor()
         var codec: MediaCodec? = null
         try {
-            ex.setDataSource(ctx, uri, null)
+            setSource(ex)
             var track = -1
             for (i in 0 until ex.trackCount) {
                 val m = ex.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: ""

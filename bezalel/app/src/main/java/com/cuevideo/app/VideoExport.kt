@@ -32,7 +32,8 @@ object VideoExport {
         cancelled: () -> Boolean,
     ): ExportOutcome? {
         val voice = s.audio
-        val audioEnabled = voice != null || s.clicksEnabled
+        val bgm = BgmCatalog.byId(s.bgmId)
+        val audioEnabled = voice != null || s.clicksEnabled || bgm != null
         val total = s.timing?.totalSeconds ?: throw IllegalStateException("No timing yet.")
         val fps = s.fps
         val W = Defaults.W
@@ -45,7 +46,7 @@ object VideoExport {
         // 1. Optional audio mix. With no voice-over and clicks off, the MP4 has no audio track.
         val mix = File(workDir, "mix.m4a")
         val audio = if (audioEnabled) AudioJob.run(
-            ctx, voice, s.click, s.clicksEnabled, clickTimes, total, s.audioSeconds, mix,
+            ctx, voice, s.click, s.clicksEnabled, clickTimes, total, s.audioSeconds, mix, bgm, s.bgmLevel,
             { label, p -> progress(label, p * audioShare) },
             cancelled,
         ) ?: return null else null

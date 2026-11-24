@@ -5,8 +5,8 @@ on:
     branches: [ main ]
     paths-ignore:
       - '**/*.md'
-      - 'suko/**'
-      - '.github/workflows/build-suko.yml'
+      - 'bezalel/**'
+      - '.github/workflows/build-bezalel.yml'
   workflow_dispatch:
 
 permissions:

@@ -5,19 +5,19 @@ This repository contains three separate Android projects plus a browser extensio
 | Project | Folder | Purpose | Build workflow |
 |---|---|---|---|
 | **Sukko Image Upscaler** | repository root (`app/`, `extension/`) | AI image upscaler for Android and browser extension | `.github/workflows/build.yml` |
-| **Bezalel** | `suko/` | Offline Android app with Auto Editor, SVG Editor and Text Editor | `.github/workflows/build-suko.yml` |
+| **Bezalel** | `bezalel/` | Offline Android app with Auto Editor and Text Editor | `.github/workflows/build-bezalel.yml` |
 
 ## Bezalel Android video editor
 
-Bezalel is a separate offline Android app in [`suko/`](suko/README.md). Its Auto Editor turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds. The audio add-on supports voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export when enabled.
+Bezalel is a separate offline Android app in [`bezalel/`](bezalel/README.md). Its Auto Editor turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds. The audio add-on supports voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export when enabled.
 
-The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Bezalel project has its own CI workflow: [`.github/workflows/build-suko.yml`](.github/workflows/build-suko.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Bezalel-debug-apk` artifact.
+The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Bezalel project has its own CI workflow: [`.github/workflows/build-bezalel.yml`](.github/workflows/build-bezalel.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Bezalel-debug-apk` artifact.
 
 The Bezalel screens share one dark, premium look: the home screen has tool cards with gradient badges, and the SVG Editor is a full-window in-app screen (top bar, pinned preview with play and timeline, tabs for Import / Style / Audio / Images / Export) instead of a web page.
 
-Current implementation and phone verification notes are maintained in [`suko/README.md`](suko/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (built green on GitHub Actions; not yet run on a phone); the web SVG Editor screen now exports the MP4 (with AI upscale, cache and cancel).
+Current implementation and phone verification notes are maintained in [`bezalel/README.md`](bezalel/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (built green on GitHub Actions; not yet run on a phone); the web SVG Editor screen now exports the MP4 (with AI upscale, cache and cancel).
 
-**Latest status (2026-11-19):** Bezalel builds green; the APK is at Releases -> `bezalel-latest` (`Bezalel.apk`, unsigned debug; the repo is private, so open the link while logged in to GitHub). Not yet run on a phone. Developer guide: [`suko/DEVELOPER.md`](suko/DEVELOPER.md). Prompt skills for the SVG Editor (Bible and history, health and finance) and their README: [`suko/docs/skills/`](suko/docs/skills/README.md). Full step table and phone test lists: [`suko/README.md`](suko/README.md).
+**Latest status (2026-11-19):** Bezalel builds green; the APK is at Releases -> `bezalel-latest` (`Bezalel.apk`, unsigned debug; the repo is private, so open the link while logged in to GitHub). Not yet run on a phone. Developer guide: [`bezalel/DEVELOPER.md`](bezalel/DEVELOPER.md). Prompt skills for the SVG Editor (Bible and history, health and finance) and their README: [`bezalel/docs/skills/`](bezalel/docs/skills/README.md). Full step table and phone test lists: [`bezalel/README.md`](bezalel/README.md).
 
 ## Sukko Image Upscaler
 
@@ -62,7 +62,7 @@ Light edge-preserving denoise, 2x Lanczos-3 upscale, gentle sharpen. Pictures la
 
 ## Get the Android APK
 Push to `main` (or run **Build Sukko Image Upscaler APK** in Actions). The release workflow publishes
-`Sukko.apk` under Releases -> `suko-latest`. This is the root image-upscaler app, not the Bezalel video editor.
+`Sukko.apk` under Releases -> `sukko-latest`. This is the root image-upscaler app, not the Bezalel video editor.
 
 ## Install the extension
 See [`extension/README.md`](extension/README.md). In short: open `chrome://extensions`, switch on *Developer mode*,

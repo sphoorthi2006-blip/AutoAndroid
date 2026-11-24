@@ -13,7 +13,7 @@ Bezalel lives in [`bezalel/`](bezalel/). Its **Auto Editor** turns images, scrip
 
 Bezalel has its own CI workflow, [`.github/workflows/build-bezalel.yml`](.github/workflows/build-bezalel.yml). It runs the Kotlin logic tests, builds the Android debug APK, uploads the `Bezalel-debug-apk` artifact and publishes `Bezalel.apk` under Releases -> `bezalel-latest`. If the build fails, the error log is saved to the `buildlog-bezalel` branch.
 
-**Status (2026-11-24):** the build is green and the APK is published (unsigned debug build; if the repo is private, open the release link while signed in to GitHub). Not yet run on a phone.
+**Status (2026-11-24):** the build is green, the APK is published (unsigned debug build; if the repo is private, open the release link while signed in to GitHub). Tested on a phone and working.
 
 ## Sukko Image Upscaler
 

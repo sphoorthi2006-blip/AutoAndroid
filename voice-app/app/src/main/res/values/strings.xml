@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Kokoro Speak</string>
+    <string name="input_hint">Type or paste the text to speak (English)</string>
+    <string name="default_text">Hello! This is an offline AI voice running entirely on my phone.</string>
+</resources>

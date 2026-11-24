@@ -1,0 +1,9 @@
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+# fetched by the Voice App workflow (see SETUP.md), not committed
+app/src/main/jniLibs/
+app/src/main/assets/kokoro-*/
+app/src/main/java/com/k2fsa/sherpa/onnx/

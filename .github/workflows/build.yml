@@ -7,6 +7,8 @@ on:
       - '**/*.md'
       - 'bezalel/**'
       - '.github/workflows/build-bezalel.yml'
+      - 'voice-app/**'
+      - '.github/workflows/build-voice-app.yml'
   workflow_dispatch:
 
 permissions:

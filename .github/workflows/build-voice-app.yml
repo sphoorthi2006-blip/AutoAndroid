@@ -40,12 +40,20 @@ jobs:
           gh release download "$TAG" -R k2-fsa/sherpa-onnx -p '*-android.tar.bz2' -D /tmp/sherpa
           ls -la /tmp/sherpa
           tar -xjf /tmp/sherpa/*-android.tar.bz2 -C /tmp/sherpa/x
-          ARM=$(find /tmp/sherpa/x -type d -name arm64-v8a | head -1)
-          echo "arm64 libs in: $ARM"
-          test -n "$ARM"
-          mkdir -p app/src/main/jniLibs/arm64-v8a
-          cp "$ARM"/*.so app/src/main/jniLibs/arm64-v8a/
-          ls -la app/src/main/jniLibs/arm64-v8a
+          # Copy every processor type so the APK installs on any phone (64/32-bit ARM, x86).
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            d=$(find /tmp/sherpa/x -type d -name "$abi" | head -1)
+            if [ -n "$d" ]; then
+              echo "$abi libs in: $d"
+              mkdir -p "app/src/main/jniLibs/$abi"
+              cp "$d"/*.so "app/src/main/jniLibs/$abi/"
+              ls -la "app/src/main/jniLibs/$abi"
+            else
+              echo "no $abi folder in the release"
+            fi
+          done
+          test -d app/src/main/jniLibs/arm64-v8a
+          test -d app/src/main/jniLibs/armeabi-v7a
           # The Kotlin file must come from the same release as the native libraries.
           mkdir -p app/src/main/java/com/k2fsa/sherpa/onnx
           curl -fsSL --retry 3 -o app/src/main/java/com/k2fsa/sherpa/onnx/Tts.kt \
@@ -85,6 +93,8 @@ jobs:
           apk=$(ls app/build/outputs/apk/debug/*.apk | head -1)
           ls -la "$apk"
           unzip -l "$apk" | grep -E 'libsherpa-onnx-jni.so|libonnxruntime.so|kokoro-multi-lang-v1_0/model.onnx|kokoro-multi-lang-v1_0/voices.bin'
+          echo "Processor types in the APK:"
+          unzip -l "$apk" | grep -oE 'lib/[^/]+/libsherpa-onnx-jni.so'
           cp "$apk" VoiceApp.apk
 
       - uses: actions/upload-artifact@v4

@@ -14,10 +14,11 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Most modern phones are arm64. If you test on an x86_64 emulator,
-        // add "x86_64" here AND copy the x86_64 native libs into jniLibs.
+        // Include every common processor type so the APK installs on any phone:
+        // 64-bit ARM, 32-bit ARM, and the two Intel/emulator types.
+        // Each one needs its native libs in jniLibs (the GitHub workflow copies them all).
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
         }
     }
 

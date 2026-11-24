@@ -25,9 +25,11 @@ Android Gradle Plugin, you can accept.
 ## 3. Add the sherpa-onnx native libraries
 1. Go to https://github.com/k2-fsa/sherpa-onnx/releases and open a recent release.
 2. Download the Android build (a file named like `sherpa-onnx-v<version>-android.tar.bz2`) and extract it.
-3. Copy the `.so` files for arm64 into:
-   `app/src/main/jniLibs/arm64-v8a/`
-   You need both `libsherpa-onnx-jni.so` and `libonnxruntime.so`.
+3. Copy the `.so` files from each processor folder (`arm64-v8a`, `armeabi-v7a`, `x86`,
+   `x86_64`) into the matching folder under `app/src/main/jniLibs/`, for example
+   `app/src/main/jniLibs/arm64-v8a/`. You need both `libsherpa-onnx-jni.so` and
+   `libonnxruntime.so` in each. (For a quick local test on one phone, the arm64 folder alone
+   is enough if you also change `abiFilters` in `app/build.gradle.kts`.)
 
 ## 4. Add the matching Kotlin file
 IMPORTANT: it must come from the SAME release version as step 3, or the app will crash.
@@ -71,9 +73,10 @@ blocks, one per voice. If the app says "Unexpected voices.bin layout", that assu
 did not hold for your file; tell me the message and I will adjust.
 
 ## Troubleshooting
-- "UnsatisfiedLinkError": the `.so` files are missing, in the wrong folder, or the
-  phone is not arm64. For an x86_64 emulator, add "x86_64" to `abiFilters` in
-  `app/build.gradle.kts` and copy the x86_64 libs too.
+- "App not compatible with your phone" when installing: the APK has no libraries for the
+  phone's processor type. The default build includes arm64-v8a, armeabi-v7a, x86 and x86_64.
+- "UnsatisfiedLinkError": the `.so` files are missing or in the wrong folder for this phone's
+  processor type.
 - "Unresolved reference: OfflineTts": `Tts.kt` is missing or in the wrong folder (step 4).
 - Crash or error right after starting speech: library version and `Tts.kt` version
   do not match. Re-download both from the same release.

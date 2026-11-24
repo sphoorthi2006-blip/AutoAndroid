@@ -1,23 +1,19 @@
 # AutoAndroid repository
 
-This repository contains three separate Android projects plus a browser extension. They have independent build workflows; the Bezalel video-editor audio add-on does not replace the original image upscaler.
+This repository contains two separate Android apps and a browser extension. Each has its own build workflow.
 
-| Project | Folder | Purpose | Build workflow |
-|---|---|---|---|
-| **Sukko Image Upscaler** | repository root (`app/`, `extension/`) | AI image upscaler for Android and browser extension | `.github/workflows/build.yml` |
-| **Bezalel** | `bezalel/` | Offline Android app with Auto Editor and Text Editor | `.github/workflows/build-bezalel.yml` |
+| Project | Folder | Purpose | Build workflow | APK download |
+|---|---|---|---|---|
+| **Bezalel** | `bezalel/` | Offline Android video maker with the Auto Editor and Text Editor | `.github/workflows/build-bezalel.yml` | Releases -> `bezalel-latest` (`Bezalel.apk`) |
+| **Sukko Image Upscaler** | repository root (`app/`) and `extension/` | One-button AI image upscaler for Android, plus a browser extension | `.github/workflows/build.yml` | Releases -> `sukko-latest` (`Sukko.apk`) |
 
 ## Bezalel Android video editor
 
-Bezalel is a separate offline Android app in [`bezalel/`](bezalel/README.md). Its Auto Editor turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds. The audio add-on supports voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export when enabled.
+Bezalel lives in [`bezalel/`](bezalel/). Its **Auto Editor** turns images, scripts and SRT timing into a 1080p MP4, with optional voice-over and click sounds (voice + clicks, voice-only, click-only, or a silent MP4; AAC audio is muxed into the H.264 export). Its **Text Editor** handles text layout, placement and handwriting-style writing on the slides. The plan for text placement is in [`bezalel/TEXT_PLACEMENT_PLAN.md`](bezalel/TEXT_PLACEMENT_PLAN.md).
 
-The add-on extends the existing Auto Editor and does not replace the root Sukko Image Upscaler. The Bezalel project has its own CI workflow: [`.github/workflows/build-bezalel.yml`](.github/workflows/build-bezalel.yml). That workflow runs web and Kotlin tests, builds the native upscaler and Android debug APK, and uploads the `Bezalel-debug-apk` artifact.
+Bezalel has its own CI workflow, [`.github/workflows/build-bezalel.yml`](.github/workflows/build-bezalel.yml). It runs the Kotlin logic tests, builds the Android debug APK, uploads the `Bezalel-debug-apk` artifact and publishes `Bezalel.apk` under Releases -> `bezalel-latest`. If the build fails, the error log is saved to the `buildlog-bezalel` branch.
 
-The Bezalel screens share one dark, premium look: the home screen has tool cards with gradient badges, and the SVG Editor is a full-window in-app screen (top bar, pinned preview with play and timeline, tabs for Import / Style / Audio / Images / Export) instead of a web page.
-
-Current implementation and phone verification notes are maintained in [`bezalel/README.md`](bezalel/README.md). The Android SVG Editor screen now has native audio input, per-element click sounds and an audio mix test (built green on GitHub Actions; not yet run on a phone); the web SVG Editor screen now exports the MP4 (with AI upscale, cache and cancel).
-
-**Latest status (2026-11-19):** Bezalel builds green; the APK is at Releases -> `bezalel-latest` (`Bezalel.apk`, unsigned debug; the repo is private, so open the link while logged in to GitHub). Not yet run on a phone. Developer guide: [`bezalel/DEVELOPER.md`](bezalel/DEVELOPER.md). Prompt skills for the SVG Editor (Bible and history, health and finance) and their README: [`bezalel/docs/skills/`](bezalel/docs/skills/README.md). Full step table and phone test lists: [`bezalel/README.md`](bezalel/README.md).
+**Status (2026-11-24):** the build is green and the APK is published (unsigned debug build; if the repo is private, open the release link while signed in to GitHub). Not yet run on a phone.
 
 ## Sukko Image Upscaler
 

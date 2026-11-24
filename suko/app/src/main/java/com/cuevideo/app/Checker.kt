@@ -30,6 +30,8 @@ data class CheckResult(
     val extraImages: List<ImageEntry>,
     val headingCues: Int,
     val subscribeCues: Int,
+    val texts: List<TextPlacement> = emptyList(),   // valid text placements, sorted by first cue
+    val textCovered: Set<Int> = emptySet(),         // cues shown as placed text
 ) {
     val canExport: Boolean get() = errors.isEmpty() && missing.isEmpty()
     val missingText: String get() = "Missing images: " + missing.joinToString(", ")
@@ -57,6 +59,7 @@ object Checker {
         images: List<ImageEntry>,
         clips: List<ClipEntry>,
         corrections: Map<String, Pair<Int, Int>> = emptyMap(),
+        texts: List<TextPlacement> = emptyList(),
     ): CheckResult {
         val n = cues.size
         val errors = ArrayList<String>()
@@ -92,6 +95,28 @@ object Checker {
             prev = r
         }
 
+        // ---- text placements: a range of cues written by hand instead of their images ----
+        val validTexts = ArrayList<TextPlacement>()
+        val textCovered = HashSet<Int>()
+        for (t in texts.sortedWith(compareBy({ it.first }, { it.last }))) {
+            val what = "Text for ${t.label}"
+            if (t.first < 1 || t.last < t.first || t.last > n) {
+                errors.add("$what: the range must be inside cues 1 to $n, with the first number not larger than the second.")
+            } else if (t.text.isBlank()) {
+                errors.add("$what: the text is empty.")
+            } else {
+                val clash = (t.first..t.last).firstOrNull { it in covered || it in textCovered }
+                if (clash != null) {
+                    val other = if (clash in covered) "a scene clip" else "another text"
+                    errors.add("$what overlaps $other at cue $clash. Each cue can have only one of: scene clip, text.")
+                } else {
+                    validTexts.add(t)
+                }
+                // a bad overlap still reserves its cues, so the same cues are not also reported missing
+                for (c in t.first..t.last) textCovered.add(c)
+            }
+        }
+
         // ---- images by cue number (section 3, 5) ----
         val byCue = LinkedHashMap<Int, ImageEntry>()
         val extra = ArrayList<ImageEntry>()
@@ -106,7 +131,7 @@ object Checker {
                 byCue[num] = img
             }
         }
-        val missing = (1..n).filter { it !in covered && !byCue.containsKey(it) }
+        val missing = (1..n).filter { it !in covered && it !in textCovered && !byCue.containsKey(it) }
         val ignored = byCue.keys.filter { it in covered }.sorted()
 
         if (dupes.isNotEmpty())
@@ -115,6 +140,9 @@ object Checker {
         if (ignored.isNotEmpty())
             warnings.add("Images for cues under a scene clip are ignored: " +
                 ignored.joinToString(", ") + ".")
+        val ignoredText = byCue.keys.filter { it in textCovered && it !in covered }.sorted()
+        if (ignoredText.isNotEmpty())
+            warnings.add("Images for cues under a text are ignored: " + ignoredText.joinToString(", ") + ".")
         if (extra.isNotEmpty())
             warnings.add("${extra.size} image(s) match no cue and will not be used: " +
                 extra.take(8).joinToString(", ") { it.name } +
@@ -131,8 +159,10 @@ object Checker {
             imageForCue = byCue,
             ignoredUnderClips = ignored,
             extraImages = extra,
-            headingCues = kinds.withIndex().count { (i, k) -> k == CueKind.HEADING && (i + 1) !in covered },
-            subscribeCues = kinds.withIndex().count { (i, k) -> k == CueKind.SUBSCRIBE && (i + 1) !in covered },
+            headingCues = kinds.withIndex().count { (i, k) -> k == CueKind.HEADING && (i + 1) !in covered && (i + 1) !in textCovered },
+            subscribeCues = kinds.withIndex().count { (i, k) -> k == CueKind.SUBSCRIBE && (i + 1) !in covered && (i + 1) !in textCovered },
+            texts = validTexts,
+            textCovered = textCovered,
         )
     }
 }

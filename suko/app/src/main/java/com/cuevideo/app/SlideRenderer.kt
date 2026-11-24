@@ -5,10 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.ExifInterface
@@ -24,7 +25,7 @@ class SlideRenderer(private val ctx: Context) {
 
     private val typeface: Typeface = Typeface.createFromAsset(ctx.assets, "PatrickHand-Regular.ttf")
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-        color = Color.WHITE
+        color = Color.BLACK
         typeface = this@SlideRenderer.typeface
         textAlign = Paint.Align.CENTER
     }
@@ -111,18 +112,17 @@ class SlideRenderer(private val ctx: Context) {
         return textPaint.measureText(text).toDouble()
     }
 
-    /** White text on black at 2x resolution (3840x2160), laid out like the desktop engine. */
-    fun headingLayer(text: String): Bitmap {
+    /** The finished text: black on a transparent 1920x1080 bitmap, laid out like the desktop engine. */
+    fun headingInk(text: String): Bitmap {
         val lay = SlideMath.layout(
             text, W, H, Defaults.LAYER_SCALE,
             Defaults.HEADING_SIZE.toDouble(),
-            SlideMath.animMaxWidth(W, Defaults.ZOOM),
+            SlideMath.headingMaxWidth(W),
             Defaults.HEADING_MIN.toDouble(),
             ::measure,
         )
         val bmp = Bitmap.createBitmap(lay.layerW, lay.layerH, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-        c.drawColor(Color.BLACK)
         if (lay.size > 0) {
             textPaint.textSize = lay.size.toFloat()
             val fm = textPaint.fontMetrics
@@ -133,27 +133,78 @@ class SlideRenderer(private val ctx: Context) {
         return bmp
     }
 
-    /** Frame f (0-based) of a heading cue that lasts n frames: zoom crop + fade-in from black. */
-    fun headingFrame(layer: Bitmap, f: Int, n: Int, fps: Int): Bitmap {
-        val z = SlideMath.zoomFactor(f, n)
-        val q = SlideMath.fadeBrightness(f, SlideMath.fadeFrames(fps))
-        val box = SlideMath.cropBox(layer.width, layer.height, z)
-        val m = Matrix()
-        m.setRectToRect(
-            RectF(box.left.toFloat(), box.top.toFloat(), box.right.toFloat(), box.bottom.toFloat()),
-            RectF(0f, 0f, W.toFloat(), H.toFloat()),
-            Matrix.ScaleToFit.FILL,
-        )
-        val out = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
-        val c = Canvas(out)
-        c.drawColor(Color.BLACK)
-        val p = Paint(drawPaint)
-        if (q < 1.0) {
-            val cm = ColorMatrix()
-            cm.setScale(q.toFloat(), q.toFloat(), q.toFloat(), 1f)
-            p.colorFilter = ColorMatrixColorFilter(cm)
+    /**
+     * The finished placed text on a transparent 1920x1080 bitmap: white ink for the black look
+     * ([dark] = true), black ink for the white look. Layout comes from [TextLayout].
+     */
+    fun textInk(tp: TextPlacement): Bitmap {
+        val lay = TextLayout.layout(tp.text, W, H, tp.align, tp.size, tp.x, tp.y, ::measure)
+        val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        if (lay.size > 0) {
+            val paint = Paint(textPaint).apply {
+                color = if (tp.dark) Color.WHITE else Color.BLACK
+                textSize = lay.size.toFloat()
+                textAlign = if (lay.align == TextAlign.CENTER) Paint.Align.CENTER else Paint.Align.LEFT
+            }
+            val fm = paint.fontMetrics
+            val shift = (fm.ascent + fm.descent) / 2f
+            for (ln in lay.lines) c.drawText(ln.text, ln.x.toFloat(), ln.cy.toFloat() - shift, paint)
         }
-        c.drawBitmap(layer, m, p)
+        return bmp
+    }
+
+    /** 1 = ink, 0 = background, for the pen engine. */
+    fun inkBits(ink: Bitmap): ByteArray {
+        val w = ink.width
+        val h = ink.height
+        val px = IntArray(w * h)
+        ink.getPixels(px, 0, w, 0, 0, w, h)
+        return ByteArray(w * h) { if ((px[it] ushr 24) > 127) 1 else 0 }
+    }
+}
+
+/**
+ * Draws one frame of handwriting: [background] screen (white by default), the text uncovered under the pen lines of [WriteFrame].
+ * Reuses two bitmaps, so the returned bitmap is only valid until the next call (upload or copy it at once).
+ */
+class HeadingPainter(
+    private val w: Int = Defaults.W,
+    private val h: Int = Defaults.H,
+    private val background: Int = Color.WHITE,
+) {
+    private val mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    private val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    private val maskCanvas = Canvas(mask)
+    private val outCanvas = Canvas(out)
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+    private val keepInk = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN) }
+    private val fadePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+    fun draw(ink: Bitmap, fr: WriteFrame): Bitmap {
+        out.eraseColor(background)
+        if (fr.finish >= 1.0) { outCanvas.drawBitmap(ink, 0f, 0f, null); return out }
+        mask.eraseColor(Color.TRANSPARENT)
+        for ((pts, pen) in fr.lines) {
+            if (pts.isEmpty()) continue
+            if (pts.size == 1) { maskCanvas.drawCircle(pts[0].x.toFloat(), pts[0].y.toFloat(), (pen / 2).toFloat(), dotPaint); continue }
+            linePaint.strokeWidth = pen.toFloat()
+            val path = Path()
+            path.moveTo(pts[0].x.toFloat(), pts[0].y.toFloat())
+            for (k in 1 until pts.size) path.lineTo(pts[k].x.toFloat(), pts[k].y.toFloat())
+            maskCanvas.drawPath(path, linePaint)
+        }
+        maskCanvas.drawBitmap(ink, 0f, 0f, keepInk)          // ink only where the pen has been
+        if (fr.finish > 0.0) {                                // the last fade shows what the pen missed
+            fadePaint.alpha = (fr.finish * 255).toInt().coerceIn(0, 255)
+            maskCanvas.drawBitmap(ink, 0f, 0f, fadePaint)
+        }
+        outCanvas.drawBitmap(mask, 0f, 0f, null)
         return out
     }
+
+    fun recycle() { mask.recycle(); out.recycle() }
 }

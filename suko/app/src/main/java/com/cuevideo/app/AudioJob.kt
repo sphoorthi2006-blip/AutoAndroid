@@ -25,7 +25,9 @@ fun clickTimesFor(s: UiState): List<Double>? {
         val l = r.last
         if (f != null && l != null && f >= 1 && l >= f && l <= chk.cueCount) Pair(f, l) else null
     }
-    return ClickPlan.times(t.frames, clips, s.fps)
+    // a placed text acts like a scene clip for clicks: one click at its start, none inside it
+    val texts = chk.texts.map { Pair(it.first, it.last) }
+    return ClickPlan.times(t.frames, clips + texts, s.fps)
 }
 
 /** Voice-over and/or click track -> limited AAC. No voice-over is a valid click-only export. */

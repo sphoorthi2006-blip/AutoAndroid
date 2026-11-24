@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cuevideo.app.CueTheme
 
-/** Bezalel home screen: three tools. */
+/** Bezalel home screen: the Auto Editor (text on video is now part of it). */
 class HubActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,36 +46,11 @@ class HubActivity : ComponentActivity() {
                         onOpenAutoEditor = {
                             startActivity(Intent(this, com.cuevideo.app.MainActivity::class.java))
                         },
-                        onOpenUpscale = {
-                            startActivity(Intent(this, UpscaleImagesActivity::class.java))
-                        },
-                        onOpenSvgEditor = {
-                            openWeb(SVG_EDITOR_PAGE, "SVG Editor")   // new workflow: the Video screen of the web editor, inside the app (offline)
-                        },
-                        onOpenTextEditor = { openWeb(TEXT_EDITOR_PAGE, "Text Editor") },
                     )
                 }
             }
         }
     }
-}
-
-/** Step 19: the Text Editor is the Layer Studio's Text tab, opened inside the app (offline web view) with the other tabs hidden. */
-const val TEXT_EDITOR_PAGE = "web/studio/index.html?app=text"
-
-/** New workflow: the SVG Editor is the web editor's Video screen (headings, subscribe, scenes, timeline), opened inside the app with the other tabs hidden. */
-const val SVG_EDITOR_PAGE = "web/studio/index.html?app=video"
-
-/** Steps 16-18: opens a page from the app's own web assets. [sample] hands the page one small file so the smoke test can read it. */
-private fun android.app.Activity.openWeb(page: String, title: String, sample: Boolean = false) {
-    com.suko.app.web.WebInputs.files = if (sample) listOf(
-        com.suko.app.web.InputFile("hello.txt", "text/plain", 10) { java.io.ByteArrayInputStream("hello suko".toByteArray()) },
-    ) else emptyList()
-    startActivity(
-        Intent(this, com.suko.app.web.WebHostActivity::class.java)
-            .putExtra(com.suko.app.web.WebHostActivity.EXTRA_PAGE, page)
-            .putExtra(com.suko.app.web.WebHostActivity.EXTRA_TITLE, title),
-    )
 }
 
 private val HubBg = Color(0xFF0B0D12)
@@ -89,7 +64,7 @@ private val CardTop = Color(0xFF1A1E2B)
 
 @Composable
 private fun HubScreen(
-    onOpenAutoEditor: () -> Unit, onOpenUpscale: () -> Unit, onOpenSvgEditor: () -> Unit, onOpenTextEditor: () -> Unit,
+    onOpenAutoEditor: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -109,35 +84,14 @@ private fun HubScreen(
             }
         }
         Spacer(Modifier.height(4.dp))
-        Text("PICK A TOOL", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Muted, letterSpacing = 1.2.sp)
+        Text("TOOLS", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Muted, letterSpacing = 1.2.sp)
 
         ToolCard(
             title = "Auto Editor",
             tag = "Video",
-            blurb = "Images, script, SRT files and voice-over become a 1080p video.",
+            blurb = "Images, script, SRT files and voice-over become a 1080p video. Verses and other text can be handwritten over any cues.",
             colors = listOf(Accent, Accent2),
             onClick = onOpenAutoEditor,
-        )
-        ToolCard(
-            title = "Upscale Images",
-            tag = "Images",
-            blurb = "AI upscale 2x. Pictures, ZIPs and folders in; PNG folder or ZIPs out.",
-            colors = listOf(Color(0xFF34D399), Accent2),
-            onClick = onOpenUpscale,
-        )
-        ToolCard(
-            title = "SVG Editor",
-            tag = "Animation",
-            blurb = "Turn your pictures and a timing file into a drawn, animated video.",
-            colors = listOf(Color(0xFFF472B6), Accent),
-            onClick = onOpenSvgEditor,
-        )
-        ToolCard(
-            title = "Text Editor",
-            tag = "Text",
-            blurb = "Write text by hand-style animation. Use your own font and export in 1080p, 2K or 4K.",
-            colors = listOf(Color(0xFFFBBF24), Color(0xFFF472B6)),
-            onClick = onOpenTextEditor,
         )
         Spacer(Modifier.height(6.dp))
         Text("Everything runs on your phone. Nothing is uploaded.", fontSize = 12.sp, color = Muted)

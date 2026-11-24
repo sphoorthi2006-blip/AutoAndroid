@@ -1,7 +1,7 @@
 name: Build Bezalel APK
 on:
   push:
-    branches: [ main ]
+    branches: [ main, bezalel-step11 ]
     paths:
       - 'suko/**'
       - '.github/workflows/build-suko.yml'
@@ -27,60 +27,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - name: Install CMake for the native build
-        run: (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1" > /dev/null) || true
-      - name: Pick a recent NDK (the current ncnn build needs NDK r28 or newer)
-        run: |
-          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          ls "$SDK/ndk" || true
-          best=$(ls "$SDK/ndk" | sort -V | tail -1)
-          if [ "${best%%.*}" -lt 28 ]; then
-            (yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" > /dev/null) || true
-            best=$(ls "$SDK/ndk" | sort -V | tail -1)
-          fi
-          echo "Using NDK $best"
-          echo "NDK_VER=$best" >> "$GITHUB_ENV"
-      - name: Fetch ncnn (prebuilt, Vulkan) and the Real-ESRGAN models
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/ncnn app/src/main/cpp/ncnn app/src/main/assets/models
-          gh release download -R Tencent/ncnn -p '*-android-vulkan.zip' -D /tmp/ncnn
-          unzip -q /tmp/ncnn/*-android-vulkan.zip -d app/src/main/cpp/ncnn
-          ls app/src/main/cpp/ncnn
-          # Real-ESRGAN animevideov3 ncnn models (the same files Upscayl ships)
-          base=https://raw.githubusercontent.com/upscayl/upscayl/main/models
-          for s in 2 3 4; do
-            for e in param bin; do
-              curl -fsSL --retry 3 -o "app/src/main/assets/models/realesr-animevideov3-x$s.$e" "$base/realesr-animevideov3-x$s.$e"
-            done
-            test "$(stat -c%s app/src/main/assets/models/realesr-animevideov3-x$s.bin)" -gt 1000000
-          done
-          ls -la app/src/main/assets/models
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Run web tests (Studio units and the Suko bridge)
-        run: |
-          set -o pipefail
-          cd web
-          npm ci --no-audit --no-fund
-          npm test
-          npx tsc --noEmit
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Check the picture analyser (desktop Python code) on the real reference pictures
-        run: |
-          set -o pipefail
-          python -m pip install --quiet numpy opencv-python-headless pillow 2>&1 | tee /tmp/build.log
-          python -I app/src/test/python/check_engine.py app/src/main/python docs/reference 2>&1 | tee -a /tmp/build.log
-      - name: Build the web screens into the app (Studio and Text Editor)
-        run: |
-          set -o pipefail
-          cd web
-          npm run build:suko
       - name: Run logic tests
         run: |
           set -o pipefail
@@ -88,18 +34,7 @@ jobs:
       - name: Build debug APK
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --no-daemon -PndkVer=$NDK_VER 2>&1 | tee -a /tmp/build.log
-      - name: Check the native library is self-contained
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/apkcheck
-          unzip -q -o app/build/outputs/apk/debug/*.apk 'lib/*' -d /tmp/apkcheck
-          for so in /tmp/apkcheck/lib/*/libupscaler.so; do
-            echo "== $so"
-            readelf -d "$so" | grep NEEDED
-            if readelf -d "$so" | grep -q 'libomp.so'; then echo "libomp.so is a runtime dependency - APK would crash"; exit 1; fi
-          done
-          ls /tmp/apkcheck/lib/*/libupscaler.so
+          gradle :app:assembleDebug --no-daemon 2>&1 | tee -a /tmp/build.log
       - name: Build the signed release APK (only on main, only when the keystore secrets exist)
         if: github.ref == 'refs/heads/main' && env.HAS_KEYSTORE == 'true'
         env:
@@ -111,14 +46,14 @@ jobs:
           set -o pipefail
           echo "$KS_B64" | base64 -d > /tmp/bezalel.jks
           export BEZALEL_KEYSTORE=/tmp/bezalel.jks
-          gradle :app:assembleRelease --no-daemon -PndkVer=$NDK_VER 2>&1 | tee -a /tmp/build.log
+          gradle :app:assembleRelease --no-daemon 2>&1 | tee -a /tmp/build.log
           ls -la app/build/outputs/apk/release/
       - uses: actions/upload-artifact@v4
         with:
           name: Bezalel-debug-apk
           path: suko/app/build/outputs/apk/debug/app-debug.apk
       - name: Publish APK as a release (download link)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bezalel-step11'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -128,19 +63,16 @@ jobs:
             cp app/build/outputs/apk/debug/app-debug.apk Bezalel.apk; KIND="debug"
           fi
           gh release delete bezalel-latest -y --cleanup-tag || true
-          gh release create bezalel-latest Bezalel.apk --title "Bezalel (latest build)" --notes "Latest Bezalel $KIND APK from branch main." --target "${{ github.sha }}"
+          gh release create bezalel-latest Bezalel.apk --title "Bezalel (latest build)" --notes "Latest Bezalel $KIND APK from branch ${{ github.ref_name }}." --target "${{ github.sha }}"
       - name: Save error log to the buildlog-suko branch
         if: failure()
         run: |
           mkdir /tmp/out
           touch /tmp/build.log
-          { grep -E "^e: |^w: |FAILED|Exception|Error|What went wrong|expected|but was" /tmp/build.log | head -150; echo ----; grep -B70 'PythonRequirements FAILED' /tmp/build.log | cut -c1-300 | head -120; echo ----; tail -60 /tmp/build.log; } > /tmp/out/log.txt
-          for pk in numpy opencv-python-headless pillow; do
-            echo "== $pk"; curl -fsSL "https://chaquo.com/pypi-13.1/$pk/" | grep -o 'href="[^"]*"' | grep -i 'cp311.*arm64\|cp311.*aarch64' | sed 's/href=//' | head -20
-          done > /tmp/out/wheels.txt 2>&1 || true
+          { grep -E "^e: |^w: |FAILED|Exception|Error|What went wrong|expected|but was" /tmp/build.log | head -150; echo ----; tail -60 /tmp/build.log; } > /tmp/out/log.txt
           cd /tmp/out
           git init -q
           git checkout -q -b buildlog-suko
-          git add log.txt wheels.txt
+          git add log.txt
           git -c user.name=ci -c user.email=ci@example.com commit -q -m "log"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" buildlog-suko

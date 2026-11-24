@@ -2,7 +2,7 @@ package com.cuevideo.app
 
 import java.util.Locale
 
-enum class SegKind { STILL, BLACK, HEADING, SCENE }
+enum class SegKind { STILL, BLACK, HEADING, SCENE, TEXT }
 
 /**
  * One piece of the video (section 9). Frames [startFrame, endFrame) are shown.
@@ -17,6 +17,7 @@ data class Segment(
     val image: ImageEntry? = null,
     val clip: ClipEntry? = null,
     val text: String = "",
+    val placement: TextPlacement? = null,
 ) {
     val frames: Int get() = endFrame - startFrame
 }
@@ -34,6 +35,8 @@ object ExportPlanner {
             val l = r.last
             if (f != null && l != null && f >= 1 && l >= f && l <= n) for (c in f..l) clipOf[c] = r
         }
+        val textOf = HashMap<Int, TextPlacement>()
+        for (t in chk.texts) if (t.first >= 1 && t.last >= t.first && t.last <= n) for (c in t.first..t.last) textOf[c] = t
         val segs = ArrayList<Segment>()
         var i = 1
         while (i <= n) {
@@ -43,6 +46,12 @@ object ExportPlanner {
                 val l = row.last!!
                 segs.add(Segment(SegKind.SCENE, f, l, bf[f - 1], bf[l], clip = row.clip))
                 i = l + 1
+                continue
+            }
+            val tp = textOf[i]
+            if (tp != null) {
+                segs.add(Segment(SegKind.TEXT, tp.first, tp.last, bf[tp.first - 1], bf[tp.last], text = tp.text.trim(), placement = tp))
+                i = tp.last + 1
                 continue
             }
             val text = cues[i - 1].text
@@ -78,8 +87,9 @@ object ReportCsv {
             val source = if (seg == null) "" else when (seg.kind) {
                 SegKind.STILL -> seg.image!!.name
                 SegKind.SCENE -> "SCENE " + seg.clip!!.name
-                SegKind.HEADING -> "TEXT SLIDE (heading, fade-in + zoom)"
-                SegKind.BLACK -> "TEXT SLIDE (subscribe)"
+                SegKind.HEADING -> "TEXT SLIDE (heading, handwritten)"
+                SegKind.BLACK -> "TEXT SLIDE (subscribe, handwritten)"
+                SegKind.TEXT -> "TEXT (placed, handwritten)"
             }
             val replaced = if (seg != null && seg.kind != SegKind.STILL) (chk.imageForCue[i]?.name ?: "") else ""
             val text = cues[i - 1].text.take(80)

@@ -42,12 +42,12 @@ data class UiState(
     val images: List<ImageEntry> = emptyList(),
     val clips: List<ClipEntry> = emptyList(),
     val corrections: Map<String, Pair<Int, Int>> = emptyMap(),
+    /** Text written by hand over cue ranges ("text on video"). */
+    val texts: List<TextPlacement> = emptyList(),
     val busy: String? = null,
     val message: String? = null,
     val check: CheckResult? = null,
     val fps: Int = 30,
-    /** The "Upscale images" switch of the export: on = every picture is AI-upscaled before the video is rendered. */
-    val upscale: Boolean = true,
     val audioSeconds: Double? = null,
     val core: TimingResult? = null,
     val timing: TimingReport? = null,
@@ -65,8 +65,6 @@ data class ExportSummary(
     val unusedImages: List<String>,
     val lufs: Double?,
     val clicks: Int,
-    val upscaleNote: String? = null,
-    val upscaleOn: Boolean = true,
 )
 
 data class ExportUi(
@@ -124,8 +122,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val preview: StateFlow<PreviewState> = _preview
     private var previewJob: Job? = null
     private val renderer by lazy { SlideRenderer(ctx) }
-    private var layerText: String? = null
-    private var layerBmp: Bitmap? = null
+    private var inkText: String? = null
+    private var inkBmp: Bitmap? = null
+    private var inkPlan: WritePlan? = null
+    private val painter by lazy { HeadingPainter() }
+    private val painterDark by lazy { HeadingPainter(background = android.graphics.Color.BLACK) }
 
     fun showPreview(cue: Int, frame: Int) {
         previewJob?.cancel()
@@ -148,24 +149,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     _preview.value = PreviewState(cue, 0, 0, null, "Cue $cue is covered by a scene clip. Scene clips only appear in the exported video.")
                     return@launch
                 }
-                when (CueClassifier.classify(text)) {
-                    CueKind.SUBSCRIBE -> {
-                        val bmp = renderer.blackFrame()
-                        _preview.value = PreviewState(cue, 0, 0, bmp.asImageBitmap(),
-                            "Cue $cue: subscribe slide, pure black picture, no text.")
+                val tp = chk.texts.firstOrNull { cue in it.first..it.last }
+                if (tp != null) {
+                    // placed text: the writing runs over the whole range, so frames count the range
+                    val n = if (rep != null) rep.frames[tp.last] - rep.frames[tp.first - 1] else 90 * (tp.last - tp.first + 1)
+                    val f = frame.coerceIn(0, maxOf(0, n - 1))
+                    val key = "\u0000T:" + tp
+                    val bmp = synchronized(painter) {
+                        if (inkText != key || inkBmp == null || inkPlan == null) {
+                            inkBmp?.recycle()
+                            val ink = renderer.textInk(tp)
+                            inkBmp = ink
+                            inkPlan = HeadingWrite.plan(renderer.inkBits(ink), Defaults.W, Defaults.H)
+                            inkText = key
+                        }
+                        (if (tp.dark) painterDark else painter).draw(inkBmp!!, HeadingWrite.frame(inkPlan!!, f, n, s.fps))
+                            .copy(Bitmap.Config.ARGB_8888, false)
                     }
-                    CueKind.HEADING -> {
+                    val secs = HeadingWrite.writeFrames(n, s.fps).toDouble() / s.fps
+                    _preview.value = PreviewState(cue, f, n, bmp.asImageBitmap(),
+                        "Text for ${tp.label}, handwritten over the whole range.\nframe ${f + 1} of $n at ${s.fps} fps, writing time ${"%.2f".format(secs)} s")
+                    return@launch
+                }
+                when (CueClassifier.classify(text)) {
+                    CueKind.SUBSCRIBE, CueKind.HEADING -> {
+                        val shown = text.trim()
+                        val what = if (CueClassifier.classify(text) == CueKind.SUBSCRIBE) "subscribe" else "heading"
                         val n = if (rep != null) rep.frames[cue] - rep.frames[cue - 1] else 90
                         val f = frame.coerceIn(0, maxOf(0, n - 1))
-                        if (layerText != text || layerBmp == null) {
-                            layerBmp = renderer.headingLayer(text)
-                            layerText = text
+                        val bmp = synchronized(painter) {
+                            if (inkText != shown || inkBmp == null || inkPlan == null) {
+                                inkBmp?.recycle()
+                                val ink = renderer.headingInk(shown)
+                                inkBmp = ink
+                                inkPlan = HeadingWrite.plan(renderer.inkBits(ink), Defaults.W, Defaults.H)
+                                inkText = shown
+                            }
+                            painter.draw(inkBmp!!, HeadingWrite.frame(inkPlan!!, f, n, s.fps))
+                                .copy(Bitmap.Config.ARGB_8888, false)
                         }
-                        val bmp = renderer.headingFrame(layerBmp!!, f, n, s.fps)
-                        val z = SlideMath.zoomFactor(f, n)
-                        val q = SlideMath.fadeBrightness(f, SlideMath.fadeFrames(s.fps))
+                        val secs = HeadingWrite.writeFrames(n, s.fps).toDouble() / s.fps
                         _preview.value = PreviewState(cue, f, n, bmp.asImageBitmap(),
-                            "Cue $cue: heading \"$text\"\nframe ${f + 1} of $n at ${s.fps} fps, zoom ${"%.3f".format(z)}x, brightness ${(q * 100).toInt()}%")
+                            "Cue $cue: $what \"$shown\", handwritten.\nframe ${f + 1} of $n at ${s.fps} fps, writing time ${"%.2f".format(secs)} s")
                     }
                     CueKind.NORMAL -> {
                         val img = chk.imageForCue[cue]
@@ -305,7 +330,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _export.value = ExportUi(
                     result = ExportSummary(
                         vname, rf.name ?: "report.csv", out.frames, out.frames.toDouble() / s.fps, out.seconds,
-                        used, s.images.size, unused, out.audio?.lufs, out.audio?.clicks ?: 0, out.upscaleNote, s.upscale,
+                        used, s.images.size, unused, out.audio?.lufs, out.audio?.clicks ?: 0,
                     ),
                 )
             } catch (e: OutOfMemoryError) {
@@ -322,7 +347,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun recompute(s: UiState): UiState {
         var chk = if (s.masterCues.isNotEmpty())
-            Checker.check(s.masterCues, s.images, s.clips, s.corrections) else null
+            Checker.check(s.masterCues, s.images, s.clips, s.corrections, s.texts) else null
         val core = s.core
         var rep: TimingReport? = null
         if (chk != null && core != null) {
@@ -361,8 +386,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setFps(fps: Int) = change { it.copy(fps = fps) }
-
-    fun setUpscale(on: Boolean) = change { it.copy(upscale = on) }
 
     private fun change(f: (UiState) -> UiState) {
         _state.update { recompute(f(it)) }
@@ -652,6 +675,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun removeClip(uri: String) =
         change { it.copy(clips = it.clips.filter { c -> c.uri != uri }, corrections = it.corrections - uri) }
 
+    // ---------- live draft of the text being typed (drag to position) ----------
+
+    private val _draft = MutableStateFlow<ImageBitmap?>(null)
+    val draft: StateFlow<ImageBitmap?> = _draft
+    private var draftJob: Job? = null
+
+    /** The finished text on its background, half size, for the "Text on video" card. Newer calls replace older ones. */
+    fun showDraft(tp: TextPlacement) {
+        draftJob?.cancel()
+        draftJob = viewModelScope.launch(Dispatchers.IO) {
+            val out = synchronized(painter) {
+                val ink = renderer.textInk(tp)
+                val b = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
+                val c = android.graphics.Canvas(b)
+                c.drawColor(if (tp.dark) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                c.drawBitmap(ink, null, android.graphics.Rect(0, 0, 960, 540), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                ink.recycle()
+                b
+            }
+            _draft.value = out.asImageBitmap()
+        }
+    }
+
+    fun addText(t: TextPlacement) = change { it.copy(texts = it.texts + t) }
+
+    fun removeText(index: Int) =
+        change { if (index in it.texts.indices) it.copy(texts = it.texts.filterIndexed { i, _ -> i != index }) else it }
+
     fun setCorrection(uri: String, first: Int, last: Int) =
         change { it.copy(corrections = it.corrections + (uri to Pair(first, last))) }
 
@@ -695,6 +746,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 images = imgs,
                 clips = g.clips.map { f -> ClipEntry(f.name, f.uri) },
                 corrections = emptyMap(),
+                texts = emptyList(),
                 message = if (g.master == null || g.audio == null)
                     "Folder read, but I could not find " +
                         listOfNotNull(

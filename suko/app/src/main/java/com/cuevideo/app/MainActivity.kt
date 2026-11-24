@@ -46,6 +46,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,16 +82,16 @@ class MainActivity : ComponentActivity() {
 
 // ------------------------------------------------------------------ look
 
-private val Bg = Color(0xFF0B0D12)
-private val PanelBg = Color(0xFF151821)
-private val Hairline = Color(0x1AFFFFFF)
-private val TextMain = Color(0xFFF2F4F8)
-private val Muted = Color(0xFF8A93A6)
-private val Accent = Color(0xFF8B5CF6)
-private val Accent2 = Color(0xFF38BDF8)
-private val Red = Color(0xFFF87171)
-private val Green = Color(0xFF34D399)
-private val Amber = Color(0xFFFBBF24)
+internal val Bg = Color(0xFF0B0D12)
+internal val PanelBg = Color(0xFF151821)
+internal val Hairline = Color(0x1AFFFFFF)
+internal val TextMain = Color(0xFFF2F4F8)
+internal val Muted = Color(0xFF8A93A6)
+internal val Accent = Color(0xFF8B5CF6)
+internal val Accent2 = Color(0xFF38BDF8)
+internal val Red = Color(0xFFF87171)
+internal val Green = Color(0xFF34D399)
+internal val Amber = Color(0xFFFBBF24)
 
 @Composable
 fun CueTheme(content: @Composable () -> Unit) {
@@ -139,25 +140,6 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) { Text(text, color = if (selected) Color.White else Muted, fontWeight = FontWeight.Medium, fontSize = 14.sp) }
-}
-
-/**
- * The "Upscale images" option shown in every export section (Auto Editor now, SVG Editor when its export exists).
- * One switch plus a visible sentence that says what the export does with the pictures.
- */
-@Composable
-fun UpscaleOption(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text("Upscale images", fontWeight = FontWeight.Medium, fontSize = 15.sp, color = TextMain)
-            Text(
-                if (checked) "On: every picture is AI-upscaled 2x first (step 1), then the video is rendered (step 2). One progress bar covers both."
-                else "Off: pictures are used as they are. Faster, but less sharp.",
-                fontSize = 12.sp, color = if (checked) Accent2 else Amber,
-            )
-        }
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
-    }
 }
 
 /** level: 0 = found, 1 = optional and missing, 2 = needed and missing */
@@ -354,6 +336,9 @@ fun MainScreen(vm: AppViewModel) {
             }
         }
 
+        // ---- text on video
+        TextOnVideoSection(s, vm)
+
         // ---- export
         Section("Export") {
             val c = s.check
@@ -365,7 +350,7 @@ fun MainScreen(vm: AppViewModel) {
                     if (ready) "Ready to export" else "Not ready yet",
                     color = if (ready) Green else Red, fontWeight = FontWeight.Bold, fontSize = 16.sp,
                 )
-                Text("${c.cueCount} cues  -  ${c.headingCues} headings  -  ${c.subscribeCues} subscribe  -  ${c.covered.size} under scene clips", fontSize = 12.sp, color = Muted)
+                Text("${c.cueCount} cues  -  ${c.headingCues} headings  -  ${c.subscribeCues} subscribe  -  ${c.covered.size} under scene clips  -  ${c.textCovered.size} under text", fontSize = 12.sp, color = Muted)
                 for (e in c.errors) Text(e, color = Red, fontSize = 13.sp)
                 if (c.missing.isNotEmpty()) Text(c.missingText, color = Red, fontWeight = FontWeight.Medium, fontSize = 13.sp)
                 if (s.audio == null) Text(
@@ -374,21 +359,17 @@ fun MainScreen(vm: AppViewModel) {
                     color = Muted, fontSize = 12.sp,
                 )
                 if (c.missing.isNotEmpty() || c.headingCues + c.subscribeCues > 0)
-                    Text("Heading and subscribe cues also need a picture file. It is never shown, but it must be there.", fontSize = 11.sp, color = Muted)
+                    Text("Heading and subscribe cues also need a picture file. It is never shown, but it must be there. Cues under a text need none.", fontSize = 11.sp, color = Muted)
                 for (w in c.warnings) Text(w, color = Amber, fontSize = 12.sp)
                 if (s.original == null) Text("No original SRT: master timestamps will be used.", color = Amber, fontSize = 12.sp)
             }
-            UpscaleOption(s.upscale, !ex.busy) { vm.setUpscale(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Frame rate", color = Muted, fontSize = 13.sp)
                 Spacer(Modifier.width(4.dp))
                 for (f in listOf(30, 60)) Pill("$f fps", s.fps == f) { vm.setFps(f) }
             }
+            Text("Headings and subscribe cues are handwritten. The pen uses 80% of the cue's length, then the finished text stays.", fontSize = 11.sp, color = Muted)
             if (ex.busy) {
-                if (s.upscale) Text(
-                    if (ex.label.startsWith("Upscaling") || ex.label.startsWith("Checking")) "Step 1 of 2: upscaling pictures" else "Step 2 of 2: rendering video",
-                    color = Accent2, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                )
                 Text(ex.label, color = Amber, fontSize = 13.sp)
                 LinearProgressIndicator(progress = { ex.progress.toFloat() }, modifier = Modifier.fillMaxWidth(), color = Accent, trackColor = Hairline)
                 OutlinedButton(onClick = { vm.cancelExport() }, border = BorderStroke(1.dp, Hairline)) { Text("Cancel", color = TextMain) }
@@ -410,9 +391,6 @@ fun MainScreen(vm: AppViewModel) {
                 }
                 Text("${r.frames} frames, ${"%.1f".format(r.seconds)} s of video, made in ${"%.0f".format(r.took)} s. ${r.clicks} clicks, $audioSummary.", fontSize = 13.sp, color = Muted)
                 Text("Pictures used: ${r.usedImages} of ${r.givenImages}.", fontSize = 13.sp, color = Muted)
-                if (!r.upscaleOn) Text("Upscaling: off, pictures were used as they are.", fontSize = 12.sp, color = Muted)
-                else if (r.upscaleNote != null) Text("Upscaling: ${r.upscaleNote}", fontSize = 12.sp, color = Amber)
-                else Text("Upscaling: all pictures were AI-upscaled 2x.", fontSize = 12.sp, color = Green)
                 if (r.unusedImages.isNotEmpty())
                     Text("Not used: " + r.unusedImages.take(30).joinToString(", ") + if (r.unusedImages.size > 30) ", ..." else "", fontSize = 12.sp, color = Amber)
             }
@@ -459,6 +437,8 @@ fun MainScreen(vm: AppViewModel) {
             val total = s.check?.cueCount ?: 0
             var cueText by remember { mutableStateOf("1") }
             var slider by remember { mutableStateOf(0f) }
+            // the box follows the preview, so the Preview buttons of the text list fill it in
+            LaunchedEffect(pv.cue) { cueText = pv.cue.toString(); slider = 0f }
             if (total == 0) {
                 Text("Choose the master SRT to preview slides.", color = Muted, fontSize = 13.sp)
             } else {
@@ -500,7 +480,7 @@ fun MainScreen(vm: AppViewModel) {
                         onValueChange = { v -> slider = v; vm.showPreview(pv.cue, v.toInt()) },
                         valueRange = 0f..(pv.frames - 1).toFloat(),
                     )
-                    Text("Slide the bar to see the zoom and the fade-in frame by frame.", fontSize = 12.sp, color = Muted)
+                    Text("Slide the bar to watch the handwriting frame by frame.", fontSize = 12.sp, color = Muted)
                 }
                 if (pv.info.isNotEmpty()) Text(pv.info, fontSize = 13.sp)
             }

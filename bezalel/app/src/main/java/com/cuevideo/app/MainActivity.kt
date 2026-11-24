@@ -440,6 +440,9 @@ fun MainScreen(vm: AppViewModel) {
             }
         }
 
+        // ---- background music (always visible)
+        BgmSection(s, vm, ex.busy || au.busy)
+
         // ---- tools
         if (details) {
         Section("Timing") {
@@ -530,8 +533,6 @@ fun MainScreen(vm: AppViewModel) {
             }
         }
 
-
-        BgmSection(s, vm, ex.busy || au.busy)
 
         Section("Audio mix test") {
             val times = if (s.clicksEnabled) clickTimesFor(s) else emptyList()

@@ -20,12 +20,13 @@ object ImageProcessor {
     // The hole is filled by copying TEXTURE from the surrounding picture (patch-based inpainting), working
     // inwards from the edge of the hole, so grain and patterns continue through it instead of leaving a blurry patch.
     /**
-     * Finds the sparkle in the bottom-right part of the picture (its position differs between files:
-     * e.g. ~(1247, 638) in some PNGs but ~(1279, 670) in the JPGs, on a 1376x768 image).
-     * Scores every spot by "star-shaped area brighter than the ring around it" and takes the best.
-     * Returns (cx, cy) or null if nothing star-like is found.
+     * Finds the sparkle. It sits at one of two known places depending on how the picture was saved
+     * (on a 1376x768 image: ~(1247, 639) in PNGs, ~(1280, 670) in JPGs). Both places are searched in a
+     * small window (+-12 px, 1 px steps, star radius 22/26/30) and the one with the most star-like spot
+     * wins ("star-shaped area brighter than the ring around it"). There is no threshold: the mark is
+     * always removed at the better of the two, so every picture gets cleaned.
      */
-    private fun findMark(src: Img): DoubleArray? {
+    private fun findMark(src: Img): DoubleArray {
         val w = src.w
         val h = src.h
         val s = w / 1376.0
@@ -34,63 +35,56 @@ object ImageProcessor {
             val p = src.px[i]
             lum[i] = (((p shr 16) and 255) + ((p shr 8) and 255) + (p and 255)) / 3
         }
-        // The sparkle sits a fixed distance from the bottom-right corner (about (1247, 639) on 1376x768);
-        // a weak pull towards that spot stops dark lines next to the star from dragging the match away.
-        val ex = w - 129.0 * s
-        val ey = h - 129.0 * s
+        val anchors = arrayOf(
+            doubleArrayOf(1247.0 * s, 639.0 * (h / 768.0)),   // PNG position
+            doubleArrayOf(1280.0 * s, 670.0 * (h / 768.0))    // JPG position
+        )
         var bestScore = -1e9
-        var bestX = 0
-        var bestY = 0
-        var bestShape = 0.0
-
-        fun scan(r0: Int, xFrom: Int, xTo: Int, yFrom: Int, yTo: Int, step: Int) {
-            val r = r0 * s
-            val rr = (r * 2.3).toInt() + 1
-            val insX = ArrayList<Int>(); val insY = ArrayList<Int>()
-            val ringX = ArrayList<Int>(); val ringY = ArrayList<Int>()
-            var oy = -rr
-            while (oy <= rr) {
-                var ox = -rr
-                while (ox <= rr) {
-                    val f = (abs(ox) / r).pow(2.0 / 3.0) + (abs(oy) / r).pow(2.0 / 3.0)
-                    if (f <= 0.9) { insX.add(ox); insY.add(oy) }
-                    else if (f >= 1.4 && f <= 2.3) { ringX.add(ox); ringY.add(oy) }
-                    ox += 2
+        var bestX = anchors[1][0]
+        var bestY = anchors[1][1]
+        val win = max(8, (12 * s).toInt())
+        for (a in anchors) {
+            for (r0 in intArrayOf(22, 26, 30)) {
+                val r = r0 * s
+                val rr = (r * 2.3).toInt() + 1
+                val insX = ArrayList<Int>(); val insY = ArrayList<Int>()
+                val ringX = ArrayList<Int>(); val ringY = ArrayList<Int>()
+                var oy = -rr
+                while (oy <= rr) {
+                    var ox = -rr
+                    while (ox <= rr) {
+                        val f = (abs(ox) / r).pow(2.0 / 3.0) + (abs(oy) / r).pow(2.0 / 3.0)
+                        if (f <= 0.9) { insX.add(ox); insY.add(oy) }
+                        else if (f >= 1.4 && f <= 2.3) { ringX.add(ox); ringY.add(oy) }
+                        ox += 2
+                    }
+                    oy += 2
                 }
-                oy += 2
-            }
-            if (insX.isEmpty() || ringX.isEmpty()) return
-            val ix = insX.toIntArray(); val iy = insY.toIntArray()
-            val rx = ringX.toIntArray(); val ry = ringY.toIntArray()
-            var cy = max(yFrom, rr + 1)
-            while (cy <= min(yTo, h - rr - 2)) {
-                var cx = max(xFrom, rr + 1)
-                while (cx <= min(xTo, w - rr - 2)) {
-                    var a = 0L
-                    for (k in ix.indices) a += lum[(cy + iy[k]) * w + cx + ix[k]]
-                    var b = 0L
-                    var b2 = 0L
-                    for (k in rx.indices) { val v = lum[(cy + ry[k]) * w + cx + rx[k]]; b += v; b2 += v.toLong() * v }
-                    val ma = a.toDouble() / ix.size
-                    val mb = b.toDouble() / rx.size
-                    val sd = sqrt(max(0.0, b2.toDouble() / rx.size - mb * mb))
-                    val shape = (ma - mb) - 0.5 * sd              // star must be brighter than a calm ring
-                    val dist = sqrt((cx - ex) * (cx - ex) + (cy - ey) * (cy - ey)) / s
-                    val score = shape - 1.5 * dist
-                    if (score > bestScore) { bestScore = score; bestX = cx; bestY = cy; bestShape = shape }
-                    cx += step
+                if (insX.isEmpty() || ringX.isEmpty()) continue
+                val ix = insX.toIntArray(); val iy = insY.toIntArray()
+                val rx = ringX.toIntArray(); val ry = ringY.toIntArray()
+                val ax = a[0].toInt()
+                val ay = a[1].toInt()
+                for (cy in max(rr + 1, ay - win)..min(h - rr - 2, ay + win)) {
+                    for (cx in max(rr + 1, ax - win)..min(w - rr - 2, ax + win)) {
+                        var sum = 0L
+                        for (k in ix.indices) sum += lum[(cy + iy[k]) * w + cx + ix[k]]
+                        var b = 0L
+                        var b2 = 0L
+                        for (k in rx.indices) { val v = lum[(cy + ry[k]) * w + cx + rx[k]]; b += v; b2 += v.toLong() * v }
+                        val ma = sum.toDouble() / ix.size
+                        val mb = b.toDouble() / rx.size
+                        val sd = sqrt(max(0.0, b2.toDouble() / rx.size - mb * mb))
+                        // star must be brighter than a calm ring; a small pull towards the known spot stops a
+                        // dark line beside the star from dragging the match away
+                        val dd = sqrt(((cx - ax) * (cx - ax) + (cy - ay) * (cy - ay)).toDouble()) / s
+                        val score = (ma - mb) - 0.5 * sd - 1.5 * dd
+                        if (score > bestScore) { bestScore = score; bestX = cx.toDouble(); bestY = cy.toDouble() }
+                    }
                 }
-                cy += step
             }
         }
-
-        val radii = intArrayOf(22, 26, 30, 34)
-        for (r0 in radii) scan(r0, (w * 0.70).toInt(), (w - 80 * s).toInt(), (h * 0.60).toInt(), (h - 80 * s).toInt(), 2)
-        val cx0 = bestX
-        val cy0 = bestY
-        for (r0 in radii) scan(r0, cx0 - 3, cx0 + 3, cy0 - 3, cy0 + 3, 1)   // fine pass, 1 px steps
-        // the sparkle is a clearly brighter shape (about +25..+80 levels); weaker than this is not a sparkle
-        return if (bestShape >= 12.0) doubleArrayOf(bestX.toDouble(), bestY.toDouble()) else null
+        return doubleArrayOf(bestX, bestY)
     }
 
     fun removeMark(src: Img): Img {
@@ -98,10 +92,10 @@ object ImageProcessor {
         val w = src.w
         val h = src.h
         val s = w / 1376.0
-        // Always remove: use the detected position; if detection finds nothing, fall back to the old fixed spot.
+        // Always remove, at the sparkle's real position (PNG or JPG place, whichever has the star).
         val found = findMark(src)
-        val cx = found?.get(0) ?: (1279.0 * s)
-        val cy = found?.get(1) ?: (669.5 * (h / 768.0))
+        val cx = found[0]
+        val cy = found[1]
         val r = 30.0 * s
         val x0 = max(1, (cx - r - 4).toInt())
         val x1 = min(w - 2, (cx + r + 4).toInt())

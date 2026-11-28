@@ -150,7 +150,12 @@ async function resolveVoice(a, b, pctA) {
 
 // ---------- speed boost ----------
 function speedNote() {
-  if (device === "webgpu") return "Running on the graphics chip (fastest).";
+  const su = SETUPS[level] || SETUPS[SETUPS.length - 1];
+  if (su.dtype !== "fp32") return "Using the " + su.name + ". " + coreNote();
+  if (device === "webgpu") return "Using the best model on the graphics chip (fastest).";
+  return "Using the best model. " + coreNote();
+}
+function coreNote() {
   if (window.crossOriginIsolated) {
     const cores = navigator.hardwareConcurrency || 4;
     const n = Math.min(4, Math.ceil(cores / 2));
@@ -168,42 +173,81 @@ function offerSafeMode() {
 }
 
 // ---------- model loading ----------
-// Always the full-precision model (clearest words). It downloads once (about 330 MB),
-// is saved by the browser, and opens by itself every time the app starts.
+// Tries the clearest setup first. If the app closed during the last load or generation
+// (usually the phone running out of memory), it steps down to a lighter setup by itself.
+const SETUPS = [
+  { device: "webgpu", dtype: "fp32", name: "best model on the graphics chip" },
+  { device: "wasm", dtype: "fp32", name: "best model on the processor" },
+  { device: "wasm", dtype: "q8", name: "lighter model (fits phones with less memory)" },
+];
+const mem = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* optional */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* optional */ } },
+};
+let level = Math.min(Number(mem.get("setupLevel")) || 0, SETUPS.length - 1);
+let crashNote = "";
+if (mem.get("busy")) {
+  // the app was closed in the middle of work last time: use a lighter setup
+  level = SETUPS.length - 1; mem.set("setupLevel", String(level));
+  crashNote = "The app closed last time, so it now uses a lighter setup that fits this phone. ";
+  mem.del("busy");
+}
+const markBusy = () => mem.set("busy", "1");
+const clearBusy = () => mem.del("busy");
+// leaving the app normally is not a crash
+window.addEventListener("pagehide", () => { if (!running && !loading) clearBusy(); });
+
 async function hasWebGPU() {
   try { return !!(navigator.gpu && (await navigator.gpu.requestAdapter())); } catch (e) { return false; }
 }
 
 let device = "wasm";
+let loading = false;
 let modelPromise = null;
 function loadModel() {
   if (!modelPromise) modelPromise = doLoad().catch((err) => { modelPromise = null; throw err; });
   return modelPromise;
 }
 async function doLoad() {
+  loading = true;
   prog.hidden = false;
-  setStatus("Getting the voice model ready...");
+  setStatus(crashNote + "Getting the voice model ready...");
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* optional */ }
-  const opts = (dev) => ({
-    dtype: "fp32", device: dev,
-    progress_callback: (p) => {
-      if (p && typeof p.progress === "number") {
-        prog.value = p.progress;
-        setStatus(`Loading voice model: ${Math.round(p.progress)}% (first time only, about 330 MB)`);
-      }
-    },
-  });
+  if (level === 0 && !(await hasWebGPU())) level = 1;
   try {
-    if (await hasWebGPU()) {
-      try { tts = await KokoroTTS.from_pretrained(MODEL_ID, opts("webgpu")); device = "webgpu"; }
-      catch (e) { console.error(e); tts = null; }
+    let lastErr = null;
+    for (; level < SETUPS.length; level++) {
+      const su = SETUPS[level];
+      const size = su.dtype === "fp32" ? "about 330 MB" : "about 90 MB";
+      markBusy();
+      try {
+        tts = await KokoroTTS.from_pretrained(MODEL_ID, {
+          dtype: su.dtype, device: su.device,
+          progress_callback: (p) => {
+            if (p && typeof p.progress === "number") {
+              prog.value = p.progress;
+              setStatus(crashNote + `Loading voice model: ${Math.round(p.progress)}% (first time only, ${size})`);
+            }
+          },
+        });
+        device = su.device;
+        break;
+      } catch (e) {
+        console.error(e); tts = null; lastErr = e;
+      }
     }
-    if (!tts) { tts = await KokoroTTS.from_pretrained(MODEL_ID, opts("wasm")); device = "wasm"; }
+    clearBusy();
+    if (!tts) throw lastErr || new Error("no setup worked");
+    mem.set("setupLevel", String(level));
+    loading = false;
     prog.hidden = true;
-    setStatus("Ready. " + speedNote());
+    setStatus(crashNote + "Ready. " + speedNote());
     return tts;
   } catch (err) {
     console.error(err);
+    loading = false; clearBusy();
+    level = Math.min(Number(mem.get("setupLevel")) || 0, SETUPS.length - 1);
     tts = null;
     prog.hidden = true;
     setStatus("Could not load the voice model: " + (err && err.message ? err.message : err) + ". Check your internet and reopen the app.");
@@ -264,6 +308,7 @@ async function run(previewOnly) {
       setStatus("Waiting for the voice model to finish loading...");
       await loadModel();
     }
+    markBusy();
     setStatus(b ? "Blending voices..." : "Preparing voice...");
     try {
       voice = await resolveVoice(a, b, pctA);
@@ -322,7 +367,7 @@ async function run(previewOnly) {
     console.error(err);
     setStatus("Something went wrong: " + (err && err.message ? err.message : err));
   } finally {
-    releaseScreen(); running = false;
+    releaseScreen(); running = false; clearBusy();
     genBtn.disabled = false; prevBtn.disabled = false; stopBtn.hidden = true;
   }
 }

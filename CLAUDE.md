@@ -10,3 +10,5 @@ Static web app (no build step) that runs Kokoro-82M in the browser. Files are at
 - The sandbox cannot reach the npm registry, jsDelivr or Hugging Face, so the model, blending and PDF/zip reading have not been run in a real browser. Pure helpers in `lib.js` are tested with Node.
 - Blending depends on how `kokoro-js@1.2.1` loads voices (a fetch to `.../voices/<name>.bin`, voice list at `tts.voices`). If the library version changes, re-check this. The app falls back to Voice A if blending fails.
 - Bump the cache name in `sw.js` when the list of files or their contents change, so phones pick up updates.
+- Quality: a "Voice quality" choice picks `fp32` ("Best", default, 326 MB; WebGPU when available, else wasm) or `q8` ("Standard", 92 MB). Phonemes come from the same espeak-based phonemizer in kokoro-js on every device, so desktop/mobile differences come from the model precision or device (many desktop demos use fp32 on WebGPU), not the text.
+- After the first successful load, a localStorage flag makes the app open the cached model automatically on later visits.

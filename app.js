@@ -150,6 +150,11 @@ async function resolveVoice(a, b, pctA) {
 
 // ---------- speed boost ----------
 function speedNote() {
+  const qual = qualityEl.value === "best" ? "Best pronunciation model" : "Standard model";
+  if (device === "webgpu") return `${qual}, running on the graphics chip (fast).`;
+  return `${qual}. ` + coreNote();
+}
+function coreNote() {
   if (window.crossOriginIsolated) {
     const cores = navigator.hardwareConcurrency || 4;
     const n = Math.min(4, Math.ceil(cores / 2));
@@ -191,33 +196,70 @@ function makePlayer() {
 function stopPlayer() { if (player) { player.stop(); player = null; } }
 
 // ---------- model loading ----------
-loadBtn.addEventListener("click", async () => {
-  loadBtn.disabled = true;
+// "best" uses the full-precision model (clearer words, same as most desktop demos);
+// "standard" uses the smaller 8-bit model. Both stay saved on the phone after the first download.
+const QUALITY = {
+  standard: { dtype: "q8", label: "Load voice model (about 90 MB, one time)" },
+  best: { dtype: "fp32", label: "Load voice model (about 330 MB, one time)" },
+};
+const qualityEl = $("quality");
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* optional */ } },
+};
+qualityEl.value = QUALITY[store.get("quality")] ? store.get("quality") : "best";
+const updateLoadLabel = () => { loadBtn.textContent = QUALITY[qualityEl.value].label; };
+updateLoadLabel();
+qualityEl.addEventListener("change", () => {
+  store.set("quality", qualityEl.value);
+  if (tts) { location.reload(); return; } // switch models on a fresh page
+  updateLoadLabel();
+});
+
+async function hasWebGPU() {
+  try { return !!(navigator.gpu && (await navigator.gpu.requestAdapter())); } catch (e) { return false; }
+}
+
+let device = "wasm";
+async function loadModel(auto) {
+  loadBtn.disabled = true; qualityEl.disabled = true;
   prog.hidden = false;
-  setStatus("Downloading model...");
+  const q = qualityEl.value, dtype = QUALITY[q].dtype;
+  setStatus(auto ? "Opening the saved voice model..." : "Downloading model...");
+  // ask the browser not to clear the saved model when space runs low
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* optional */ }
+  const opts = (dev) => ({
+    dtype, device: dev,
+    progress_callback: (p) => {
+      if (p && typeof p.progress === "number") {
+        prog.value = p.progress;
+        setStatus(`${auto ? "Opening" : "Downloading"} ${p.file ? p.file.split("/").pop() : "model"}: ${Math.round(p.progress)}%`);
+      }
+    },
+  });
   try {
-    tts = await KokoroTTS.from_pretrained(MODEL_ID, {
-      dtype: "q8",
-      device: "wasm",
-      progress_callback: (p) => {
-        if (p && typeof p.progress === "number") {
-          prog.value = p.progress;
-          setStatus(`Downloading ${p.file ? p.file.split("/").pop() : "model"}: ${Math.round(p.progress)}%`);
-        }
-      },
-    });
+    // the full-precision model runs much faster on the phone's graphics chip, where available
+    if (dtype === "fp32" && (await hasWebGPU())) {
+      try { tts = await KokoroTTS.from_pretrained(MODEL_ID, opts("webgpu")); device = "webgpu"; }
+      catch (e) { console.error(e); tts = null; }
+    }
+    if (!tts) { tts = await KokoroTTS.from_pretrained(MODEL_ID, opts("wasm")); device = "wasm"; }
+    store.set("loaded-" + q, "1");
     prog.hidden = true;
     loadBtn.hidden = true;
     genBtn.disabled = false; prevBtn.disabled = false;
     setStatus("Model ready. Pick a style, add your script or files, and tap Generate.\n" + speedNote());
   } catch (err) {
     console.error(err);
+    tts = null;
     prog.hidden = true;
-    loadBtn.disabled = false;
+    loadBtn.disabled = false; qualityEl.disabled = false;
     setStatus("Could not load the model: " + (err && err.message ? err.message : err) + ". Check your internet and try again.");
     if (window.crossOriginIsolated) offerSafeMode();
   }
-});
+  qualityEl.disabled = false;
+}
+loadBtn.addEventListener("click", () => loadModel(false));
 
 // ---------- generation ----------
 function addPart(samples, rate, index) {
@@ -356,3 +398,14 @@ if ("serviceWorker" in navigator) {
     if (canReload && !tts) location.reload();
   }).catch(() => {});
 }
+
+// Open the saved model automatically if it was downloaded before (no new download).
+// Wait a moment in case the page reloads once for the speed boost.
+if (store.get("loaded-" + qualityEl.value) === "1") {
+  setTimeout(() => {
+    const reloading = "serviceWorker" in navigator && !window.crossOriginIsolated && !SAFE &&
+      sessionStorageGet("boostReload") !== "1";
+    if (!tts && !loadBtn.disabled && !reloading) loadModel(true);
+  }, 1500);
+}
+function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return "1"; } }

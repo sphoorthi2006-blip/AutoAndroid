@@ -7,6 +7,7 @@ A free web app for English narration. It runs the open-source Kokoro-82M model (
 - **Narration styles:** suggested presets for storytelling, conversation, and British narration. Tune by ear.
 - **Voice blending:** pick Voice A and Voice B and mix them with a slider (for example female + male).
 - **Preview** the first sentence before generating a long script.
+- **Faster:** uses several processor cores where the phone allows, and plays the narration while the rest is still being made.
 - Long texts are made in parts of about 4 minutes each, each with its own player and WAV download.
 
 ## Files

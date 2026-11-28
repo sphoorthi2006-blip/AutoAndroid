@@ -3,7 +3,8 @@
 Static web app (no build step) that runs Kokoro-82M in the browser. Files are at the repo root: `index.html`, `app.js`, `lib.js`, `files.js`, `sw.js`, `manifest.json`.
 
 - The repo used to hold other projects (Bezalel, Sukko image upscaler, an old native voice app). All were removed on the owner's request; they remain in git history.
-- Hosting is GitHub Pages from `main` at `/ (root)`. The owner turns Pages on in the GitHub website; the sandbox proxy blocks the Pages API.
+- Hosting: GitHub Pages is currently set to build from the `gh-pages` branch (root). After changing `main`, copy the app files onto `gh-pages` and push both. The sandbox proxy blocks the Pages API, so only the owner can change this setting.
+- Speed: `sw.js` adds COOP/COEP (credentialless) headers to page loads so onnxruntime can use several threads; the app reloads once to pick this up. `index.html?safe=1` turns it off, and a "safe mode" button appears if the model fails to load while isolated. "Play while generating" plays each piece through Web Audio as it is made.
 - The owner is not a developer and uses a phone. Keep instructions as short tap-by-tap steps.
 - Never write the owner's GitHub token anywhere (files, git config, remote URLs). A token was pasted into chat earlier and should be revoked.
 - The sandbox cannot reach the npm registry, jsDelivr or Hugging Face, so the model, blending and PDF/zip reading have not been run in a real browser. Pure helpers in `lib.js` are tested with Node.

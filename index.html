@@ -45,7 +45,13 @@
   <p class="sub">Free English narration with the Kokoro model. Add your script or documents, pick a style, and get a voice-over. Runs on your phone, no account.</p>
 
   <div class="card">
-    <button id="loadBtn">Load voice model (about 90 MB, one time)</button>
+    <label for="quality">Voice quality</label>
+    <select id="quality">
+      <option value="best">Best pronunciation (clearer words, 330 MB)</option>
+      <option value="standard">Standard (faster on old phones, 90 MB)</option>
+    </select>
+    <div class="hint" style="margin-bottom:10px">The model is saved on your phone after the first download and opens by itself next time.</div>
+    <button id="loadBtn">Load voice model</button>
     <progress id="prog" value="0" max="100" hidden></progress>
     <div id="status">Model not loaded yet.</div>
   </div>

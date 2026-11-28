@@ -19,6 +19,8 @@ let tts = null;
 let cancelled = false;
 let urls = [];
 let wakeLock = null;
+let player = null;
+const SAFE = new URLSearchParams(location.search).has("safe");
 const setStatus = (m) => (statusEl.textContent = m);
 
 // ---------- controls ----------
@@ -146,6 +148,48 @@ async function resolveVoice(a, b, pctA) {
   return name;
 }
 
+// ---------- speed boost ----------
+function speedNote() {
+  if (window.crossOriginIsolated) {
+    const cores = navigator.hardwareConcurrency || 4;
+    const n = Math.min(4, Math.ceil(cores / 2));
+    return `Speed boost on: using ${n} processor core${n > 1 ? "s" : ""}.`;
+  }
+  return SAFE ? "Safe mode: using 1 processor core (slower)." : "Speed boost off: using 1 processor core. Close and reopen the app to turn it on.";
+}
+function offerSafeMode() {
+  if (document.getElementById("safeBtn")) return;
+  const b = document.createElement("button");
+  b.id = "safeBtn"; b.className = "secondary";
+  b.textContent = "Try safe mode (slower, but more compatible)";
+  b.addEventListener("click", () => { location.href = "index.html?safe=1"; });
+  loadBtn.after(b);
+}
+
+// ---------- live playback ----------
+// Plays each piece as soon as it is made, so you can listen while the rest is generated.
+function makePlayer() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  const ctx = new Ctx();
+  if (ctx.resume) ctx.resume();
+  let next = 0;
+  return {
+    push(samples, rate) {
+      const buf = ctx.createBuffer(1, samples.length, rate);
+      buf.getChannelData(0).set(samples);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      const t = Math.max(ctx.currentTime + 0.05, next);
+      src.start(t);
+      next = t + buf.duration;
+    },
+    stop() { try { ctx.close(); } catch (e) { /* already closed */ } },
+  };
+}
+function stopPlayer() { if (player) { player.stop(); player = null; } }
+
 // ---------- model loading ----------
 loadBtn.addEventListener("click", async () => {
   loadBtn.disabled = true;
@@ -165,12 +209,13 @@ loadBtn.addEventListener("click", async () => {
     prog.hidden = true;
     loadBtn.hidden = true;
     genBtn.disabled = false; prevBtn.disabled = false;
-    setStatus("Model ready. Pick a style, add your script or files, and tap Generate.");
+    setStatus("Model ready. Pick a style, add your script or files, and tap Generate.\n" + speedNote());
   } catch (err) {
     console.error(err);
     prog.hidden = true;
     loadBtn.disabled = false;
     setStatus("Could not load the model: " + (err && err.message ? err.message : err) + ". Check your internet and try again.");
+    if (window.crossOriginIsolated) offerSafeMode();
   }
 });
 
@@ -209,6 +254,12 @@ async function run(previewOnly) {
   let chunks = chunkText(text);
   if (!chunks.length) { setStatus("Nothing readable in that text."); return; }
   if (previewOnly) chunks = chunks.slice(0, 1);
+  // make the first piece short so the first audio arrives sooner
+  else if (chunks[0].length > 160) chunks = [...chunkText(chunks[0], 140), ...chunks.slice(1)];
+
+  // the audio player must be created right after the tap, before any waiting
+  stopPlayer();
+  if ($("live").checked) { try { player = makePlayer(); } catch (e) { player = null; } }
 
   cancelled = false;
   genBtn.disabled = true; prevBtn.disabled = true; stopBtn.hidden = false;
@@ -261,6 +312,7 @@ async function run(previewOnly) {
         audio = await tts.generate(chunks[i], { voice, speed: spd });
       }
       rate = audio.sampling_rate || rate;
+      if (player && !cancelled) { try { player.push(audio.audio, rate); player.push(gap, rate); } catch (e) { console.error(e); } }
       pending.push(audio.audio, gap);
       pendingLen += audio.audio.length + gap.length;
       if (pendingLen >= rate * PART_SECONDS) flush();
@@ -287,8 +339,20 @@ async function run(previewOnly) {
 
 genBtn.addEventListener("click", () => run(false));
 prevBtn.addEventListener("click", () => run(true));
-stopBtn.addEventListener("click", () => { cancelled = true; setStatus("Stopping after this sentence..."); });
+stopBtn.addEventListener("click", () => { cancelled = true; stopPlayer(); setStatus("Stopping after this sentence..."); });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("sw.js").then(async () => {
+    if (window.crossOriginIsolated || SAFE) return;
+    // The speed boost only applies once the worker controls the page, so reload once.
+    await navigator.serviceWorker.ready;
+    let canReload = false;
+    try {
+      if (sessionStorage.getItem("boostReload") !== "1") {
+        sessionStorage.setItem("boostReload", "1");
+        canReload = sessionStorage.getItem("boostReload") === "1";
+      }
+    } catch (e) { canReload = false; }
+    if (canReload && !tts) location.reload();
+  }).catch(() => {});
 }

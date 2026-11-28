@@ -25,7 +25,7 @@ A free web app for English narration. It runs the open-source Kokoro-82M model (
 
 In the repository on GitHub: **Settings > Pages > Build and deployment > Deploy from a branch**, choose branch `main` and folder `/ (root)`, then save. The app appears at `https://<username>.github.io/<repository>/`.
 
-On a phone: open that address in Chrome, then menu > **Add to Home screen**. The first run downloads the model (about 90 MB), then the browser caches it.
+On a phone: open that address in Chrome, then menu > **Add to Home screen**. The first run downloads the model (about 330 MB), then the browser caches it.
 
 ## Notes
 - Blending relies on how the `kokoro-js` library (pinned to 1.2.1) loads voices. If blending fails, the app says so and uses Voice A alone.

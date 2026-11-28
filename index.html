@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Kokoro Narrator</title>
+<style>
+  :root { --bg:#111827; --card:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --accent:#38bdf8; --accent-ink:#04293a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 16px; font-size: .9rem; }
+  .card { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  label { display:block; font-size:.8rem; color:var(--muted); margin: 12px 0 6px; }
+  label:first-child { margin-top: 0; }
+  textarea, select { width:100%; background:#0b1220; color:var(--text); border:1px solid #374151; border-radius:10px; padding:10px; font-size:1rem; }
+  textarea { min-height: 170px; resize: vertical; }
+  .row { display:flex; gap:10px; }
+  .row > div { flex:1; min-width:0; }
+  input[type=range] { width:100%; }
+  button { width:100%; padding:14px; border:0; border-radius:12px; font-size:1rem; font-weight:600; background:var(--accent); color:var(--accent-ink); }
+  button:disabled { opacity:.5; }
+  button.secondary { background:#374151; color:var(--text); margin-top:10px; }
+  #status { color:var(--muted); font-size:.9rem; min-height:1.2em; margin-top:10px; }
+  progress { width:100%; height:8px; margin-top:8px; }
+  audio { width:100%; margin-top:10px; }
+  a.dl { display:block; text-align:center; margin-top:10px; color:var(--accent); }
+  .hint { color: var(--muted); font-size: .8rem; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Kokoro Narrator</h1>
+  <p class="sub">Free English narration with the Kokoro model. Blend two voices for a more natural sound. Runs on your phone, no account.</p>
+
+  <div class="card">
+    <button id="loadBtn">Load voice model (about 90 MB, one time)</button>
+    <progress id="prog" value="0" max="100" hidden></progress>
+    <div id="status">Model not loaded yet.</div>
+  </div>
+
+  <div class="card">
+    <label for="preset">Narration style</label>
+    <select id="preset"></select>
+    <div class="hint">Starting points. Use Preview and adjust by ear.</div>
+
+    <div class="row">
+      <div>
+        <label for="voiceA">Voice A</label>
+        <select id="voiceA"></select>
+      </div>
+      <div>
+        <label for="voiceB">Voice B (blend)</label>
+        <select id="voiceB"></select>
+      </div>
+    </div>
+
+    <label for="mix">Mix: <span id="mixVal"></span></label>
+    <input id="mix" type="range" min="0" max="100" step="5" value="65">
+
+    <label for="speed">Speed: <span id="speedVal"></span>x</label>
+    <input id="speed" type="range" min="0.7" max="1.3" step="0.05" value="1">
+
+    <label for="text">Your script</label>
+    <textarea id="text" placeholder="Paste your script here. Short sentences with commas and full stops sound the most natural."></textarea>
+
+    <button id="prevBtn" class="secondary" disabled>Preview first sentence</button>
+    <button id="genBtn" style="margin-top:10px" disabled>Generate full speech</button>
+    <button id="stopBtn" class="secondary" hidden>Stop</button>
+    <audio id="player" controls hidden></audio>
+    <a id="dl" class="dl" hidden>Download WAV file</a>
+  </div>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,13 +1,12 @@
-# Kokoro Narrator - notes for Claude
+# Voice Studio - notes for Claude
 
-Static web app (no build step) that runs Kokoro-82M in the browser. Files are at the repo root: `index.html`, `app.js`, `lib.js`, `files.js`, `sw.js`, `manifest.json`.
+Static web app (no build step): script to natural, conversational narration using Google's Gemini TTS API with the owner's own free API key. Files are at the repo root: `index.html`, `app.js`, `studio-lib.js` (pure helpers, tested with Node), `files.js` + `lib.js` (file reading), `sw.js`, `manifest.json`.
 
-- The repo used to hold other projects (Bezalel, Sukko image upscaler, an old native voice app). All were removed on the owner's request; they remain in git history.
-- Hosting: GitHub Pages is currently set to build from the `gh-pages` branch (root). After changing `main`, copy the app files onto `gh-pages` and push both. The sandbox proxy blocks the Pages API, so only the owner can change this setting.
-- Speed: `sw.js` adds COOP/COEP (credentialless) headers to page loads so onnxruntime can use several threads; the app reloads once to pick this up. `index.html?safe=1` turns it off, and a "safe mode" button appears only if the model fails to load while isolated.
-- The owner is not a developer and uses a phone. Keep instructions as short tap-by-tap steps.
-- Never write the owner's GitHub token anywhere (files, git config, remote URLs). A token was pasted into chat earlier and should be revoked.
-- The sandbox cannot reach the npm registry, jsDelivr or Hugging Face, so the model, blending and PDF/zip reading have not been run in a real browser. Pure helpers in `lib.js` are tested with Node.
-- Blending depends on how `kokoro-js@1.2.1` loads voices (a fetch to `.../voices/<name>.bin`, voice list at `tts.voices`). If the library version changes, re-check this. The app falls back to Voice A if blending fails.
-- Bump the cache name in `sw.js` when the list of files or their contents change, so phones pick up updates.
-- Model: `fp32` (326 MB), WebGPU when available, else wasm. A localStorage "busy" flag is set during load and generation; if it is still set at next open (the tab was killed, usually out of memory), the app switches permanently to `q8` wasm (`setupLevel` in localStorage). It loads automatically when the app opens (no Load button, no quality choice, no live playback: the owner asked for no options). Generate/Preview are always enabled and wait for the model if needed. Phonemes come from the same espeak-based phonemizer on every device, so desktop/mobile differences come from model precision/device, not the text.
+- History: the repo used to hold other projects (Bezalel, Sukko, an old native voice app) and then a Kokoro-in-the-browser narrator. Kokoro was dropped because the 330 MB model crashed the owner's phone and the 90 MB one had poor pronunciation. All of it remains in git history. `sw.js` deletes old caches, including the Kokoro model.
+- Hosting: GitHub Pages builds from the `gh-pages` branch (root). After changing `main`, copy the app files onto `gh-pages` and push both. The sandbox proxy blocks the Pages API.
+- The owner is not a developer and uses a phone. Keep instructions as short tap-by-tap steps. The owner asked for no fiddly options: keep the UI minimal.
+- Never write the owner's GitHub token or Gemini key anywhere in the repo. The Gemini key lives only in the phone's localStorage (`geminiKey`).
+- API: `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent` with `x-goog-api-key`. Models are tried in order (`MODELS` in `studio-lib.js`); 404, no audio or exhausted quota moves to the next model; short 429 retryDelay waits and retries. The last working model is remembered (`model` in localStorage). Audio may come back as raw L16 PCM (2.5 models) or WAV (3.8 models); `decodeAudio` handles both.
+- Scripts with exactly two "Name: text" speakers use multi-speaker voice config; anything else is single-voice narration. Long scripts are split into pieces of about 2,500 characters and joined into one WAV.
+- The sandbox cannot reach Google's API, so tests mock it with Playwright routes. Real-world free-tier limits are not published and vary by account.
+- Bump the cache name in `sw.js` when files change.

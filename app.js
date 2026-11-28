@@ -1,400 +1,216 @@
-import { KokoroTTS } from "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm";
 import {
-  VOICE_BASE, VOICES, PRESETS,
-  blendStyles, blendName, chunkText, floatTo16BitWav, estimateMinutes,
-} from "./lib.js";
+  VOICES, MODELS, parseDialogue, splitNarration, splitDialogue,
+  buildPrompt, buildRequest, decodeAudio, joinToWav, retryDelaySec,
+} from "./studio-lib.js";
 import { fileToText } from "./files.js";
 
-const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
-const PART_SECONDS = 240; // each downloadable file holds about 4 minutes of audio
-
+const API = "https://generativelanguage.googleapis.com/v1beta/models/";
 const $ = (id) => document.getElementById(id);
+const textEl = $("text"), voiceEl = $("voice"), voice2El = $("voice2"), styleEl = $("style");
 const genBtn = $("genBtn"), prevBtn = $("prevBtn"), stopBtn = $("stopBtn");
 const statusEl = $("status"), prog = $("prog");
-const selA = $("voiceA"), selB = $("voiceB"), selPreset = $("preset");
-const mix = $("mix"), speed = $("speed");
-const textEl = $("text"), partsEl = $("parts");
-
-let tts = null;
-let cancelled = false;
-let running = false;
-let urls = [];
-let wakeLock = null;
-const SAFE = new URLSearchParams(location.search).has("safe");
 const setStatus = (m) => (statusEl.textContent = m);
 
-// ---------- controls ----------
-for (const [id, label] of VOICES) {
-  selA.add(new Option(label, id));
-  selB.add(new Option(label, id));
-}
-selB.insertBefore(new Option("None (use one voice)", ""), selB.firstChild);
-
-for (const p of PRESETS) selPreset.add(new Option(p.label, p.id));
-selPreset.insertBefore(new Option("Custom", ""), selPreset.firstChild);
-
-function updateLabels() {
-  const a = Number(mix.value);
-  const single = !selB.value || a >= 100;
-  $("mixVal").textContent = single ? "100% voice A" : `A ${a}% / B ${100 - a}%`;
-  $("speedVal").textContent = Number(speed.value).toFixed(2);
-  mix.disabled = !selB.value;
-}
-function applyPreset(p) {
-  selA.value = p.a; selB.value = p.b; mix.value = p.mix; speed.value = p.speed;
-  updateLabels();
-}
-selPreset.addEventListener("change", () => {
-  const p = PRESETS.find((x) => x.id === selPreset.value);
-  if (p) applyPreset(p);
-});
-for (const el of [selA, selB, mix, speed]) {
-  el.addEventListener("input", () => { selPreset.value = ""; updateLabels(); });
-}
-applyPreset(PRESETS[0]);
-selPreset.value = PRESETS[0].id;
-
-// ---------- text and files ----------
-function updateCount() {
-  const n = textEl.value.length;
-  $("count").textContent = `${n.toLocaleString()} characters`;
-  const mins = estimateMinutes(n);
-  $("est").textContent = n ? `about ${mins < 1 ? "under 1" : mins} min of audio` : "";
-}
-textEl.addEventListener("input", updateCount);
-$("clearBtn").addEventListener("click", () => { textEl.value = ""; updateCount(); });
-
-$("files").addEventListener("change", async (e) => {
-  const files = Array.from(e.target.files || []);
-  e.target.value = "";
-  if (!files.length) return;
-  const problems = [];
-  let added = 0;
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    setStatus(`Reading file ${i + 1} of ${files.length}: ${f.name}`);
-    try {
-      const text = await fileToText(f);
-      textEl.value = (textEl.value.trim() ? textEl.value.trim() + "\n\n" : "") + text;
-      added++;
-    } catch (err) {
-      console.error(err);
-      problems.push(`${f.name}: ${err && err.message ? err.message : err}`);
-    }
-  }
-  updateCount();
-  setStatus(
-    (added ? `Added ${added} file${added > 1 ? "s" : ""}. Review the text, then tap Generate.` : "No text was added.") +
-    (problems.length ? "\n" + problems.join("\n") : "")
-  );
-});
-
-// ---------- voice blending ----------
-// The library loads each voice from a .bin file (a table of style vectors).
-// To blend, we load two tables ourselves, average them, and hand the result to the
-// library under a new voice name by answering its download request for that name.
-const blendBuffers = new Map(); // blend name -> ArrayBuffer
-const voiceCache = new Map();   // voice id -> Float32Array
-const realFetch = window.fetch.bind(window);
-window.fetch = (input, init) => {
-  try {
-    const url = typeof input === "string" ? input : (input && input.url) || String(input);
-    const m = url.match(/\/voices\/([^/?#]+)\.bin(?:[?#]|$)/);
-    if (m && blendBuffers.has(m[1])) {
-      return Promise.resolve(new Response(blendBuffers.get(m[1]).slice(0), {
-        status: 200, headers: { "Content-Type": "application/octet-stream" },
-      }));
-    }
-  } catch (e) { /* fall through to the real fetch */ }
-  return realFetch(input, init);
-};
-
-async function loadVoiceTable(id) {
-  if (voiceCache.has(id)) return voiceCache.get(id);
-  const url = VOICE_BASE + id + ".bin";
-  let buf = null;
-  try {
-    const cache = await caches.open("narrator-voices");
-    const hit = await cache.match(url);
-    if (hit) buf = await hit.arrayBuffer();
-    else {
-      const res = await realFetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      await cache.put(url, res.clone());
-      buf = await res.arrayBuffer();
-    }
-  } catch (e) {
-    const res = await realFetch(url);
-    if (!res.ok) throw new Error(`Could not download voice ${id} (HTTP ${res.status})`);
-    buf = await res.arrayBuffer();
-  }
-  const table = new Float32Array(buf);
-  voiceCache.set(id, table);
-  return table;
-}
-
-// Returns the voice name to pass to the model
-async function resolveVoice(a, b, pctA) {
-  if (!b || pctA >= 100) return a;
-  if (pctA <= 0) return b;
-  const name = blendName(a, b, pctA);
-  if (!blendBuffers.has(name)) {
-    const [ta, tb] = await Promise.all([loadVoiceTable(a), loadVoiceTable(b)]);
-    blendBuffers.set(name, blendStyles(ta, tb, pctA / 100).buffer);
-  }
-  const list = tts.voices;
-  if (!list || typeof list !== "object") throw new Error("voice list not available");
-  if (!list[name]) list[name] = { ...(list[a] || {}), name };
-  return name;
-}
-
-// ---------- speed boost ----------
-function speedNote() {
-  const su = SETUPS[level] || SETUPS[SETUPS.length - 1];
-  if (su.dtype !== "fp32") return "Using the " + su.name + ". " + coreNote();
-  if (device === "webgpu") return "Using the best model on the graphics chip (fastest).";
-  return "Using the best model. " + coreNote();
-}
-function coreNote() {
-  if (window.crossOriginIsolated) {
-    const cores = navigator.hardwareConcurrency || 4;
-    const n = Math.min(4, Math.ceil(cores / 2));
-    return `Using ${n} processor core${n > 1 ? "s" : ""}.`;
-  }
-  return SAFE ? "Safe mode: using 1 processor core (slower)." : "Using 1 processor core. Close and reopen the app to speed it up.";
-}
-function offerSafeMode() {
-  if (document.getElementById("safeBtn")) return;
-  const b = document.createElement("button");
-  b.id = "safeBtn"; b.className = "secondary";
-  b.textContent = "Try again in safe mode";
-  b.addEventListener("click", () => { location.href = "index.html?safe=1"; });
-  statusEl.after(b);
-}
-
-// ---------- model loading ----------
-// Tries the clearest setup first. If the app closed during the last load or generation
-// (usually the phone running out of memory), it steps down to a lighter setup by itself.
-const SETUPS = [
-  { device: "webgpu", dtype: "fp32", name: "best model on the graphics chip" },
-  { device: "wasm", dtype: "fp32", name: "best model on the processor" },
-  { device: "wasm", dtype: "q8", name: "lighter model (fits phones with less memory)" },
-];
-const mem = {
+const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* optional */ } },
   del(k) { try { localStorage.removeItem(k); } catch (e) { /* optional */ } },
 };
-let level = Math.min(Number(mem.get("setupLevel")) || 0, SETUPS.length - 1);
-let crashNote = "";
-if (mem.get("busy")) {
-  // the app was closed in the middle of work last time: use a lighter setup
-  level = SETUPS.length - 1; mem.set("setupLevel", String(level));
-  crashNote = "The app closed last time, so it now uses a lighter setup that fits this phone. ";
-  mem.del("busy");
-}
-const markBusy = () => mem.set("busy", "1");
-const clearBusy = () => mem.del("busy");
-// leaving the app normally is not a crash
-window.addEventListener("pagehide", () => { if (!running && !loading) clearBusy(); });
 
-async function hasWebGPU() {
-  try { return !!(navigator.gpu && (await navigator.gpu.requestAdapter())); } catch (e) { return false; }
+// ---------- key ----------
+function showKeyCard(show) {
+  $("keyCard").hidden = !show;
+  $("changeKey").hidden = show;
 }
+showKeyCard(!store.get("geminiKey"));
+$("saveKey").addEventListener("click", () => {
+  const k = $("key").value.trim();
+  if (k.length < 20) { alert("That doesn't look like a full key. Copy the whole key and paste it again."); return; }
+  store.set("geminiKey", k);
+  $("key").value = "";
+  showKeyCard(false);
+  setStatus("Key saved. Add your script and tap Make narration.");
+});
+$("changeKey").addEventListener("click", () => { showKeyCard(true); window.scrollTo(0, 0); });
 
-let device = "wasm";
-let loading = false;
-let modelPromise = null;
-function loadModel() {
-  if (!modelPromise) modelPromise = doLoad().catch((err) => { modelPromise = null; throw err; });
-  return modelPromise;
-}
-async function doLoad() {
-  loading = true;
-  prog.hidden = false;
-  setStatus(crashNote + "Getting the voice model ready...");
-  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* optional */ }
-  if (level === 0 && !(await hasWebGPU())) level = 1;
-  try {
-    let lastErr = null;
-    for (; level < SETUPS.length; level++) {
-      const su = SETUPS[level];
-      const size = su.dtype === "fp32" ? "about 330 MB" : "about 90 MB";
-      markBusy();
-      try {
-        tts = await KokoroTTS.from_pretrained(MODEL_ID, {
-          dtype: su.dtype, device: su.device,
-          progress_callback: (p) => {
-            if (p && typeof p.progress === "number") {
-              prog.value = p.progress;
-              setStatus(crashNote + `Loading voice model: ${Math.round(p.progress)}% (first time only, ${size})`);
-            }
-          },
-        });
-        device = su.device;
-        break;
-      } catch (e) {
-        console.error(e); tts = null; lastErr = e;
-      }
-    }
-    clearBusy();
-    if (!tts) throw lastErr || new Error("no setup worked");
-    mem.set("setupLevel", String(level));
-    loading = false;
-    prog.hidden = true;
-    setStatus(crashNote + "Ready. " + speedNote());
-    return tts;
-  } catch (err) {
-    console.error(err);
-    loading = false; clearBusy();
-    level = Math.min(Number(mem.get("setupLevel")) || 0, SETUPS.length - 1);
-    tts = null;
-    prog.hidden = true;
-    setStatus("Could not load the voice model: " + (err && err.message ? err.message : err) + ". Check your internet and reopen the app.");
-    if (window.crossOriginIsolated) offerSafeMode();
-    throw err;
+// ---------- voices ----------
+for (const v of VOICES) { voiceEl.add(new Option(v.label, v.id)); voice2El.add(new Option(v.label, v.id)); }
+voiceEl.value = store.get("voice") || "Puck";
+voice2El.value = store.get("voice2") || "Sulafat";
+styleEl.value = store.get("style") || "";
+voiceEl.addEventListener("change", () => store.set("voice", voiceEl.value));
+voice2El.addEventListener("change", () => store.set("voice2", voice2El.value));
+styleEl.addEventListener("change", () => store.set("style", styleEl.value));
+
+// ---------- script ----------
+function update() {
+  const t = textEl.value;
+  $("count").textContent = `${t.length.toLocaleString()} characters`;
+  const mins = Math.round(t.length / 900);
+  $("est").textContent = t.trim() ? `about ${mins < 1 ? "under 1" : mins} min of audio` : "";
+  const d = parseDialogue(t);
+  $("voice2Box").hidden = !d;
+  if (d) {
+    $("detect").textContent = `Conversation found: ${d.speakers[0]} and ${d.speakers[1]}.`;
+    $("voiceLabel").textContent = `Voice for ${d.speakers[0]}`;
+    $("voice2Label").textContent = `Voice for ${d.speakers[1]}`;
+  } else {
+    $("detect").textContent = "";
+    $("voiceLabel").textContent = "Voice";
   }
+  store.set("script", t);
 }
+textEl.value = store.get("script") || "";
+textEl.addEventListener("input", update);
+update();
+
+$("files").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = "";
+  const problems = [];
+  for (let i = 0; i < files.length; i++) {
+    setStatus(`Reading ${files[i].name}...`);
+    try {
+      const t = await fileToText(files[i]);
+      textEl.value = (textEl.value.trim() ? textEl.value.trim() + "\n\n" : "") + t;
+    } catch (err) {
+      problems.push(`${files[i].name}: ${err && err.message ? err.message : err}`);
+    }
+  }
+  update();
+  setStatus(problems.length ? problems.join("\n") : "File added. Check the text, then tap Make narration.");
+});
 
 // ---------- generation ----------
-function addPart(samples, rate, index) {
-  const blob = floatTo16BitWav(samples, rate);
-  const url = URL.createObjectURL(blob);
-  urls.push(url);
+let cancelled = false;
+let lastUrl = null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const box = document.createElement("div");
-  box.className = "part";
-  const title = document.createElement("b");
-  title.textContent = `Part ${index}`;
-  const audio = document.createElement("audio");
-  audio.controls = true; audio.src = url;
-  const link = document.createElement("a");
-  link.className = "dl"; link.href = url;
-  link.download = `narration-part-${index}.wav`;
-  link.textContent = `Download part ${index} (WAV)`;
-  box.append(title, audio, link);
-  partsEl.appendChild(box);
-  return { title, link };
+function b64ToBytes(b64) {
+  const s = atob(b64);
+  const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  return u;
 }
 
-async function keepScreenOn() {
-  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { /* optional */ }
-}
-function releaseScreen() {
-  try { if (wakeLock) wakeLock.release(); } catch (e) { /* optional */ }
-  wakeLock = null;
+class StopError extends Error {}
+
+// One request. Moves to the next model when one is unavailable or out of free quota.
+async function speak(body, label) {
+  const key = store.get("geminiKey");
+  const saved = store.get("model");
+  let order = MODELS.slice();
+  if (saved && order.includes(saved)) order = [saved, ...order.filter((m) => m !== saved)];
+  let lastMsg = "";
+  for (const model of order) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (cancelled) throw new StopError();
+      let res, data = null;
+      try {
+        res = await fetch(`${API}${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify(body),
+        });
+        data = await res.json().catch(() => null);
+      } catch (e) {
+        lastMsg = "No internet connection.";
+        await sleep(3000);
+        continue;
+      }
+      if (res.ok) {
+        const part = data && data.candidates && data.candidates[0] && data.candidates[0].content &&
+          (data.candidates[0].content.parts || []).find((p) => p.inlineData && p.inlineData.data);
+        if (part) {
+          store.set("model", model);
+          return decodeAudio(b64ToBytes(part.inlineData.data), part.inlineData.mimeType);
+        }
+        lastMsg = "Google returned no audio for this part.";
+        break; // try the next model
+      }
+      const msg = (data && data.error && data.error.message) || `HTTP ${res.status}`;
+      lastMsg = msg;
+      if (res.status === 400 && /api key|API_KEY/i.test(msg)) throw new Error("KEY");
+      if (res.status === 401 || res.status === 403) throw new Error("KEY");
+      if (res.status === 429) {
+        const wait = retryDelaySec(data);
+        if (wait <= 60 && attempt < 2) {
+          for (let s = Math.ceil(wait); s > 0; s--) {
+            if (cancelled) throw new StopError();
+            setStatus(`${label}\nGoogle's free limit is busy. Waiting ${s} s...`);
+            await sleep(1000);
+          }
+          continue;
+        }
+        break; // this model's free quota is used up: try the next one
+      }
+      if (res.status >= 500 && attempt < 2) { await sleep(3000); continue; }
+      break; // 404 (model not available) or another problem: next model
+    }
+  }
+  throw new Error(lastMsg || "Could not make audio.");
 }
 
 async function run(previewOnly) {
+  if (!store.get("geminiKey")) { showKeyCard(true); window.scrollTo(0, 0); setStatus("First, do the one-time setup above."); return; }
   const text = textEl.value.trim();
-  if (!text) { setStatus("Please add some text or a file first."); return; }
-  let chunks = chunkText(text);
-  if (!chunks.length) { setStatus("Nothing readable in that text."); return; }
-  if (previewOnly) chunks = chunks.slice(0, 1);
+  if (!text) { setStatus("Please add your script first."); return; }
 
-  cancelled = false; running = true;
-  genBtn.disabled = true; prevBtn.disabled = true; stopBtn.hidden = false;
-  for (const u of urls) URL.revokeObjectURL(u);
-  urls = []; partsEl.textContent = "";
-  await keepScreenOn();
-
-  const a = selA.value, b = selB.value, pctA = Number(mix.value);
-  const spd = Number(speed.value);
-  let voice = a;
-  let notice = "";
-
-  try {
-    if (!tts) {
-      setStatus("Waiting for the voice model to finish loading...");
-      await loadModel();
-    }
-    markBusy();
-    setStatus(b ? "Blending voices..." : "Preparing voice...");
-    try {
-      voice = await resolveVoice(a, b, pctA);
-    } catch (e) {
-      console.error(e);
-      voice = a;
-      notice = " (Voice blending failed, so voice A alone was used.)";
-    }
-
-    let rate = 24000;
-    const gap = new Float32Array(Math.floor(rate * 0.25));
-    let pending = [], pendingLen = 0, partCount = 0;
-    const made = [];
-
-    const flush = () => {
-      if (!pendingLen) return;
-      const all = new Float32Array(pendingLen);
-      let o = 0;
-      for (const p of pending) { all.set(p, o); o += p.length; }
-      pending = []; pendingLen = 0;
-      partCount++;
-      made.push(addPart(all, rate, partCount));
-    };
-
-    for (let i = 0; i < chunks.length; i++) {
-      if (cancelled) break;
-      setStatus(`Generating ${i + 1} of ${chunks.length} (part ${partCount + 1})...`);
-      await new Promise((r) => setTimeout(r, 0));
-      let audio;
-      try {
-        audio = await tts.generate(chunks[i], { voice, speed: spd });
-      } catch (e) {
-        if (voice === a) throw e;
-        console.error(e);
-        voice = a;
-        notice = " (Voice blending is not working here, so voice A alone was used.)";
-        audio = await tts.generate(chunks[i], { voice, speed: spd });
-      }
-      rate = audio.sampling_rate || rate;
-      pending.push(audio.audio, gap);
-      pendingLen += audio.audio.length + gap.length;
-      if (pendingLen >= rate * PART_SECONDS) flush();
-    }
-    flush();
-
-    if (made.length === 1) {
-      made[0].title.textContent = previewOnly ? "Preview" : "Your narration";
-      made[0].link.textContent = "Download (WAV)";
-      made[0].link.download = previewOnly ? "preview.wav" : "narration.wav";
-    }
-    setStatus(
-      (cancelled ? "Stopped. Parts finished so far are below." :
-        previewOnly ? "Preview ready." : "Done. Play or download below.") + notice
-    );
-  } catch (err) {
-    console.error(err);
-    setStatus("Something went wrong: " + (err && err.message ? err.message : err));
-  } finally {
-    releaseScreen(); running = false; clearBusy();
-    genBtn.disabled = false; prevBtn.disabled = false; stopBtn.hidden = true;
+  const dialogue = parseDialogue(text);
+  let pieces = dialogue ? splitDialogue(dialogue.lines) : splitNarration(text);
+  if (previewOnly) {
+    pieces = dialogue
+      ? [dialogue.lines.slice(0, 2).map((l) => `${l.speaker}: ${l.text}`).join("\n")]
+      : splitNarration(text, 300).slice(0, 1);
   }
+  if (!pieces.length) { setStatus("Nothing readable in the script."); return; }
+
+  cancelled = false;
+  genBtn.disabled = true; prevBtn.disabled = true; stopBtn.hidden = false;
+  $("result").hidden = true;
+  prog.hidden = false; prog.value = 0;
+  const audio = [];
+  let rate = 24000;
+  try {
+    for (let i = 0; i < pieces.length; i++) {
+      const label = pieces.length > 1 ? `Making part ${i + 1} of ${pieces.length}...` : "Making audio...";
+      setStatus(label);
+      const body = buildRequest(buildPrompt(pieces[i], styleEl.value, dialogue), voiceEl.value, dialogue, voice2El.value);
+      const out = await speak(body, label);
+      rate = out.rate;
+      audio.push(out.pcm);
+      prog.value = Math.round(((i + 1) / pieces.length) * 100);
+    }
+    finish(audio, rate, previewOnly ? "Preview ready." : "Done. Play it or download it below.");
+  } catch (err) {
+    if (err instanceof StopError) {
+      if (audio.length) finish(audio, rate, "Stopped. The parts made so far are below.");
+      else setStatus("Stopped.");
+    } else if (err.message === "KEY") {
+      setStatus("Google didn't accept your key. Do the setup again with a new key.");
+      showKeyCard(true); window.scrollTo(0, 0);
+    } else {
+      if (audio.length) finish(audio, rate, "");
+      const limit = /quota|exhausted|rate/i.test(err.message);
+      setStatus((audio.length ? `Made ${audio.length} of ${pieces.length} parts (download below). ` : "") +
+        (limit ? "Google's free daily limit is used up. Try again later or tomorrow." : "Problem: " + err.message));
+    }
+  } finally {
+    genBtn.disabled = false; prevBtn.disabled = false; stopBtn.hidden = true; prog.hidden = true;
+  }
+}
+
+function finish(audio, rate, msg) {
+  if (lastUrl) URL.revokeObjectURL(lastUrl);
+  lastUrl = URL.createObjectURL(new Blob([joinToWav(audio, rate)], { type: "audio/wav" }));
+  $("player").src = lastUrl;
+  $("download").href = lastUrl;
+  $("result").hidden = false;
+  if (msg) setStatus(msg);
 }
 
 genBtn.addEventListener("click", () => run(false));
 prevBtn.addEventListener("click", () => run(true));
-stopBtn.addEventListener("click", () => { cancelled = true; setStatus("Stopping after this sentence..."); });
+stopBtn.addEventListener("click", () => { cancelled = true; setStatus("Stopping..."); });
 
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").then(async () => {
-    if (window.crossOriginIsolated || SAFE) return;
-    // The speed boost only applies once the worker controls the page, so reload once.
-    await navigator.serviceWorker.ready;
-    let canReload = false;
-    try {
-      if (sessionStorage.getItem("boostReload") !== "1") {
-        sessionStorage.setItem("boostReload", "1");
-        canReload = sessionStorage.getItem("boostReload") === "1";
-      }
-    } catch (e) { canReload = false; }
-    if (canReload && !modelPromise && !running) location.reload();
-  }).catch(() => {});
-}
-
-// Start loading the model as soon as the app opens. Wait a moment first in case the
-// page reloads once to turn on the multi-core speed boost.
-function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return "1"; } }
-const willReload = "serviceWorker" in navigator && !window.crossOriginIsolated && !SAFE &&
-  sessionStorageGet("boostReload") !== "1";
-setTimeout(() => { loadModel().catch(() => {}); }, willReload ? 2500 : 0);
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});

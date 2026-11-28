@@ -1,7 +1,7 @@
 // Caches the app shell so the page opens offline. The voice model and voices
 // are cached separately by the browser after the first download.
-const CACHE = "kokoro-narrator-v1";
-const SHELL = ["./", "index.html", "app.js", "lib.js", "manifest.json", "icon-192.png", "icon-512.png"];
+const CACHE = "kokoro-narrator-v2";
+const SHELL = ["./", "index.html", "app.js", "lib.js", "files.js", "manifest.json", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

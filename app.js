@@ -1,21 +1,24 @@
 import { KokoroTTS } from "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm";
 import {
   VOICE_BASE, VOICES, PRESETS,
-  blendStyles, blendName, chunkText, floatTo16BitWav,
+  blendStyles, blendName, chunkText, floatTo16BitWav, estimateMinutes,
 } from "./lib.js";
+import { fileToText } from "./files.js";
 
 const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
+const PART_SECONDS = 240; // each downloadable file holds about 4 minutes of audio
 
 const $ = (id) => document.getElementById(id);
 const loadBtn = $("loadBtn"), genBtn = $("genBtn"), prevBtn = $("prevBtn"), stopBtn = $("stopBtn");
 const statusEl = $("status"), prog = $("prog");
-const player = $("player"), dl = $("dl");
 const selA = $("voiceA"), selB = $("voiceB"), selPreset = $("preset");
 const mix = $("mix"), speed = $("speed");
+const textEl = $("text"), partsEl = $("parts");
 
 let tts = null;
 let cancelled = false;
-let lastUrl = null;
+let urls = [];
+let wakeLock = null;
 const setStatus = (m) => (statusEl.textContent = m);
 
 // ---------- controls ----------
@@ -47,6 +50,42 @@ for (const el of [selA, selB, mix, speed]) {
   el.addEventListener("input", () => { selPreset.value = ""; updateLabels(); });
 }
 applyPreset(PRESETS[0]);
+selPreset.value = PRESETS[0].id;
+
+// ---------- text and files ----------
+function updateCount() {
+  const n = textEl.value.length;
+  $("count").textContent = `${n.toLocaleString()} characters`;
+  const mins = estimateMinutes(n);
+  $("est").textContent = n ? `about ${mins < 1 ? "under 1" : mins} min of audio` : "";
+}
+textEl.addEventListener("input", updateCount);
+$("clearBtn").addEventListener("click", () => { textEl.value = ""; updateCount(); });
+
+$("files").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = "";
+  if (!files.length) return;
+  const problems = [];
+  let added = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    setStatus(`Reading file ${i + 1} of ${files.length}: ${f.name}`);
+    try {
+      const text = await fileToText(f);
+      textEl.value = (textEl.value.trim() ? textEl.value.trim() + "\n\n" : "") + text;
+      added++;
+    } catch (err) {
+      console.error(err);
+      problems.push(`${f.name}: ${err && err.message ? err.message : err}`);
+    }
+  }
+  updateCount();
+  setStatus(
+    (added ? `Added ${added} file${added > 1 ? "s" : ""}. Review the text, then tap Generate.` : "No text was added.") +
+    (problems.length ? "\n" + problems.join("\n") : "")
+  );
+});
 
 // ---------- voice blending ----------
 // The library loads each voice from a .bin file (a table of style vectors).
@@ -126,7 +165,7 @@ loadBtn.addEventListener("click", async () => {
     prog.hidden = true;
     loadBtn.hidden = true;
     genBtn.disabled = false; prevBtn.disabled = false;
-    setStatus("Model ready. Pick a preset, paste a script, and tap Generate.");
+    setStatus("Model ready. Pick a style, add your script or files, and tap Generate.");
   } catch (err) {
     console.error(err);
     prog.hidden = true;
@@ -136,16 +175,46 @@ loadBtn.addEventListener("click", async () => {
 });
 
 // ---------- generation ----------
+function addPart(samples, rate, index) {
+  const blob = floatTo16BitWav(samples, rate);
+  const url = URL.createObjectURL(blob);
+  urls.push(url);
+
+  const box = document.createElement("div");
+  box.className = "part";
+  const title = document.createElement("b");
+  title.textContent = `Part ${index}`;
+  const audio = document.createElement("audio");
+  audio.controls = true; audio.src = url;
+  const link = document.createElement("a");
+  link.className = "dl"; link.href = url;
+  link.download = `narration-part-${index}.wav`;
+  link.textContent = `Download part ${index} (WAV)`;
+  box.append(title, audio, link);
+  partsEl.appendChild(box);
+  return { title, link };
+}
+
+async function keepScreenOn() {
+  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { /* optional */ }
+}
+function releaseScreen() {
+  try { if (wakeLock) wakeLock.release(); } catch (e) { /* optional */ }
+  wakeLock = null;
+}
+
 async function run(previewOnly) {
-  const text = $("text").value.trim();
-  if (!text) { setStatus("Please paste some text first."); return; }
+  const text = textEl.value.trim();
+  if (!text) { setStatus("Please add some text or a file first."); return; }
   let chunks = chunkText(text);
-  if (!chunks.length) { setStatus("Nothing to read in that text."); return; }
+  if (!chunks.length) { setStatus("Nothing readable in that text."); return; }
   if (previewOnly) chunks = chunks.slice(0, 1);
 
   cancelled = false;
   genBtn.disabled = true; prevBtn.disabled = true; stopBtn.hidden = false;
-  player.hidden = true; dl.hidden = true;
+  for (const u of urls) URL.revokeObjectURL(u);
+  urls = []; partsEl.textContent = "";
+  await keepScreenOn();
 
   const a = selA.value, b = selB.value, pctA = Number(mix.value);
   const spd = Number(speed.value);
@@ -162,13 +231,24 @@ async function run(previewOnly) {
       notice = " (Voice blending failed, so voice A alone was used.)";
     }
 
-    const parts = [];
     let rate = 24000;
     const gap = new Float32Array(Math.floor(rate * 0.25));
+    let pending = [], pendingLen = 0, partCount = 0;
+    const made = [];
+
+    const flush = () => {
+      if (!pendingLen) return;
+      const all = new Float32Array(pendingLen);
+      let o = 0;
+      for (const p of pending) { all.set(p, o); o += p.length; }
+      pending = []; pendingLen = 0;
+      partCount++;
+      made.push(addPart(all, rate, partCount));
+    };
 
     for (let i = 0; i < chunks.length; i++) {
       if (cancelled) break;
-      setStatus(`Generating ${i + 1} of ${chunks.length}...`);
+      setStatus(`Generating ${i + 1} of ${chunks.length} (part ${partCount + 1})...`);
       await new Promise((r) => setTimeout(r, 0));
       let audio;
       try {
@@ -181,25 +261,26 @@ async function run(previewOnly) {
         audio = await tts.generate(chunks[i], { voice, speed: spd });
       }
       rate = audio.sampling_rate || rate;
-      parts.push(audio.audio, gap);
+      pending.push(audio.audio, gap);
+      pendingLen += audio.audio.length + gap.length;
+      if (pendingLen >= rate * PART_SECONDS) flush();
     }
-    if (cancelled) { setStatus("Stopped."); return; }
+    flush();
 
-    const total = parts.reduce((n, p) => n + p.length, 0);
-    const all = new Float32Array(total);
-    let o = 0;
-    for (const p of parts) { all.set(p, o); o += p.length; }
-
-    const blob = floatTo16BitWav(all, rate);
-    if (lastUrl) URL.revokeObjectURL(lastUrl);
-    lastUrl = URL.createObjectURL(blob);
-    player.src = lastUrl; player.hidden = false;
-    dl.href = lastUrl; dl.download = "voiceover.wav"; dl.hidden = false;
-    setStatus((previewOnly ? "Preview ready." : "Done. Play it below or download the WAV file.") + notice);
+    if (made.length === 1) {
+      made[0].title.textContent = previewOnly ? "Preview" : "Your narration";
+      made[0].link.textContent = "Download (WAV)";
+      made[0].link.download = previewOnly ? "preview.wav" : "narration.wav";
+    }
+    setStatus(
+      (cancelled ? "Stopped. Parts finished so far are below." :
+        previewOnly ? "Preview ready." : "Done. Play or download below.") + notice
+    );
   } catch (err) {
     console.error(err);
     setStatus("Something went wrong: " + (err && err.message ? err.message : err));
   } finally {
+    releaseScreen();
     genBtn.disabled = false; prevBtn.disabled = false; stopBtn.hidden = true;
   }
 }

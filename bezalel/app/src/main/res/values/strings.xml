@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- The app name lives only here. Change it here and the launcher label and the home title follow. -->
-    <string name="app_name">Bezalel</string>
-</resources>

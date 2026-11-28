@@ -1,11 +1,12 @@
 # AutoAndroid repository
 
-This repository contains two separate Android apps and a browser extension. Each has its own build workflow.
+This repository contains two separate Android apps, a browser extension and a small web app. The Android apps each have their own build workflow.
 
 | Project | Folder | Purpose | Build workflow | APK download |
 |---|---|---|---|---|
 | **Bezalel** | `bezalel/` | Offline Android video maker with the Auto Editor and Text Editor | `.github/workflows/build-bezalel.yml` | Releases -> `bezalel-latest` (`Bezalel.apk`) |
 | **Sukko Image Upscaler** | repository root (`app/`) and `extension/` | One-button AI image upscaler for Android, plus a browser extension | `.github/workflows/build.yml` | Releases -> `sukko-latest` (`Sukko.apk`) |
+| **Kokoro Narrator** | `voice-app/` | Free English text-to-speech web app with voice blending, installable on a phone from GitHub Pages (`gh-pages` branch) | none (static files) | not an APK, see [`voice-app/README.md`](voice-app/README.md) |
 
 ## Bezalel Android video editor
 

@@ -1,14 +1,23 @@
 {
-  "name": "Kokoro Narrator",
-  "short_name": "Narrator",
-  "description": "Free English narration with Kokoro voice blending",
+  "name": "Voice Studio",
+  "short_name": "Voice Studio",
+  "description": "Natural conversational narration from your script, with free Gemini voices",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

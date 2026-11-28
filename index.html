@@ -7,84 +7,89 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>Kokoro Narrator</title>
+<title>Voice Studio</title>
 <style>
-  :root { --bg:#111827; --card:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --accent:#38bdf8; --accent-ink:#04293a; }
+  :root { --bg:#111827; --card:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --accent:#38bdf8; --accent-ink:#04293a; --ok:#34d399; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, sans-serif; }
   main { max-width: 640px; margin: 0 auto; padding: 16px; }
   h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
   p.sub { color: var(--muted); margin: 0 0 16px; font-size: .9rem; }
   .card { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
   label { display:block; font-size:.8rem; color:var(--muted); margin: 12px 0 6px; }
-  label:first-child { margin-top: 0; }
-  textarea, select { width:100%; background:#0b1220; color:var(--text); border:1px solid #374151; border-radius:10px; padding:10px; font-size:1rem; }
-  textarea { min-height: 170px; resize: vertical; }
-  .row { display:flex; gap:10px; }
-  .row > div { flex:1; min-width:0; }
-  input[type=range] { width:100%; }
-  button, .btn { display:block; width:100%; padding:14px; border:0; border-radius:12px; font-size:1rem; font-weight:600; text-align:center; background:var(--accent); color:var(--accent-ink); cursor:pointer; }
+  textarea, select, input[type=text], input[type=password] { width:100%; background:#0b1220; color:var(--text); border:1px solid #374151; border-radius:10px; padding:10px; font-size:1rem; }
+  textarea { min-height: 200px; resize: vertical; }
+  button, .btn { display:block; width:100%; padding:14px; border:0; border-radius:12px; font-size:1rem; font-weight:600; text-align:center; background:var(--accent); color:var(--accent-ink); cursor:pointer; text-decoration:none; }
   button:disabled { opacity:.5; }
   button.secondary, .btn.secondary { background:#374151; color:var(--text); margin-top:10px; }
   input[type=file] { display:none; }
+  ol { margin: 6px 0 10px 20px; padding:0; line-height:1.5; }
+  a { color: var(--accent); }
   #status { color:var(--muted); font-size:.9rem; min-height:1.2em; margin-top:10px; white-space:pre-wrap; }
+  #detect { color:var(--ok); font-size:.85rem; margin-top:6px; min-height:1em; }
   progress { width:100%; height:8px; margin-top:8px; }
-  audio { width:100%; margin-top:6px; }
-  a.dl { display:block; text-align:center; margin: 6px 0 12px; color:var(--accent); }
+  audio { width:100%; margin-top:10px; }
   .hint { color: var(--muted); font-size: .8rem; margin-top: 6px; }
-  .part { border-top: 1px solid #374151; margin-top: 12px; padding-top: 10px; }
-  .part b { font-size:.9rem; }
   .meta { display:flex; justify-content:space-between; color:var(--muted); font-size:.8rem; margin-top:6px; }
+  .link { background:none; color:var(--muted); font-weight:400; font-size:.85rem; padding:8px; text-decoration:underline; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Kokoro Narrator</h1>
-  <p class="sub">Free English narration with the Kokoro model. Add your script or documents, pick a style, and get a voice-over. Runs on your phone, no account.</p>
+  <h1>Voice Studio</h1>
+  <p class="sub">Turn your script into natural, conversational narration with Google's free Gemini voices. Write "Name: words" lines for a two-person conversation.</p>
 
-  <div class="card">
-    <progress id="prog" value="0" max="100" hidden></progress>
-    <div id="status">Getting the voice model ready...</div>
+  <div class="card" id="keyCard" hidden>
+    <h2>One-time setup (free, about 1 minute)</h2>
+    <ol>
+      <li>Tap <b>Get my free key</b> and sign in with your Google account.</li>
+      <li>Tap <b>Create API key</b>, then copy the key.</li>
+      <li>Come back here, paste it below and tap <b>Save key</b>.</li>
+    </ol>
+    <a class="btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get my free key</a>
+    <label for="key">Your key</label>
+    <input id="key" type="password" autocomplete="off" placeholder="Paste your key here">
+    <button id="saveKey" class="secondary">Save key</button>
+    <div class="hint">The key is saved only on this phone.</div>
   </div>
 
   <div class="card">
-    <label for="preset">Narration style</label>
-    <select id="preset"></select>
-    <div class="hint">Starting points. Use Preview and adjust by ear.</div>
+    <label for="files" class="btn secondary" style="margin:0">Add a file (documents, books, subtitles...)</label>
+    <input id="files" type="file" multiple>
 
-    <div class="row">
-      <div>
-        <label for="voiceA">Voice A</label>
-        <select id="voiceA"></select>
-      </div>
-      <div>
-        <label for="voiceB">Voice B (blend)</label>
-        <select id="voiceB"></select>
-      </div>
+    <label for="text">Your script</label>
+    <textarea id="text" placeholder="Paste or type your script.
+
+For a conversation, write it like this:
+Ravi: Hey, did you see the news today?
+Priya: I did! I couldn't believe it."></textarea>
+    <div class="meta"><span id="count">0 characters</span><span id="est"></span></div>
+    <div id="detect"></div>
+
+    <label for="voice" id="voiceLabel">Voice</label>
+    <select id="voice"></select>
+    <div id="voice2Box" hidden>
+      <label for="voice2" id="voice2Label">Second voice</label>
+      <select id="voice2"></select>
     </div>
 
-    <label for="mix">Mix: <span id="mixVal"></span></label>
-    <input id="mix" type="range" min="0" max="100" step="5" value="65">
+    <label for="style">How should it sound? (optional)</label>
+    <input id="style" type="text" placeholder="Natural and conversational, like talking to a friend">
 
-    <label for="speed">Speed: <span id="speedVal"></span>x</label>
-    <input id="speed" type="range" min="0.7" max="1.3" step="0.05" value="1">
-  </div>
-
-  <div class="card">
-    <label for="files" class="btn" style="margin:0">Add files (documents, books, subtitles...)</label>
-    <input id="files" type="file" multiple>
-    <div class="hint">Works with .txt, .md, .docx, .pdf, .epub, .odt, .pptx, .rtf, .html, .srt, .vtt, .csv and other plain-text files. You can add several files. PDFs must have selectable text.</div>
-
-    <label for="text">Your script (you can also type or paste, and edit what the files added)</label>
-    <textarea id="text" placeholder="Paste your script here, or add files above. Short sentences with commas and full stops sound the most natural."></textarea>
-    <div class="meta"><span id="count">0 characters</span><span id="est"></span></div>
-    <button id="clearBtn" class="secondary">Clear text</button>
-
-    <button id="prevBtn" class="secondary">Preview first sentence</button>
-    <button id="genBtn" style="margin-top:10px">Generate narration</button>
+    <button id="prevBtn" class="secondary">Preview first lines</button>
+    <button id="genBtn" style="margin-top:10px">Make narration</button>
     <button id="stopBtn" class="secondary" hidden>Stop</button>
-    <div id="parts"></div>
+    <progress id="prog" value="0" max="100" hidden></progress>
+    <div id="status"></div>
+    <div id="result" hidden>
+      <audio id="player" controls></audio>
+      <a id="download" class="btn" style="margin-top:10px" download="narration.wav">Download (WAV)</a>
+    </div>
   </div>
+
+  <button id="changeKey" class="link" hidden>Change my key</button>
 </main>
 <script type="module" src="app.js"></script>
 </body>
